@@ -13,7 +13,7 @@ import os
 from aggregator import db
 from aggregator.article_signals import bias_bucket_for_score, is_roundup_article, low_value_article_reason
 from aggregator.html_safety import strip_title_tags
-from aggregator.models import Article, Outlet, Story, Topic, IngestionBlock
+from aggregator.models import Article, OpinionPiece, Outlet, Story, Topic, IngestionBlock
 from news_fetcher.allsides_lookup import get_allsides_score
 from news_fetcher.outlet_bias_llm import get_outlet_bias_from_llm
 from news_fetcher.scraper import scrape_article
@@ -204,6 +204,44 @@ def detect_duplicate_outlet_content(content, outlet_id, exclude_article_id=None)
     return False, None
 
 
+def save_opinion_piece(title, url, source_name, published_at, content, image_url, seen_urls):
+    """Add an op-ed/editorial to `opinion_pieces` (committed with the batch).
+
+    Deliberately cheap: no scraping, embedding or LLM call, and an unknown
+    outlet is left NULL rather than created (creating one can ask the LLM for
+    its bias). A failure here is logged and never stops the news ingestion.
+    """
+    if url in seen_urls:
+        return False
+    seen_urls.add(url)
+    # A savepoint, so a failure here rolls back only this row. Without it a
+    # DB error (say, the table missing on an un-migrated install) aborts the
+    # whole batch's transaction and every news article after it fails too.
+    savepoint = db.session.begin_nested()
+    try:
+        if OpinionPiece.query.filter_by(url=url).first():
+            savepoint.rollback()
+            return False
+        outlet = Outlet.query.filter_by(name=source_name).first()
+        from news_fetcher.scraper import sanitize_html
+        db.session.add(OpinionPiece(
+            title=title,
+            url=url,
+            source=source_name,
+            outlet_id=outlet.id if outlet else None,
+            bias_score=outlet.bias_score if outlet else None,
+            date=published_at,
+            content=sanitize_html(f"<div>{content}</div>") if content else None,
+            image_url=image_url,
+        ))
+        savepoint.commit()
+        return True
+    except Exception as e:
+        savepoint.rollback()
+        logger.warning(f"  [OpEd] Could not save opinion piece {url[:80]}: {e}")
+        return False
+
+
 def store_articles(articles_data, topic_name, provider=None):
     """
     Store a list of normalized article dicts into the database,
@@ -241,6 +279,7 @@ def store_articles(articles_data, topic_name, provider=None):
     # Same reasoning as the story pre-fetch above: every article in the batch
     # is tested against these, so load them once rather than per article.
     blocked_sources, blocked_title_keywords = get_ingestion_blocks()
+    opinion_urls_seen = set()
 
     for article in articles_data:
         # Some outlets (National Review's culture pieces, e.g. "Not Ready for
@@ -268,6 +307,11 @@ def store_articles(articles_data, topic_name, provider=None):
             continue
 
         low_value_reason = low_value_article_reason(title, url)
+        if low_value_reason == "opinion":
+            # Still refused as news (and counted as skipped), but kept in the
+            # separate Op/Ed table unless a title block applies.
+            if not any(kw in title.lower() for kw in blocked_title_keywords):
+                save_opinion_piece(title, url, source_name, published_at, content, image_url, opinion_urls_seen)
         if low_value_reason:
             logger.debug(f"Skipping low-value article ({low_value_reason}): {title} [{url}]")
             metrics["skipped"][low_value_reason if low_value_reason in metrics["skipped"] else "low_value_url"] += 1

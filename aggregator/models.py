@@ -133,6 +133,36 @@ class Article(db.Model):
     def is_roundup(self):
         return is_roundup_article(self.title, self.url)
 
+
+class OpinionPiece(db.Model):
+    """Op-eds, columns and editorials, kept apart from the news (2026-10-08).
+
+    Ingestion refuses opinion as news (`article_signals.is_opinion_article`)
+    and stores it here instead. A separate table on purpose: nothing in the
+    news pipeline (grouping, editions, embeddings, summaries, listings) reads
+    it, so opinion can't leak into stories. Nothing is fetched for it; it only
+    collects what the regular fetches bring in. No scraping, embedding or LLM
+    work is done for these rows; `content` is what the feed supplied.
+    """
+    __tablename__ = "opinion_pieces"
+    __table_args__ = (
+        db.Index("ix_opinion_pieces_date", "date"),
+        db.Index("ix_opinion_pieces_outlet_id", "outlet_id"),
+    )
+
+    id         = db.Column(db.Integer, primary_key=True)
+    title      = db.Column(db.String, nullable=False)
+    url        = db.Column(db.String, unique=True, nullable=False)
+    source     = db.Column(db.String)
+    outlet_id  = db.Column(db.Integer, db.ForeignKey("outlets.id", ondelete="SET NULL"))
+    bias_score = db.Column(db.Float)  # the outlet's, copied at ingestion like Article.bias_score
+    date       = db.Column(db.DateTime, default=datetime.utcnow)  # published
+    fetched_at = db.Column(db.DateTime, default=datetime.utcnow)
+    content    = db.Column(db.Text)
+    image_url  = db.Column(db.String)
+
+    outlet = db.relationship("Outlet")
+
     @property
     def has_usable_image(self):
         return bool(self.image_url) and not self.is_roundup
