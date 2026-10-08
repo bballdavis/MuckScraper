@@ -95,6 +95,21 @@ BETTING_TITLE_PATTERNS = (
     # "bet365 bonus code: ..."). All 181 titles in the DB matching this were
     # promos (2026-10-03); a backstop for outlets that move the URL section.
     re.compile(r"\b(?:promo|bonus) code\b", re.IGNORECASE),
+    # "College football odds, predictions: ..." (CBS Sports' weekly picks
+    # column; reached the 10-08 morning fetch). The "predictions, odds" order
+    # above missed it. All 9 stored titles were picks columns (2026-10-08).
+    re.compile(r"\bodds,?\s+(?:and\s+)?predictions?\b", re.IGNORECASE),
+    # Fantasy sports advice (waiver pickups, start/sit, rankings). Same family
+    # as the tipster content, and a four-outlet waiver-wire story reached rank
+    # 15 of the 10-08 morning edition. Matched on the title phrase, NOT on a
+    # /fantasy/ URL: NBC Sports files ordinary player news ("Colts and Taylor
+    # agree on two-year extension") under /fantasy/. Bare "waiver wire" is out
+    # too: team blogs run "practice squad and waiver wire tracker" news. The
+    # 295 stored "fantasy <sport>" titles were all fantasy content (a few
+    # features about fantasy football itself, no hard news).
+    re.compile(r"\bfantasy (?:football|baseball|basketball|hockey|golf|nascar|waiver wire)\b", re.IGNORECASE),
+    re.compile(r"\bstart ['\u2019]?em,? sit ['\u2019]?em\b", re.IGNORECASE),
+    re.compile(r"\bfaab\b", re.IGNORECASE),
 )
 
 # Syndicated personal-advice columns. Not news, but they arrive through ordinary
@@ -164,6 +179,14 @@ OPINION_URL_HINTS = (
     "/opinions/",
     "/editorials/",
     "/commentisfree/",
+)
+
+# Host + path prefixes for outlets whose opinion has no generic path segment.
+# Seeking Alpha: /article/ is contributor stock-pick commentary ("Why I Am
+# Buying REITs Hand Over Fist", "Micron: The Market Is In Disbelief"); its
+# reporting is under /news/ and is kept. 105 stored /article/ rows, 2026-10-08.
+OPINION_URL_PREFIXES = (
+    "seekingalpha.com/article/",
 )
 
 # Title-prefix signal, verified separately against 39 "Opinion:" and 75
@@ -254,8 +277,12 @@ def is_opinion_article(title=None, url=None):
     if any(pattern.search(normalized_title) for pattern in OPINION_TITLE_PATTERNS):
         return True
 
-    parsed_path = urlparse(url or "").path.lower()
-    return any(hint in parsed_path for hint in OPINION_URL_HINTS)
+    parsed = urlparse(url or "")
+    parsed_path = parsed.path.lower()
+    if any(hint in parsed_path for hint in OPINION_URL_HINTS):
+        return True
+    host_path = parsed.netloc.lower().removeprefix("www.") + parsed_path
+    return any(host_path.startswith(prefix) for prefix in OPINION_URL_PREFIXES)
 
 
 def is_promotional_article(title=None, url=None):
