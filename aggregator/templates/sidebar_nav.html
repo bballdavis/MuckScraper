@@ -19,11 +19,6 @@
                         <span class="full-text">All Stories</span>
                     </a>
                 </div>
-                <div class="topic-block {% if active_nav == 'oped' %}active{% endif %}">
-                    <a href="{{ url_for('admin.oped_list', range=active_range|default('7d')) }}">
-                        <span class="full-text">Op/Ed</span>
-                    </a>
-                </div>
                 {%- if can('scraper') %}
                 <div class="topic-block {% if active_nav == 'fetch' %}active{% endif %}">
                     <a href="{{ url_for('admin.fetch_page') }}">
@@ -49,6 +44,14 @@
                     </a>
                 </div>
                 {% endfor %}
+
+                {#- Op/Ed sits below the topics: it is not a topic and not part of the news (Regis, 2026-10-09). #}
+                <hr class="sidebar-divider">
+                <div class="topic-block {% if active_nav == 'oped' %}active{% endif %}">
+                    <a href="{{ url_for('admin.oped_list', range=active_range|default('7d')) }}">
+                        <span class="full-text">Op/Ed</span>
+                    </a>
+                </div>
             </div>
 
             {# Status lights are for signed-in users only (Regis, 2026-10-06);
