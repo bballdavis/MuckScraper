@@ -198,6 +198,25 @@ OPINION_URL_PREFIXES = (
     "nationalreview.com/",
 )
 
+# Editorial cartoons (2026-10-09). Checked against every stored title/URL
+# containing "cartoon": 73 opinion rows (Toronto Sun /opinion/cartoons/, WaPo
+# "matt-davies-cartoon-...") and ~30 news rows (Economist "Cartoon: ...",
+# Politico /cartoons/, Daily Kos /cartoon/, Fox "Sports cartoons of the day").
+# Deliberately NOT a bare "cartoon" substring: news about cartoons stays
+# ("Toronto Sun political cartoonist Andy Donato passes away", "Hastie accepts
+# apology over 'traitor' cartoon", "...freckle-faced-cartoon-character").
+CARTOON_TITLE_PATTERNS = (
+    re.compile(r"^\s*cartoons?\s*(?::|by\b)", re.IGNORECASE),
+    re.compile(r"\b(?:editorial|political|sports) cartoons?\b", re.IGNORECASE),
+    re.compile(r"\bcartoons? of the (?:day|week)\b", re.IGNORECASE),
+    re.compile(r"^\s*the weekly cartoon\s*$", re.IGNORECASE),
+    # "Steve Nease cartoon, Sept. 10, 2026"
+    re.compile(r"\bcartoons?,\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d", re.IGNORECASE),
+)
+CARTOON_URL_SEGMENTS = ("/cartoons/", "/cartoon/")
+# "<first>-<last>-cartoon-..." slugs, only under an opinion path (WaPo).
+CARTOONIST_SLUG = re.compile(r"^[a-z]+-[a-z]+-cartoons?(?:-|$)")
+
 # Title-prefix signal, verified separately against 39 "Opinion:" and 75
 # "Editorial:" matches with zero false positives. Needed alongside the URL
 # check because some outlets (NPR) don't use a dedicated opinion URL path at
@@ -280,6 +299,21 @@ def is_advice_column(title=None):
     return any(pattern.search(normalized_title) for pattern in ADVICE_COLUMN_TITLE_PATTERNS)
 
 
+def is_cartoon(title=None, url=None):
+    """Editorial/political cartoons: an image with a title, not reporting, and
+    not something to republish (Regis, 2026-10-09)."""
+    normalized_title = (title or "").strip()
+    if any(pattern.search(normalized_title) for pattern in CARTOON_TITLE_PATTERNS):
+        return True
+    path = urlparse(url or "").path.lower()
+    if any(segment in path for segment in CARTOON_URL_SEGMENTS):
+        return True
+    slug = path.rstrip("/").rsplit("/", 1)[-1]
+    if slug.startswith(("cartoon-", "cartoons-")):
+        return True
+    return any(hint in path for hint in OPINION_URL_HINTS) and bool(CARTOONIST_SLUG.match(slug))
+
+
 def is_opinion_article(title=None, url=None):
     """Op-eds, columns, and editorial-board pieces -- not reporting."""
     normalized_title = (title or "").strip()
@@ -314,6 +348,9 @@ def low_value_article_reason(title=None, url=None):
 
     if is_advice_column(title):
         return "advice_column"
+
+    if is_cartoon(title, url):
+        return "cartoon"
 
     parsed = urlparse(url or "")
     host_path = parsed.netloc.lower().removeprefix("www.") + parsed.path.lower()

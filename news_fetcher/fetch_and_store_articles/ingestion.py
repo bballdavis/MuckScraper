@@ -73,6 +73,7 @@ def empty_store_metrics(topic_name, provider=None, input_articles=0):
             "roundup": 0,
             "betting": 0,
             "advice_column": 0,
+            "cartoon": 0,
             "opinion": 0,
             "promotional": 0,
             "duplicate_url": 0,
