@@ -83,6 +83,10 @@ DOMAIN_SOURCE_OVERRIDES = {
     "washingtonpost.com": "Washington Post",
     # The LA Times opinion feed is titled "Opinion Voices" (2026-10-09).
     "latimes.com": "Los Angeles Times",
+    # Op/Ed feed titles ("Opinion - Washington Examiner", "Opinion – Latest
+    # Op-Eds & News Commentary | New York Post") don't normalize (2026-10-09).
+    "nypost.com": "New York Post",
+    "washingtonexaminer.com": "Washington Examiner",
 }
 
 

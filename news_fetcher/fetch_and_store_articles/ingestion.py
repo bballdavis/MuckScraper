@@ -242,6 +242,49 @@ def save_opinion_piece(title, url, source_name, published_at, content, image_url
         return False
 
 
+def store_opinion_feed(articles_data):
+    """Store every entry of an Op/Ed feed (RssFeed bucket `op_ed`) as opinion.
+
+    These feeds are opinion sections, so the URL check in is_opinion_article()
+    is not needed and would miss outlets whose column URLs carry no /opinion/
+    (Washington Times, National Review, ...). Everything else still applies:
+    source and title blocks, and the other low-value reasons (betting,
+    roundups, video, promo). Nothing here reaches `articles`.
+    """
+    metrics = {"input_articles": len(articles_data), "saved": 0, "skipped": {}}
+
+    def skip(reason):
+        metrics["skipped"][reason] = metrics["skipped"].get(reason, 0) + 1
+
+    blocked_sources, blocked_title_keywords = get_ingestion_blocks()
+    seen_urls = set()
+    for article in articles_data:
+        title = strip_title_tags(article.get("title"))
+        raw_url = article.get("url")
+        if not title or not raw_url:
+            skip("missing_required")
+            continue
+        url = normalize_url(raw_url)
+        if any(blocked in url.lower() for blocked in blocked_sources):
+            skip("blocked_source")
+            continue
+        if any(kw in title.lower() for kw in blocked_title_keywords):
+            skip("blocked_title")
+            continue
+        reason = low_value_article_reason(title, url)
+        if reason and reason != "opinion":
+            skip(reason)
+            continue
+        source_name = source_name_from_url(raw_url) or normalize_source_name(article.get("source_name", "Unknown"))
+        if save_opinion_piece(title, url, source_name, article.get("published_at") or datetime.utcnow(),
+                              article.get("content") or "", article.get("image_url"), seen_urls):
+            metrics["saved"] += 1
+        else:
+            skip("not_saved")  # already stored, or the save failed (logged)
+    db.session.commit()
+    return metrics
+
+
 def store_articles(articles_data, topic_name, provider=None):
     """
     Store a list of normalized article dicts into the database,

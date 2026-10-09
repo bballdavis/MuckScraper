@@ -327,7 +327,7 @@ class RssFeed(db.Model):
 
     id         = db.Column(db.Integer, primary_key=True)
     url        = db.Column(db.String, nullable=False)
-    bucket     = db.Column(db.String(32), nullable=False)  # general / right_enrichment / left_enrichment
+    bucket     = db.Column(db.String(32), nullable=False)  # general / right_enrichment / left_enrichment / op_ed
     label      = db.Column(db.String, nullable=True)
     enabled    = db.Column(db.Boolean, default=True, nullable=False)
     added_at   = db.Column(db.DateTime, default=datetime.utcnow)

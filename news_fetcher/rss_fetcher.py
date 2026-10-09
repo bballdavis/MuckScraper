@@ -16,7 +16,7 @@ LEFT_ENRICHMENT_TOPIC = "Targeted Left RSS Enrichment"
 
 
 def _active_feed_urls(bucket):
-    """Enabled RssFeed URLs for a bucket (general / right_enrichment / left_enrichment)."""
+    """Enabled RssFeed URLs for a bucket (general / right_enrichment / left_enrichment / op_ed)."""
     from aggregator.models import RssFeed
     return [f.url for f in RssFeed.query.filter_by(bucket=bucket, enabled=True).all()]
 
@@ -93,6 +93,33 @@ def fetch_feed(feed_url, max_entries=30):
 
 
 RSS_MAX_ENTRIES_PER_FEED_GROQ = 10
+
+
+def fetch_and_store_oped_rss():
+    """Fetch the `op_ed` feeds into the Op/Ed table (opinion_pieces).
+
+    No scraping, embedding or LLM call, so the Groq cap above doesn't apply.
+    Must be called within a Flask app context.
+    """
+    from news_fetcher.fetch_and_store_articles import store_opinion_feed
+
+    feed_urls = _active_feed_urls("op_ed")
+    metrics = {"status": "ok", "feeds_attempted": len(feed_urls), "input_articles": 0,
+               "saved": 0, "skipped": {}, "per_feed": []}
+    for feed_url in feed_urls:
+        source_name, articles = fetch_feed(feed_url)
+        feed_metrics = store_opinion_feed(articles) if articles else {"input_articles": 0, "saved": 0}
+        metrics["input_articles"] += feed_metrics.get("input_articles", 0)
+        metrics["saved"] += feed_metrics.get("saved", 0)
+        merge_count_maps(metrics["skipped"], feed_metrics.get("skipped"))
+        metrics["per_feed"].append({
+            "feed_url": feed_url,
+            "source_name": source_name,
+            "input_articles": feed_metrics.get("input_articles", 0),
+            "saved": feed_metrics.get("saved", 0),
+        })
+    logger.info(f"=== Op/Ed RSS: saved {metrics['saved']} of {metrics['input_articles']} from {len(feed_urls)} feeds ===")
+    return metrics
 
 
 def fetch_and_store_rss():

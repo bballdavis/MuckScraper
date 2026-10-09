@@ -32,6 +32,7 @@ from .ingestion import (  # noqa: F401
     normalize_url,
     detect_duplicate_outlet_content,
     store_articles,
+    store_opinion_feed,
 )
 from .providers import (  # noqa: F401
     fetch_newsapi,

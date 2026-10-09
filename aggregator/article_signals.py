@@ -190,6 +190,14 @@ LOW_VALUE_URL_PREFIXES = (
     "seekingalpha.com/article/",
 )
 
+# Host + path prefixes for outlets that are opinion throughout. National
+# Review is an opinion magazine and its URLs carry no /opinion/ (all 799 stored
+# rows were /2026/...): 243 pieces and 42 edition slots in 30 days as news
+# before this (Regis, 2026-10-09).
+OPINION_URL_PREFIXES = (
+    "nationalreview.com/",
+)
+
 # Title-prefix signal, verified separately against 39 "Opinion:" and 75
 # "Editorial:" matches with zero false positives. Needed alongside the URL
 # check because some outlets (NPR) don't use a dedicated opinion URL path at
@@ -280,7 +288,10 @@ def is_opinion_article(title=None, url=None):
 
     parsed = urlparse(url or "")
     parsed_path = parsed.path.lower()
-    return any(hint in parsed_path for hint in OPINION_URL_HINTS)
+    if any(hint in parsed_path for hint in OPINION_URL_HINTS):
+        return True
+    host_path = parsed.netloc.lower().removeprefix("www.") + parsed_path
+    return any(host_path.startswith(prefix) for prefix in OPINION_URL_PREFIXES)
 
 
 def is_promotional_article(title=None, url=None):

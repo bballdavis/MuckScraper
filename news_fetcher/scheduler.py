@@ -10,6 +10,7 @@ from news_fetcher.fetch_and_store_articles import fetch_and_store_articles, proc
 from news_fetcher.headline_generator import generate_headlines_for_stale_stories
 from news_fetcher.rss_fetcher import (
     fetch_and_store_rss,
+    fetch_and_store_oped_rss,
     enrich_skewed_stories_with_right_feeds,
     get_skewed_story_ids_for_right_enrichment,
     enrich_skewed_stories_with_left_feeds,
@@ -840,6 +841,7 @@ def run_all_fetches(run_full_pipeline=True):
             "started_at": datetime.utcnow().isoformat(),
             "topics": {},
             "rss": None,
+            "oped_rss": None,
             "totals": {
                 "input_articles": 0,
                 "stored": 0,
@@ -918,6 +920,14 @@ def run_all_fetches(run_full_pipeline=True):
                 "status": "error",
                 "reason": str(e),
             }
+
+        # Op/Ed feeds go to their own table; their counts stay out of the news totals.
+        try:
+            run_metrics["oped_rss"] = fetch_and_store_oped_rss()
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error fetching Op/Ed RSS feeds: {e}")
+            run_metrics["oped_rss"] = {"status": "error", "reason": str(e)}
 
         if run_full_pipeline:
             # Run Bias Checker ONCE after all fetches

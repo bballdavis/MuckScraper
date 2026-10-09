@@ -54,7 +54,7 @@ def update_topic(topic_id):
     return redirect(url_for("admin.topics_page"))
 
 
-RSS_FEED_BUCKETS = ["general", "right_enrichment", "left_enrichment"]
+RSS_FEED_BUCKETS = ["general", "right_enrichment", "left_enrichment", "op_ed"]
 
 
 @admin.route("/rss-feeds")
