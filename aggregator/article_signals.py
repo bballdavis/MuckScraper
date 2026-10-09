@@ -181,11 +181,12 @@ OPINION_URL_HINTS = (
     "/commentisfree/",
 )
 
-# Host + path prefixes for outlets whose opinion has no generic path segment.
+# Host + path prefixes refused outright: not news and not Op/Ed either.
 # Seeking Alpha: /article/ is contributor stock-pick commentary ("Why I Am
 # Buying REITs Hand Over Fist", "Micron: The Market Is In Disbelief"); its
-# reporting is under /news/ and is kept. 105 stored /article/ rows, 2026-10-08.
-OPINION_URL_PREFIXES = (
+# reporting is under /news/ and is kept. Kept as Op/Ed for a day, then dropped
+# from it too (Regis, 2026-10-09): stock tips, not op-eds.
+LOW_VALUE_URL_PREFIXES = (
     "seekingalpha.com/article/",
 )
 
@@ -279,10 +280,7 @@ def is_opinion_article(title=None, url=None):
 
     parsed = urlparse(url or "")
     parsed_path = parsed.path.lower()
-    if any(hint in parsed_path for hint in OPINION_URL_HINTS):
-        return True
-    host_path = parsed.netloc.lower().removeprefix("www.") + parsed_path
-    return any(host_path.startswith(prefix) for prefix in OPINION_URL_PREFIXES)
+    return any(hint in parsed_path for hint in OPINION_URL_HINTS)
 
 
 def is_promotional_article(title=None, url=None):
@@ -305,6 +303,11 @@ def low_value_article_reason(title=None, url=None):
 
     if is_advice_column(title):
         return "advice_column"
+
+    parsed = urlparse(url or "")
+    host_path = parsed.netloc.lower().removeprefix("www.") + parsed.path.lower()
+    if any(host_path.startswith(prefix) for prefix in LOW_VALUE_URL_PREFIXES):
+        return "low_value_url"
 
     if is_opinion_article(title, url):
         return "opinion"
