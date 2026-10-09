@@ -1,5 +1,5 @@
 {#- Signed-out visitors (PUBLIC_READ_ACCESS) get Headlines, the two story
-    lists and the topic filters; Search needs an account and Fetch Articles
+    lists, Op/Ed and the topic filters; Search needs an account and Fetch Articles
     the Scraper role. -#}
     <div class="sidebar" id="sidebar">
         <div class="sidebar-inner">
@@ -17,6 +17,11 @@
                 <div class="topic-block {% if active_nav == 'all' %}active{% endif %}">
                     <a href="{{ url_for('admin.list_articles', scrape_status=active_scrape_status|default(none), show_single=show_single|default(true)|string|lower, q=active_search_query|default(none) or '', range=active_range|default('7d')) }}">
                         <span class="full-text">All Stories</span>
+                    </a>
+                </div>
+                <div class="topic-block {% if active_nav == 'oped' %}active{% endif %}">
+                    <a href="{{ url_for('admin.oped_list', range=active_range|default('7d')) }}">
+                        <span class="full-text">Op/Ed</span>
                     </a>
                 </div>
                 {%- if can('scraper') %}
