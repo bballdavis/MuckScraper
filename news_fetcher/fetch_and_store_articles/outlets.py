@@ -81,6 +81,8 @@ def retry_unrated_outlets():
 # title, so this takes priority over normalize_source_name() in store_articles().
 DOMAIN_SOURCE_OVERRIDES = {
     "washingtonpost.com": "Washington Post",
+    # The LA Times opinion feed is titled "Opinion Voices" (2026-10-09).
+    "latimes.com": "Los Angeles Times",
 }
 
 
