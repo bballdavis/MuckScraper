@@ -191,7 +191,8 @@ def link_new_opinion_pieces(now=None):
     from news_fetcher.story_grouper import strip_video_prefix
 
     now = now or datetime.utcnow()
-    metrics = {"checked": 0, "linked": 0, "letters": 0, "duplicates": 0, "no_embedding": 0, "llm_errors": 0}
+    metrics = {"checked": 0, "linked": 0, "letters": 0, "duplicates": 0, "no_embedding": 0, "llm_errors": 0,
+               "story_ids": []}
     pieces = (OpinionPiece.query
               .filter(OpinionPiece.link_checked_at.is_(None),
                       OpinionPiece.fetched_at >= now - timedelta(hours=LINK_LOOKBACK_HOURS))
@@ -240,6 +241,8 @@ def link_new_opinion_pieces(now=None):
                     piece.story_id = story_id
                     piece.link_similarity = round(sim, 4)
                     metrics["linked"] += 1
+                    if story_id not in metrics["story_ids"]:
+                        metrics["story_ids"].append(story_id)
                     break
             if llm_failed:
                 metrics["llm_errors"] += 1
@@ -353,9 +356,10 @@ def write_roundup(story, now=None):
 
 
 def write_stale_roundups():
-    metrics = {"stories": 0, "written": 0, "too_few": 0, "rejected": 0, "errors": 0}
+    metrics = {"stories": 0, "written": 0, "too_few": 0, "rejected": 0, "errors": 0, "story_ids": []}
     for story_id in _stale_roundup_story_ids():
         metrics["stories"] += 1
+        metrics["story_ids"].append(story_id)
         try:
             story = db.session.get(Story, story_id)
             outcome = write_roundup(story)
@@ -373,12 +377,21 @@ def write_stale_roundups():
 
 
 def link_opinion_and_write_roundups():
-    """The full-run step: link, scrape, then write roundups."""
+    """The full-run step: link, scrape, then write roundups.
+
+    `changed_story_ids` lists every story whose Op/Ed columns, stances or
+    roundup may have changed, so a static exporter can refresh just their
+    Opinion boxes on pages of editions that are already published.
+    """
     if not llm_client.check_llm_status(tier=llm_client.TIER_FAST):
-        return {"status": "skipped", "reason": "llm_unavailable"}
+        return {"status": "skipped", "reason": "llm_unavailable", "changed_story_ids": []}
+    link = link_new_opinion_pieces()
+    scrape = scrape_linked_pieces()
+    roundups = write_stale_roundups()
     return {
         "status": "ok",
-        "link": link_new_opinion_pieces(),
-        "scrape": scrape_linked_pieces(),
-        "roundups": write_stale_roundups(),
+        "link": link,
+        "scrape": scrape,
+        "roundups": roundups,
+        "changed_story_ids": sorted(set(link["story_ids"]) | set(roundups["story_ids"])),
     }
