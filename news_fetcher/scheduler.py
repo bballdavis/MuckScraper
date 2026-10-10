@@ -93,7 +93,7 @@ def run_optional_headline_ranking():
     return {"status": "ok"}
 
 
-def run_optional_static_export(extra_edition_ids=None):
+def run_optional_static_export(extra_edition_ids=None, opinion_story_ids=None):
     """
     Export optional static output when an additional exporter is available.
     This keeps the main open-source stack working even when deployment-specific
@@ -113,7 +113,7 @@ def run_optional_static_export(extra_edition_ids=None):
             "reason": str(e),
         }
 
-    export_static_site(extra_edition_ids=extra_edition_ids)
+    export_static_site(extra_edition_ids=extra_edition_ids, opinion_story_ids=opinion_story_ids)
     return {"status": "ok"}
 
 
@@ -1071,8 +1071,11 @@ def run_all_fetches(run_full_pipeline=True):
                 backfilled_edition_ids = run_metrics["steps"]["process_current_edition"].get(
                     "backfilled_edition_ids"
                 ) if isinstance(run_metrics["steps"].get("process_current_edition"), dict) else None
+                opinion_step = run_metrics["steps"].get("opinion_roundups")
                 run_metrics["steps"]["static_export"] = run_optional_static_export(
-                    extra_edition_ids=backfilled_edition_ids
+                    extra_edition_ids=backfilled_edition_ids,
+                    opinion_story_ids=opinion_step.get("changed_story_ids")
+                    if isinstance(opinion_step, dict) else None,
                 )
             except Exception as e:
                 db.session.rollback()
