@@ -400,36 +400,8 @@
             'skipped': 'No summary: MuckScraper does not read articles from this source in full.',
         }.get(article.scrape_status) %}
 
-        <div class="summary">
-            <div class="summary-label">Executive Summary</div>
-            {% if article.summary %}
-                {% for line in article.summary.split('\n') %}
-                    {% set l = line.strip() %}
-                    {% if l %}
-                        <p>{{ l }}</p>
-                    {% endif %}
-                {% endfor %}
-            {% elif summary_blocked_reason and not (article.content and article.content|length > 100) %}
-                <p style="font-style: italic; color: var(--text-muted);">{{ summary_blocked_reason }} Read it at the source below.</p>
-            {% elif not ollama_online %}
-                <p style="font-style: italic; color: var(--text-muted);">Summary will be generated when Ollama is back online. This article has been added to the queue.</p>
-            {% else %}
-                <p style="font-style: italic; color: var(--text-muted);">No summary has been generated yet.{% if can('scraper') %} Use the summarize action to process this article.{% endif %}</p>
-            {% endif %}
-        </div>
-
-        {% if article.deep_analysis %}
-        <div class="summary">
-            <div class="summary-label">Deep Analysis</div>
-            {% for line in article.deep_analysis.split('\n') %}
-                {% set l = line.strip() %}
-                {% if l %}
-                    <p>{{ l }}</p>
-                {% endif %}
-            {% endfor %}
-        </div>
-        {% endif %}
-
+        {#- Signed-in readers see the scrape telemetry first, under the title
+            (Regis, 2026-10-10). -#}
         {% if current_user.is_authenticated %}
         <div class="scrape-panel">
             {% set scrape_status = article.scrape_status or 'pending' %}
@@ -466,7 +438,39 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
+        <div class="summary">
+            <div class="summary-label">Executive Summary</div>
+            {% if article.summary %}
+                {% for line in article.summary.split('\n') %}
+                    {% set l = line.strip() %}
+                    {% if l %}
+                        <p>{{ l }}</p>
+                    {% endif %}
+                {% endfor %}
+            {% elif summary_blocked_reason and not (article.content and article.content|length > 100) %}
+                <p style="font-style: italic; color: var(--text-muted);">{{ summary_blocked_reason }} Read it at the source below.</p>
+            {% elif not ollama_online %}
+                <p style="font-style: italic; color: var(--text-muted);">Summary will be generated when Ollama is back online. This article has been added to the queue.</p>
+            {% else %}
+                <p style="font-style: italic; color: var(--text-muted);">No summary has been generated yet.{% if can('scraper') %} Use the summarize action to process this article.{% endif %}</p>
+            {% endif %}
+        </div>
+
+        {% if article.deep_analysis %}
+        <div class="summary">
+            <div class="summary-label">Deep Analysis</div>
+            {% for line in article.deep_analysis.split('\n') %}
+                {% set l = line.strip() %}
+                {% if l %}
+                    <p>{{ l }}</p>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if current_user.is_authenticated %}
         <div class="article-body">
             {% if article.content and article.content|length > 100 %}
                 {{ article.content | clean_html }}
