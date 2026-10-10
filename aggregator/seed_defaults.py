@@ -603,6 +603,42 @@ Rules:
 - Do not include source names or outlet names
 - Respond with ONLY the headline, nothing else"""
 
+PROMPT_OPINION_LINK_CHECK = """You are matching an opinion column to a news story.
+
+Opinion column:
+Title: {title}
+Teaser: {teaser}
+
+News story:
+Headline: {headline}
+Summary: {summary}
+
+Is the opinion column mainly about the specific event or development in this news story (not just the same broad subject)? Answer with only YES or NO."""
+
+PROMPT_OPINION_ROUNDUP = """You are writing a short "Opinion roundup" for a news site. Below is a news story and the opinion columns that were linked to it. Some columns come with their text; some come with only a headline and a teaser.
+
+First, write one line per column in exactly this form:
+<number>: ON | <one short phrase describing that column's own position>
+or, if the column is not mainly about this news story:
+<number>: OFF | <one short phrase saying what it is about instead>
+
+Then write a line "ROUNDUP:" followed by ONE paragraph of 3 to 5 sentences that tells the reader what the ON columns argue and where they disagree.
+
+Rules for the paragraph:
+- Leave out every column you marked OFF.
+- Describe each column by what it actually argues, not by the outlet's reputation. A column in a left-leaning outlet can argue a conservative point, and the other way round.
+- Name the outlet when you describe an argument (for example "A Fox News column argues...").
+- For a column marked HEADLINE ONLY, say only what its headline and teaser state. Do not guess at its argument.
+- Do not take a side, do not add facts that are not in the columns, and do not repeat the news story itself.
+- No bullet points, no headline, no markdown.
+
+NEWS STORY: {headline}
+{summary}
+
+COLUMNS:
+{columns}
+"""
+
 SEED_PROMPTS = [
     ('story_summary', "Story executive summary (shown as the story's short summary)", PROMPT_STORY_SUMMARY),
     ('deep_report.politics', 'Deep report — political stories (left/center/right breakdown)', PROMPT_DEEP_REPORT_POLITICS),
@@ -618,6 +654,8 @@ SEED_PROMPTS = [
     ('outlet_bias.by_name', 'Outlet bias rating by outlet name', PROMPT_OUTLET_BIAS_BY_NAME),
     ('outlet_bias.by_article', 'Outlet bias rating by article content', PROMPT_OUTLET_BIAS_BY_ARTICLE),
     ('headline_generator', 'Wire-style headline generation for multi-article stories', PROMPT_HEADLINE_GENERATOR),
+    ('opinion_link_check', 'Is this Op/Ed column about this news story? YES/NO, fast model. Used to link Op/Ed pieces to stories.', PROMPT_OPINION_LINK_CHECK),
+    ('opinion_roundup', "The story page's opinion roundup: marks each linked column ON/OFF topic with a one-phrase position, then one paragraph.", PROMPT_OPINION_ROUNDUP),
 ]
 
 # --- END GENERATED DATA -----------------------------------------------------

@@ -66,6 +66,11 @@ class Story(db.Model):
     # stale headline (story gained an article since) from a current one. NULL
     # on every pre-existing row, which the pass treats as stale.
     headline_generated_at = db.Column(db.DateTime, nullable=True)
+    # A short reader-facing paragraph on what the Op/Ed columns linked to this
+    # story argue (news_fetcher/opinion_linker.py). NULL until the story has
+    # at least two linked columns; regenerated when a new one is linked.
+    opinion_roundup = db.Column(db.Text, nullable=True)
+    opinion_roundup_generated_at = db.Column(db.DateTime, nullable=True)
 
     topics   = db.relationship("Topic",   secondary=story_topics,  back_populates="stories")
     articles = db.relationship("Article", backref="story", lazy=True)
@@ -141,8 +146,14 @@ class OpinionPiece(db.Model):
     and stores it here instead. A separate table on purpose: nothing in the
     news pipeline (grouping, editions, embeddings, summaries, listings) reads
     it, so opinion can't leak into stories. Nothing is fetched for it; it only
-    collects what the regular fetches bring in. No scraping, embedding or LLM
-    work is done for these rows; `content` is what the feed supplied.
+    collects what the regular fetches bring in. `content` is what the feed
+    supplied.
+
+    Since 2026-10-10 full runs link each piece to the news story it argues
+    about (`news_fetcher/opinion_linker.py`): it is embedded from its title
+    and teaser, checked against the nearest stories, and, once linked,
+    scraped into `full_text` so the story's opinion roundup can read it. The
+    link only points from here to a story; no news query reads this table.
     """
     __tablename__ = "opinion_pieces"
     __table_args__ = (
@@ -160,8 +171,18 @@ class OpinionPiece(db.Model):
     fetched_at = db.Column(db.DateTime, default=datetime.utcnow)
     content    = db.Column(db.Text)
     image_url  = db.Column(db.String)
+    embedding  = db.Column(Vector(768))  # title + teaser, built like Article embeddings
+    # The story this column is about. SET NULL so merging or deleting a story
+    # just unlinks its columns.
+    story_id   = db.Column(db.Integer, db.ForeignKey("stories.id", ondelete="SET NULL"), index=True)
+    link_similarity = db.Column(db.Float)
+    link_checked_at = db.Column(db.DateTime)  # set once, linked or not, so a piece is checked one time
+    full_text  = db.Column(db.Text)  # scraped after linking; NULL when the publisher blocks it
+    scrape_status = db.Column(db.String(32))
+    stance     = db.Column(db.Text)  # one phrase from the roundup call: what this column argues
 
     outlet = db.relationship("Outlet")
+    story = db.relationship("Story")
 
     @property
     def has_usable_image(self):

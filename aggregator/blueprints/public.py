@@ -5,6 +5,7 @@ from flask_login import current_user
 from aggregator.permissions import public_or_login, public_read_enabled
 from aggregator.search import healthcheck as meili_healthcheck
 from aggregator.models import Article, Story, Topic, RawArticlePayload, Edition, EditionStory
+from aggregator.opinion import opinion_for_story
 from aggregator.story_view import apply_aggregator_filter, annotate_edition_story_flags
 from news_fetcher.llm_client import check_llm_status as check_ollama_status, TIER_QUALITY
 
@@ -97,6 +98,7 @@ def view_story(story_id):
     return render_template(
         "story.html",
         story=story,
+        opinion=opinion_for_story(story.id),
         ollama_online=ollama_online,
         topics=Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all(),
     )

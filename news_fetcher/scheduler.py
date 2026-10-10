@@ -8,6 +8,7 @@ from aggregator.article_signals import bias_bucket_for_score, is_independent_sou
 from aggregator.models import AppSetting, PipelineSchedule, ScheduledFetch
 from news_fetcher.fetch_and_store_articles import fetch_and_store_articles, process_current_edition, review_ambiguous_grouping_matches, sync_allsides_ratings, publish_edition, retry_unrated_outlets, clear_stale_single_article_headlines
 from news_fetcher.headline_generator import generate_headlines_for_stale_stories
+from news_fetcher.opinion_linker import link_opinion_and_write_roundups
 from news_fetcher.rss_fetcher import (
     fetch_and_store_rss,
     fetch_and_store_oped_rss,
@@ -1053,6 +1054,18 @@ def run_all_fetches(run_full_pipeline=True):
                 run_metrics["status"] = "partial_error"
                 run_metrics["steps"]["process_current_edition"] = {"status": "error", "reason": str(e)}
 
+            # Op/Ed: link new columns to stories and write roundups. After the
+            # edition's summaries (the link check reads them) and before the
+            # export, so the published story pages carry the roundups.
+            logging.info("--- Linking Op/Ed columns and writing roundups ---")
+            try:
+                run_metrics["steps"]["opinion_roundups"] = link_opinion_and_write_roundups()
+            except Exception as e:
+                db.session.rollback()
+                logging.error(f"Error linking Op/Ed columns: {e}")
+                run_metrics["status"] = "partial_error"
+                run_metrics["steps"]["opinion_roundups"] = {"status": "error", "reason": str(e)}
+
             logging.info("--- Exporting static site ---")
             try:
                 backfilled_edition_ids = run_metrics["steps"]["process_current_edition"].get(
@@ -1083,6 +1096,7 @@ def run_all_fetches(run_full_pipeline=True):
             run_metrics["steps"]["headline_ranking"] = {"status": "skipped", "reason": "fetch_only_run"}
             run_metrics["steps"]["publish_edition"] = {"status": "skipped", "reason": "fetch_only_run"}
             run_metrics["steps"]["process_current_edition"] = {"status": "skipped", "reason": "fetch_only_run"}
+            run_metrics["steps"]["opinion_roundups"] = {"status": "skipped", "reason": "fetch_only_run"}
             run_metrics["steps"]["static_export"] = {"status": "skipped", "reason": "fetch_only_run"}
 
         run_metrics["steps"]["search_index"] = _update_search_index(

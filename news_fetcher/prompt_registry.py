@@ -34,6 +34,8 @@ KNOWN_VARS = {
     "outlet_bias.by_name": {"outlet_name"},
     "outlet_bias.by_article": {"article_text"},
     "headline_generator": {"titles"},
+    "opinion_link_check": {"title", "teaser", "headline", "summary"},
+    "opinion_roundup": {"headline", "summary", "columns"},
 }
 
 

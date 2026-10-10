@@ -13,6 +13,7 @@ from flask_login import current_user
 from markupsafe import Markup
 
 from aggregator.models import OpinionPiece, Topic
+from aggregator.opinion import stories_with_opinion
 from aggregator.permissions import public_or_login
 
 from . import admin
@@ -73,10 +74,16 @@ def oped_list():
         .all()
     )
     excerpts = {p.id: _excerpt(p.content) for p in pieces} if current_user.is_authenticated else {}
+    active_view = "story" if request.args.get("view") == "story" else "latest"
+    by_story = []
+    if active_view == "story":
+        by_story = stories_with_opinion()
 
     return render_template(
         "oped.html",
         pieces=pieces,
+        active_view=active_view,
+        by_story=by_story,
         excerpts=excerpts,
         total=total,
         topics=Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all(),

@@ -1,6 +1,7 @@
 {% from 'story_card_macros.html' import bias_tag with context %}
 {% from 'account_menu.html' import account_menu with context %}
 {% from 'icons.html' import icon, theme_toggle_label %}
+{% from 'oped_columns.html' import oped_columns, oped_roundup %}
 <!DOCTYPE html>
 <html data-theme="light">
 <head>
@@ -15,6 +16,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
     <title>{{ story.display_headline }} — MuckScraper</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/oped_columns.css') }}">
     <style>
         :root {
             --shadow:        0 10px 30px rgba(0,0,0,0.08);
@@ -76,6 +78,8 @@
         .analysis-content strong { color: var(--accent-text); }
 
         .article-list { list-style: none; margin-top: 48px; }
+        .story-opinion { margin-top: 48px; }
+        .story-opinion .opinion-note { font-size: var(--fs-label); color: var(--text-faint); margin: -16px 0 20px; }
         .article-item {
             padding: 24px 0;
             border-top: 1px solid var(--border);
@@ -315,6 +319,15 @@
                 </div>
             {% endif %}
         </div>
+
+        {% if opinion %}
+        <div class="story-opinion">
+            <h3 style="margin-bottom: 24px; text-transform: uppercase; font-size: 14px; letter-spacing: 1px;">Opinion</h3>
+            <p class="opinion-note">What columnists are arguing about this story. The columns are filed by each outlet's leaning, link to the publisher, and are not part of the news coverage above. The summary and the line under each column are AI-written.</p>
+            {{ oped_roundup(story) }}
+            {{ oped_columns(opinion) }}
+        </div>
+        {% endif %}
 
         <div class="article-list">
             <h3 style="margin-bottom: 24px; text-transform: uppercase; font-size: 14px; letter-spacing: 1px;">Source Articles</h3>

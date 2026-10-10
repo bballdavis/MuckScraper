@@ -1,0 +1,19 @@
+/* Op/Ed columns linked to a story, split by outlet leaning, and the story's
+   opinion roundup (aggregator/templates/oped_columns.html). */
+.oped-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.oped-col h4 {
+    font-size: var(--fs-label); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em;
+    padding-bottom: 6px; margin-bottom: 10px; border-bottom: 2px solid var(--border);
+}
+.oped-col.left h4 { color: var(--bias-left-text); }
+.oped-col.center h4 { color: var(--bias-center-text); }
+.oped-col.right h4 { color: var(--bias-right-text); }
+.oped-col ul { list-style: none; margin: 0; padding: 0; }
+.oped-col li { margin-bottom: 12px; line-height: 1.35; }
+.oped-col li a { color: var(--text); font-weight: 600; font-size: var(--fs-meta); text-decoration: none; }
+.oped-col li a:hover { text-decoration: underline; }
+.oped-col .oped-outlet { display: block; font-size: var(--fs-label); color: var(--text-muted); margin-top: 2px; }
+.oped-col .oped-stance { display: block; font-size: var(--fs-label); color: var(--text-muted); font-style: italic; margin-top: 3px; }
+.oped-roundup { font-size: var(--fs-body); line-height: 1.6; color: var(--text); margin-bottom: 20px; }
+.oped-col .oped-none { font-size: var(--fs-label); color: var(--text-faint); font-style: italic; }
+@media (max-width: 700px) { .oped-columns { grid-template-columns: 1fr; } }
