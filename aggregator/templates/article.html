@@ -1,0 +1,624 @@
+{% from 'story_card_macros.html' import bias_tag with context %}
+{% from 'account_menu.html' import account_menu with context %}
+<!-- muckscraperHeadlinesGoogleNEW/aggregator/templates/article.html -->
+{% from 'icons.html' import icon, theme_toggle_label %}
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_32.png') }}">
+    <link rel="icon" type="image/png" sizes="128x128" href="{{ url_for('static', filename='favicon_128.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192.png') }}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
+    <title>{{ article.title }} — MuckScraper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <style>
+        :root {
+            --shadow:        0 10px 30px rgba(0,0,0,0.08);
+        }
+
+        [data-theme="dark"] {
+            --shadow:        0 15px 40px rgba(0,0,0,0.4);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            transition: background 0.2s, color 0.2s;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .topbar {
+            background: var(--topbar-bg);
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .topbar a { color: #89b4fa; text-decoration: none; font-size: 14px; font-weight: 600; }
+        .topbar-title { color: var(--topbar-text); font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+        .public-source { margin: 8px 0 32px; text-align: center; }
+        /* The top bar is dark in both themes, so the button keeps light text. */
+        .theme-toggle { background: none; border: 1px solid #444; color: #cdd6f4; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
+
+        .container {
+            max-width: var(--width-read);
+            margin: 60px auto;
+            padding: 0 20px;
+        }
+
+        .article-card {
+            background: var(--surface);
+            border-radius: 24px;
+            padding: 48px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .outlet-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        .article-date {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-faint);
+            color: var(--text-muted);
+        }
+
+        .article-date {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-faint);
+        }
+
+        .bias-tag {
+            display: inline-block;
+            font-size: var(--fs-label);
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .bias-none { background-color: #ddd; color: #666;  }
+
+        .source-badge {
+            font-size: var(--fs-label);
+            font-weight: 800;
+            padding: 2px 5px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            vertical-align: middle;
+        }
+        .as-badge { background: #2a7a2a; color: white; }
+        .ai-badge { background: #555; color: white; }
+
+        h1 {
+            font-size: 36px;
+            font-weight: 800;
+            color: var(--text);
+            margin-bottom: 24px;
+            line-height: 1.2;
+            letter-spacing: -1px;
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 32px 0;
+        }
+
+        .summary {
+            background: var(--summary-bg);
+            border-left: 5px solid var(--accent);
+            padding: 24px 32px;
+            margin-bottom: 40px;
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--text);
+            border-radius: 0 16px 16px 0;
+        }
+
+        .summary-label {
+            font-size: var(--fs-label);
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--accent-text);
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+        }
+
+        .summary p { margin-bottom: 1em; }
+        .summary p:last-child { margin-bottom: 0; }
+
+        .summary-section-label {
+            color: var(--accent-text);
+            font-size: 15px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .scrape-panel {
+            margin: 20px 0 28px;
+            padding: 16px 18px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: var(--summary-bg);
+        }
+
+        .scrape-panel-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .scrape-label {
+            font-size: var(--fs-label);
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        .scrape-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: rgba(0,0,0,0.03);
+            font-size: var(--fs-label);
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .scrape-chip.scrape-success { color: #1d6f42; border-color: rgba(29,111,66,0.25); background: rgba(29,111,66,0.08); }
+        .scrape-chip.scrape-fallback { color: #8a5a00; border-color: rgba(138,90,0,0.25); background: rgba(138,90,0,0.09); }
+        .scrape-chip.scrape-blocked,
+        .scrape-chip.scrape-failed { color: #a33636; border-color: rgba(163,54,54,0.25); background: rgba(163,54,54,0.08); }
+        .scrape-chip.scrape-skipped { color: #666; border-color: rgba(102,102,102,0.25); background: rgba(102,102,102,0.08); }
+
+        .scrape-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px 16px;
+        }
+
+        .scrape-item {
+            min-width: 0;
+        }
+
+        .scrape-key {
+            display: block;
+            margin-bottom: 4px;
+            font-size: var(--fs-label);
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+
+        .scrape-value {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+            color: var(--text-muted);
+            word-break: break-word;
+        }
+
+        .summary-bullets {
+            margin: 8px 0 1em 1.5em;
+            list-style: disc;
+        }
+
+        .summary-bullets li {
+            margin-bottom: 0.6em;
+        }
+
+        .btn {
+            display: inline-block;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(164, 60, 181, 0.2);
+        }
+
+        .btn:hover { background: var(--accent-dark); transform: translateY(-1px); }
+
+        .article-body {
+            font-size: 18px;
+            line-height: 1.8;
+            color: var(--text);
+        }
+
+        .article-body p {
+            margin-bottom: 1.5em;
+        }
+
+        .article-body h1, .article-body h2, .article-body h3 {
+            margin: 1.5em 0 0.5em;
+            color: var(--text);
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .article-body h1 { font-size: 28px; }
+        .article-body h2 { font-size: 24px; }
+        .article-body h3 { font-size: 20px; }
+
+        .article-body ul, .article-body ol {
+            margin: 0.5em 0 1.5em 1.5em;
+        }
+
+        .article-body li {
+            margin-bottom: 0.5em;
+        }
+
+        .article-body blockquote {
+            border-left: 4px solid var(--accent-light);
+            margin: 2em 0;
+            padding: 16px 32px;
+            color: var(--text-muted);
+            font-style: italic;
+            background: var(--bg);
+            border-radius: 0 12px 12px 0;
+        }
+
+        .article-body a:not(.btn) {
+            color: var(--accent-text);
+            text-decoration: underline;
+            text-underline-offset: 4px;
+        }
+
+        .article-body img {
+            max-width: 100%;
+            height: auto;
+            margin: 2em 0;
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .source-link {
+            margin-top: 48px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .source-link a {
+            color: var(--accent-text);
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        .source-link a:hover { text-decoration: underline; }
+
+        @media (max-width: 600px) {
+            .article-card { padding: 24px; border-radius: 0; }
+            .container { margin: 0; padding: 0; }
+            h1 { font-size: 28px; }
+            .topbar { padding: 16px 20px; }
+        }
+        {% include 'sidebar_styles.html' %}
+    </style>
+</head>
+<body>
+
+<div class="layout">
+{% include 'sidebar_nav.html' %}
+<div class="page-body">
+
+{% from 'breadcrumb.html' import back_link %}
+<div class="topbar">
+    <div class="topbar-left crumb-bar">
+        <span class="topbar-title">MuckScraper</span>
+        {% if article.story_id %}
+        {{ back_link(url_for('public.view_story', story_id=article.story_id, back=incoming_back()), 'Back to Story') }}
+        {% else %}
+        {{ back_link(feed_back_url(), 'Back to Feed') }}
+        {% endif %}
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">{{ theme_toggle_label() }}</button>
+        {{ account_menu() }}
+    </div>
+</div>
+
+<div class="container">
+    <div class="article-card">
+        <div id="ai-task-status" style="display:none; margin-bottom:20px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.03); color:var(--text-muted); font-size:13px;"></div>
+
+        <div class="article-meta">
+            <span class="outlet-name">{{ article.outlet.name }}</span>
+            <span class="article-date local-date" data-utc="{{ article.date.isoformat() }}Z">{{ article.date.strftime('%B %d, %Y') }}</span>
+            {% if article.last_updated and article.last_updated != article.date %}
+                <span style="color:var(--text-faint); font-size:12px;">•</span>
+                <span class="article-date">Updated: <span class="local-date" data-utc="{{ article.last_updated.isoformat() }}Z">{{ article.last_updated.strftime('%B %d, %Y %H:%M') }}</span></span>
+            {% endif %}
+
+            {{ bias_tag(article.outlet.bias_score if article.outlet else none) }}
+        </div>
+
+        <h1><a href="{{ article.url }}" target="_blank" style="color: inherit; text-decoration: none;">{{ article.title }}</a></h1>
+
+        {% if article.has_usable_image %}
+            <img src="{{ article.image_url }}" alt="Article Image" style="width: 100%; border-radius: 16px; margin-bottom: 32px; box-shadow: var(--shadow);">
+        {% endif %}
+
+        <hr class="divider">
+
+        {#- Plain-language read status. Signed-out visitors see this instead of
+            the telemetry panel (Regis, 2026-10-08: the technical fields and the
+            scraped text stay signed-in only). -#}
+        {% set read_status = {
+            'success':  ('Fully read', 'MuckScraper read the full article.'),
+            'fallback': ('Partly read', "Only the publisher's excerpt was available, so the summary is based on that."),
+            'blocked':  ('Publisher blocked full-text access', 'This publisher does not allow its articles to be read in full.'),
+            'failed':   ("Couldn't read the full article", 'The article was behind a paywall or could not be read when it was fetched.'),
+            'skipped':  ('Full text not available', 'MuckScraper does not read articles from this source in full.'),
+            'pending':  ('Not read yet', 'This article has not been read yet.'),
+        }[article.scrape_status or 'pending'] %}
+        {% set summary_blocked_reason = {
+            'blocked': 'No summary: the publisher blocked full-text access, so there was not enough of the article to summarize.',
+            'failed':  'No summary: the article was behind a paywall or could not be read, so there was not enough of it to summarize.',
+            'skipped': 'No summary: MuckScraper does not read articles from this source in full.',
+        }.get(article.scrape_status) %}
+
+        {#- Signed-in readers see the scrape telemetry first, under the title
+            (Regis, 2026-10-10). -#}
+        {% if current_user.is_authenticated %}
+        <div class="scrape-panel">
+            {% set scrape_status = article.scrape_status or 'pending' %}
+            <div class="scrape-panel-header">
+                <span class="scrape-label">Scrape Telemetry</span>
+                <span class="scrape-chip scrape-{{ scrape_status }}">
+                    {% if scrape_status == 'success' %}
+                        Scrape OK
+                    {% elif scrape_status == 'fallback' %}
+                        Fallback Used
+                    {% elif scrape_status == 'blocked' %}
+                        Blocked
+                    {% elif scrape_status == 'skipped' %}
+                        Skipped
+                    {% elif scrape_status == 'failed' %}
+                        Failed
+                    {% else %}
+                        Pending
+                    {% endif %}
+                </span>
+            </div>
+            <div class="scrape-grid">
+                <div class="scrape-item">
+                    <span class="scrape-key">Method</span>
+                    <span class="scrape-value">{{ article.scrape_method or 'n/a' }}</span>
+                </div>
+                <div class="scrape-item">
+                    <span class="scrape-key">HTTP Status</span>
+                    <span class="scrape-value">{{ article.scrape_http_status or 'n/a' }}</span>
+                </div>
+                <div class="scrape-item" style="grid-column: 1 / -1;">
+                    <span class="scrape-key">Failure Reason</span>
+                    <span class="scrape-value">{{ article.scrape_failure_reason or 'n/a' }}</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="summary">
+            <div class="summary-label">Executive Summary</div>
+            {% if article.summary %}
+                {% for line in article.summary.split('\n') %}
+                    {% set l = line.strip() %}
+                    {% if l %}
+                        <p>{{ l }}</p>
+                    {% endif %}
+                {% endfor %}
+            {% elif summary_blocked_reason and not (article.content and article.content|length > 100) %}
+                <p style="font-style: italic; color: var(--text-muted);">{{ summary_blocked_reason }} Read it at the source below.</p>
+            {% elif not ollama_online %}
+                <p style="font-style: italic; color: var(--text-muted);">Summary will be generated when Ollama is back online. This article has been added to the queue.</p>
+            {% else %}
+                <p style="font-style: italic; color: var(--text-muted);">No summary has been generated yet.{% if can('scraper') %} Use the summarize action to process this article.{% endif %}</p>
+            {% endif %}
+        </div>
+
+        {% if article.deep_analysis %}
+        <div class="summary">
+            <div class="summary-label">Deep Analysis</div>
+            {% for line in article.deep_analysis.split('\n') %}
+                {% set l = line.strip() %}
+                {% if l %}
+                    <p>{{ l }}</p>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if current_user.is_authenticated %}
+        <div class="article-body">
+            {% if article.content and article.content|length > 100 %}
+                {{ article.content | clean_html }}
+            {% else %}
+                <div style="padding: 40px; background: var(--bg); border-radius: 16px; text-align: center; border: 1px dashed var(--border);">
+                    <p style="color: var(--text-muted); margin-bottom: 16px;">Full scrape unavailable for this article.</p>
+                    <a href="{{ article.url }}" target="_blank" class="btn">View Article at Source</a>
+                </div>
+            {% endif %}
+        </div>
+
+        {% else %}
+        {#- Signed-out visitors get the summary, a plain read status and a link,
+            never the scraped text or the technical fields. -#}
+        <div class="scrape-panel">
+            <div class="scrape-panel-header" style="margin-bottom: 6px;">
+                <span class="scrape-label">How we read this article</span>
+                <span class="scrape-chip scrape-{{ article.scrape_status or 'pending' }}">{{ read_status[0] }}</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: var(--fs-meta); margin: 0;">{{ read_status[1] }}</p>
+        </div>
+        <div class="public-source">
+            <a href="{{ article.url }}" target="_blank" rel="noopener" class="btn">Read the full article at {{ article.outlet.name if article.outlet else 'the source' }} →</a>
+        </div>
+        {% endif %}
+
+        {% if can('scraper') %}
+        <div class="article-actions" style="margin-top: 32px; display: flex; gap: 16px;">
+            <button type="button" class="btn" onclick="startAiTask('article_summary', {{ article.id }}, this)">Summarize</button>
+            <form method="POST" action="{{ url_for('admin.rate_article', article_id=article.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn" style="background: var(--bg); color: var(--accent-text); border: 1px solid var(--accent);">Rate Bias</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <div class="source-link">
+            Original source: <a href="{{ article.url }}" target="_blank">{{ article.url }}</a>
+        </div>
+
+    </div>
+</div>
+
+</div>
+</div>
+
+<script>
+    {% include 'sidebar_script.html' %}
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+    }
+
+    function toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('muckscraper-theme', next);
+        applyTheme(next);
+    }
+
+    const savedTheme = localStorage.getItem('muckscraper-theme') || 'light';
+    applyTheme(savedTheme);
+
+    const aiTaskStartUrl = "{{ url_for('admin.start_ai_task') }}";
+    const aiTaskStatusTemplate = "{{ url_for('admin.ai_task_status', task_type='TASK_TYPE', resource_id=999999) }}";
+    let activeAiTaskPoll = null;
+
+    function aiTaskStatusUrl(taskType, resourceId) {
+        return aiTaskStatusTemplate
+            .replace('TASK_TYPE', taskType)
+            .replace('999999', String(resourceId));
+    }
+
+    function renderAiTaskStatus(status, isError = false) {
+        const box = document.getElementById('ai-task-status');
+        if (!box) return;
+        box.style.display = 'block';
+        box.style.borderColor = isError ? 'rgba(154, 114, 91, 0.22)' : 'var(--border)';
+        box.style.background = isError ? 'rgba(154, 114, 91, 0.08)' : 'rgba(0,0,0,0.03)';
+        box.style.color = isError ? '#9a725b' : 'var(--text-muted)';
+        box.textContent = status.message || 'AI task update received.';
+    }
+
+    async function pollAiTask(taskType, resourceId, button) {
+        if (activeAiTaskPoll) {
+            clearInterval(activeAiTaskPoll);
+            activeAiTaskPoll = null;
+        }
+
+        const statusUrl = aiTaskStatusUrl(taskType, resourceId);
+        activeAiTaskPoll = setInterval(async () => {
+            const response = await fetch(statusUrl);
+            const status = await response.json();
+            renderAiTaskStatus(status, status.status === 'error');
+
+            if (status.status === 'success') {
+                clearInterval(activeAiTaskPoll);
+                activeAiTaskPoll = null;
+                window.location.reload();
+                return;
+            }
+
+            if (status.status === 'error') {
+                clearInterval(activeAiTaskPoll);
+                activeAiTaskPoll = null;
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = button.dataset.originalText;
+                }
+            }
+        }, 2000);
+    }
+
+    async function startAiTask(taskType, resourceId, button) {
+        if (button) {
+            button.dataset.originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Working...';
+        }
+
+        const response = await fetch(aiTaskStartUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content,
+            },
+            body: JSON.stringify({
+                task_type: taskType,
+                resource_id: resourceId,
+            }),
+        });
+
+        const payload = await response.json();
+        renderAiTaskStatus(payload.status || payload, response.status >= 400);
+
+        if (!response.ok && response.status !== 409) {
+            if (button) {
+                button.disabled = false;
+                button.textContent = button.dataset.originalText;
+            }
+            return;
+        }
+
+        await pollAiTask(taskType, resourceId, button);
+    }
+
+</script>
+
+<script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
+</body>
+</html>

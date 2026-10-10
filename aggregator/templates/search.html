@@ -1,0 +1,340 @@
+{% from 'account_menu.html' import account_menu with context %}
+{% from 'icons.html' import icon, theme_toggle_label %}
+{% from 'pagination.html' import pager %}
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <title>MuckScraper: Search</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <style>
+        :root {
+            --row-hover:     #f4f6f8;
+        }
+
+        [data-theme="dark"] {
+            --row-hover:     #222230;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            transition: background 0.2s, color 0.2s;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        {% include 'sidebar_styles.html' %}
+
+        .main {
+            flex: 1;
+            padding: 0 32px;
+            max-width: var(--width-table);
+            margin: 0 auto;
+            min-width: 0;
+            position: relative;
+        }
+
+        /* Dark top bar, matching every other page (headlines_feed.html,
+           admin_tools.html, story.html, ...) instead of the page's own
+           translucent light header this used to carry -- see CLAUDE.md's
+           note on tokens drifting per-template. */
+        .main-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            position: sticky;
+            top: 0;
+            background: var(--topbar-bg);
+            padding: 16px 32px;
+            margin-bottom: 16px;
+            z-index: 100;
+        }
+
+        h1 { font-size: 18px; font-weight: 800; color: var(--topbar-text); letter-spacing: -0.5px; }
+
+        .theme-toggle {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: var(--topbar-text);
+            padding: 6px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+        .tab {
+            padding: 8px 18px;
+            border-radius: 10px;
+            border: 1px solid var(--input-border);
+            background: var(--surface);
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .tab.active { color: white; background: var(--accent); border-color: var(--accent); }
+
+        .search-form {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .search-form input[type="text"] {
+            flex: 1 1 280px;
+            max-width: 420px;
+            padding: 10px 14px;
+            font-size: 14px;
+            border: 1px solid var(--input-border);
+            border-radius: 10px;
+            background: var(--surface);
+            color: var(--text);
+        }
+        .search-form select,
+        .search-form input[type="date"] {
+            padding: 9px 10px;
+            font-size: 13px;
+            border: 1px solid var(--input-border);
+            border-radius: 10px;
+            background: var(--surface);
+            color: var(--text);
+        }
+        .search-form button {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .search-form button:hover { background: var(--accent-dark); }
+        .date-label { font-size: 12px; color: var(--text-faint); }
+
+        .notice {
+            font-size: 13px;
+            color: var(--text-muted);
+            background: var(--surface);
+            border: 1px dashed var(--input-border);
+            border-radius: 10px;
+            padding: 8px 12px;
+            margin-bottom: 12px;
+        }
+
+        .summary-line { font-size: 12px; color: var(--text-faint); margin: 6px 2px 10px; }
+
+        .table-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            overflow-x: auto;
+        }
+        /* Where the whole table fits (the Stories table needs ~975px beside
+           the sidebar), let the page scroll it so the header row can stick; a
+           scrolling wrapper would trap it. Narrower screens keep the sideways
+           scroll inside the box and lose the sticky header. */
+        @media (min-width: 1280px) {
+            .table-wrap { overflow: visible; }
+        }
+        /* Inside the scrolling box the header offset has nothing to clear and
+           pushed the header row down over the first result (phones). */
+        @media (max-width: 1279px) {
+            .table-wrap table.results th { top: 0; }
+        }
+
+        table.results {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+        table.results th {
+            position: sticky;
+            top: var(--sticky-header-height, 0px);
+            z-index: 2;
+            background: var(--surface);
+            text-align: left;
+            font-weight: 700;
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 9px 10px;
+            border-bottom: 1px solid var(--input-border);
+            white-space: nowrap;
+        }
+        table.results thead th:first-child { border-top-left-radius: 12px; }
+        table.results thead th:last-child { border-top-right-radius: 12px; }
+        table.results th a { color: inherit; text-decoration: none; }
+        table.results th a:hover { color: var(--accent-text); }
+        table.results td {
+            padding: 6px 10px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+        table.results tbody tr:hover { background: var(--row-hover); }
+        table.results td a { color: var(--text); text-decoration: none; }
+        table.results td a:hover { color: var(--accent-text); text-decoration: underline; }
+        .col-title { min-width: 280px; }
+        .col-topics, .col-outlet, .col-story { color: var(--text-muted); }
+        .col-num, th.col-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .col-date { white-space: nowrap; color: var(--text-muted); }
+        .col-left { color: var(--bias-left-text); }
+        .col-right { color: var(--bias-right-text); }
+        .col-center { color: var(--bias-center-text); }
+
+        .bias {
+            display: inline-block;
+            min-width: 38px;
+            text-align: center;
+            padding: 1px 6px;
+            border-radius: 6px;
+            font-weight: 700;
+            color: white;
+        }
+        .bias-unrated { background: var(--bias-unrated-bg); }
+
+        .empty { padding: 28px; text-align: center; color: var(--text-faint); }
+
+
+        @media (max-width: 900px) {
+            .main { padding: 0 16px; }
+            .main-header { padding: 16px 16px; }
+            .col-title { min-width: 200px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="layout">
+
+    {% include 'sidebar_nav.html' %}
+
+    <div class="page-body">
+    <div class="main-header">
+        <h1>Search</h1>
+        <div class="header-controls">
+            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">{{ theme_toggle_label() }}</button>
+            {{ account_menu() }}
+        </div>
+    </div>
+
+    <div class="main">
+
+        <nav class="tabs">
+            <a href="{{ tab_urls.stories }}" class="tab {{ 'active' if tab == 'stories' }}">Stories</a>
+            <a href="{{ tab_urls.articles }}" class="tab {{ 'active' if tab == 'articles' }}">Articles</a>
+        </nav>
+
+        <form method="get" action="{{ url_for('admin.search_page') }}" class="search-form">
+            <input type="hidden" name="tab" value="{{ tab }}">
+            <input type="text" name="q" value="{{ q }}" placeholder="{{ 'Search story titles, headlines, summaries, article titles…' if tab == 'stories' else 'Search article titles, outlets, sources…' }}">
+            <select name="range" aria-label="Time range">
+                {% for value, label in time_ranges %}
+                <option value="{{ value }}" {{ 'selected' if window.range == value }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <span class="date-label">From</span>
+            <input type="date" name="start" value="{{ window.start }}" aria-label="Custom start date">
+            <span class="date-label">To</span>
+            <input type="date" name="end" value="{{ window.end }}" aria-label="Custom end date">
+            <button type="submit">Search</button>
+        </form>
+
+        {% if degraded %}
+        <div class="notice">Meilisearch is unavailable, so this text match is a simple substring search.</div>
+        {% endif %}
+
+        <div class="summary-line">
+            {{ '{:,}'.format(total) }} {{ 'stories' if tab == 'stories' else 'articles' }}
+            {% if q %}matching “{{ q }}”{% endif %}
+            {% if window.range == 'all' %}· all time{% elif window.range == 'custom' %}· {{ window.start }} to {{ window.end }}{% else %}· last {{ {'24h': '24 hours', '7d': '7 days', '30d': '30 days'}[window.range] }}{% endif %}
+            {% if sorted_by_relevance %}· best match first{% elif relevance_url %}· <a href="{{ relevance_url }}">sort by best match</a>{% endif %}
+            · times in {{ config['DISPLAY_TIMEZONE'] | replace('_', ' ') }}
+        </div>
+
+        <div class="table-wrap">
+            <table class="results">
+                <thead>
+                    <tr>
+                        {% for col in columns %}
+                        <th class="{{ 'col-num' if col.numeric }} col-{{ col.key }}">
+                            {% if col.href %}<a href="{{ col.href }}">{{ col.label }} {{ col.arrow }}</a>{% else %}{{ col.label }}{% endif %}
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in rows %}
+                    {% if tab == 'stories' %}
+                    <tr>
+                        <td class="col-title"><a href="{{ url_for('public.view_story', story_id=row.id, back=current_back()) }}">{{ row.headline }}</a></td>
+                        <td class="col-topics">{{ row.topics|join(', ') }}</td>
+                        <td class="col-num">{{ row.articles }}</td>
+                        <td class="col-num">{{ row.sources }}</td>
+                        <td class="col-num col-left">{{ row.left }}</td>
+                        <td class="col-num col-center">{{ row.center }}</td>
+                        <td class="col-num col-right">{{ row.right }}</td>
+                        <td class="col-date">{{ row.created | local_datetime }}</td>
+                        <td class="col-date">{{ row.updated | local_datetime }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td class="col-title"><a href="{{ url_for('public.view_article', article_id=row.id, back=current_back()) }}">{{ row.title }}</a></td>
+                        <td class="col-outlet">{{ row.outlet_name }}</td>
+                        <td class="col-date">{{ row.date | local_datetime }}</td>
+                        {% set chip_label, chip_tooltip, chip_class = row.bias_chip %}<td class="col-num"><span class="bias {{ chip_class }}" title="{{ chip_tooltip }}" aria-label="{{ chip_tooltip }}">{{ chip_label }}</span></td>
+                        <td class="col-story">{% if row.story_id %}<a href="{{ url_for('public.view_story', story_id=row.story_id, back=current_back()) }}">{{ row.story_title }}</a>{% endif %}</td>
+                        <td class="col-num">{{ row.story_articles }}</td>
+                    </tr>
+                    {% endif %}
+                {% else %}
+                    <tr><td colspan="{{ columns|length }}" class="empty">No results in this window.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if total_pages > 1 %}
+        {{ pager(page, total_pages) }}
+        {% endif %}
+    </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const saved = localStorage.getItem('muckscraper-theme') || 'light';
+        document.documentElement.setAttribute('data-theme', saved);
+    })();
+
+    function toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('muckscraper-theme', next);
+    }
+
+    // Table header rows stick just below the sticky page header
+    function setStickyOffset() {
+        const header = document.querySelector('.main-header');
+        if (header) document.documentElement.style.setProperty('--sticky-header-height', header.offsetHeight + 'px');
+    }
+    setStickyOffset();
+    window.addEventListener('resize', setStickyOffset);
+
+    {% include 'sidebar_script.html' %}
+</script>
+</body>
+</html>

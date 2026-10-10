@@ -1,0 +1,148 @@
+    // ── Sidebar ──
+    // Phones (same query as sidebar_styles.html: narrow, or short and wide as
+    // in landscape) start with the menu closed every time and don't touch
+    // the saved desktop preference.
+    const sidebarPhoneQuery = window.matchMedia('(max-width: 768px), (max-height: 500px)');
+    let sidebarIsPhone = sidebarPhoneQuery.matches;
+
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const btn = document.getElementById('sidebar-toggle');
+        if (sidebarIsPhone) {
+            const open = sidebar.classList.toggle('mobile-open');
+            btn.textContent = open ? '«' : '»';
+            return;
+        }
+        sidebar.classList.toggle('collapsed');
+
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        try { localStorage.setItem('muckscraper-sidebar', isCollapsed ? 'collapsed' : 'expanded'); } catch (e) {}
+        btn.textContent = isCollapsed ? '»' : '«';
+    }
+
+    let savedSidebar = null;
+    try { savedSidebar = localStorage.getItem('muckscraper-sidebar'); } catch (e) {}
+    function applySidebarMode() {
+        const sidebar = document.getElementById('sidebar');
+        const btn = document.getElementById('sidebar-toggle');
+        sidebar.classList.remove('mobile-open');
+        if (sidebarIsPhone) {
+            sidebar.classList.remove('collapsed');
+            btn.textContent = '»';
+        } else {
+            const collapsed = savedSidebar === 'collapsed';
+            sidebar.classList.toggle('collapsed', collapsed);
+            btn.textContent = collapsed ? '»' : '«';
+        }
+    }
+    // On phones the button sits just below the page's top bar instead of on
+    // top of it (it hid the "M" of MuckScraper). The bars differ in height
+    // per page and wrap on narrow screens, so measure rather than hard-code.
+    function placeSidebarToggle() {
+        const btn = document.getElementById('sidebar-toggle');
+        if (!sidebarIsPhone) { btn.style.top = ''; return; }
+        const bar = document.querySelector('.topbar') || document.querySelector('.main-header');
+        // Bottom edge, not height: on All/Grouped/Search the bar starts a little
+        // below the top until it sticks, so follow it while scrolling.
+        const bottom = bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+        btn.style.top = (bottom + 8) + 'px';
+    }
+
+    applySidebarMode();
+    placeSidebarToggle();
+    window.addEventListener('resize', placeSidebarToggle);
+    let sidebarToggleFrame = 0;
+    window.addEventListener('scroll', () => {
+        if (!sidebarIsPhone || sidebarToggleFrame) return;
+        sidebarToggleFrame = requestAnimationFrame(() => { sidebarToggleFrame = 0; placeSidebarToggle(); });
+    }, { passive: true });
+    // Rotating a phone can cross the query (portrait 390x844 is a phone by
+    // width, landscape 844x390 by height), so re-apply when it changes.
+    sidebarPhoneQuery.addEventListener('change', (e) => {
+        sidebarIsPhone = e.matches;
+        try { savedSidebar = localStorage.getItem('muckscraper-sidebar'); } catch (err) {}
+        applySidebarMode();
+        placeSidebarToggle();
+    });
+
+    // ── LLM status ──
+    // One row per *distinct* provider, not per tier: LLM_FAST_PROVIDER
+    // defaults to LLM_PROVIDER, so a single-provider install (the default)
+    // renders exactly one row, and two identical rows would be worse than one.
+    function llmProviderLabel(entry, showTier) {
+        const name = entry.provider
+            ? entry.provider.charAt(0).toUpperCase() + entry.provider.slice(1)
+            : 'LLM';
+        let label = entry.online ? `${name} Online` : `${name} Offline`;
+        // Surface a sleeping primary being covered by the fallback host.
+        if (entry.online && entry.role === 'fallback') {
+            label += ' (fallback)';
+        }
+        if (showTier && entry.tier) {
+            label += ` — ${entry.tier}`;
+        }
+        return label;
+    }
+
+    function renderLlmStatus(entries) {
+        const list = document.getElementById('llm-status-list');
+        if (!list) return;
+        const showTier = entries.length > 1;
+        list.innerHTML = '';
+        entries.forEach(entry => {
+            const row = document.createElement('div');
+            row.className = 'sidebar-status';
+            const dot = document.createElement('div');
+            dot.className = 'status-dot ' + (entry.online ? 'online' : 'offline');
+            const label = document.createElement('span');
+            label.textContent = llmProviderLabel(entry, showTier);
+            row.appendChild(dot);
+            row.appendChild(label);
+            list.appendChild(row);
+        });
+    }
+
+    function checkOllamaStatus() {
+        fetch('/ollama-status')
+            .then(r => r.json())
+            .then(data => {
+                // Fall back to the flat shape if `providers` is ever absent,
+                // so an older cached page still renders something sensible.
+                const entries = (data.providers && data.providers.length)
+                    ? data.providers
+                    : [{provider: data.provider, online: data.online, role: data.role}];
+                renderLlmStatus(entries);
+            })
+            .catch(() => {
+                renderLlmStatus([{provider: 'LLM', online: false}]);
+            });
+    }
+
+    function checkMeiliStatus() {
+        fetch('/meili-status')
+            .then(r => r.json())
+            .then(data => {
+                const dot = document.getElementById('meili-dot');
+                const label = document.getElementById('meili-label');
+                if (data.online) {
+                    dot.className = 'status-dot online';
+                    label.textContent = 'Meili Search Online';
+                } else {
+                    dot.className = 'status-dot offline';
+                    label.textContent = 'Meili Search Offline';
+                }
+            })
+            .catch(() => {
+                document.getElementById('meili-dot').className = 'status-dot offline';
+                document.getElementById('meili-label').textContent = 'Meili Search Offline';
+            });
+    }
+
+    {% if current_user.is_authenticated %}
+    // Signed-out visitors get no status lights, so nothing to poll.
+    checkOllamaStatus();
+    checkMeiliStatus();
+
+    setInterval(checkOllamaStatus, 30000);
+    setInterval(checkMeiliStatus, 30000);
+    {% endif %}

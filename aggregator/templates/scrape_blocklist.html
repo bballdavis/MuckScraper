@@ -1,0 +1,327 @@
+{% from 'icons.html' import theme_toggle %}
+{% from 'account_menu.html' import account_menu with context %}
+{% from 'icons.html' import icon, theme_toggle_label %}
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_32.png') }}">
+    <link rel="icon" type="image/png" sizes="128x128" href="{{ url_for('static', filename='favicon_128.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192.png') }}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
+    <title>Scrape Blocklist — MuckScraper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+        .topbar {
+            background: var(--topbar-bg);
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .topbar a { color: #89b4fa; text-decoration: none; font-size: 14px; font-weight: 600; }
+        .topbar-title { color: var(--topbar-text); font-size: 18px; font-weight: 800; }
+        .container { max-width: 900px; margin: 48px auto; padding: 0 20px; }
+        h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+        .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 32px; }
+        .audit-btn {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 32px;
+        }
+        .card {
+            background: var(--surface);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        .card + .card { margin-top: 24px; }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .metric {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px 18px;
+            box-shadow: var(--shadow);
+        }
+        .metric-label {
+            color: var(--text-muted);
+            font-size: var(--fs-label);
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 28px;
+            font-weight: 800;
+        }
+        .section-title {
+            font-size: 16px;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+        .section-subtitle {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            text-align: left;
+            padding: 14px 20px; font-size: var(--fs-label);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            background: rgba(0,0,0,0.02);
+        }
+        td { padding: 14px 20px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        .tag-permanent {
+            background: #b51a1a;
+            color: white;
+            font-size: var(--fs-label);
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }
+        .tag-auto {
+            background: #e07b6a;
+            color: white;
+            font-size: var(--fs-label);
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }
+        .unblock-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .unblock-btn:hover { border-color: var(--accent); color: var(--accent-text); }
+        .empty { padding: 48px; text-align: center; color: var(--text-faint); font-style: italic; }
+    </style>
+    <script src="{{ url_for('static', filename='js/theme_toggle.js') }}"></script>
+</head>
+<body>
+{% from 'breadcrumb.html' import back_link %}
+<div class="topbar">
+    <div class="topbar-left crumb-bar">
+        <span class="topbar-title">MuckScraper</span>
+        {{ back_link(url_for('admin.tools_page'), 'Back to Admin Tools') }}
+    </div>
+    <div class="topbar-right">
+        {{ theme_toggle() }}
+        {{ account_menu() }}
+    </div>
+</div>
+
+<div class="container">
+    <h1>Scrape Blocklist</h1>
+    <p class="subtitle">Domains that will not be scraped. Permanent entries are pre-configured hard paywalls. Auto-blocked entries were detected at runtime.</p>
+
+    <form method="POST" action="/audit-scrapes">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="audit-btn">{{ icon('zap') }} Run Scrape Audit Now</button>
+    </form>
+
+    <div class="metrics-grid">
+        {% for label, value in [
+            ('Success', status_counts.get('success', 0)),
+            ('Fallback', status_counts.get('fallback', 0)),
+            ('Blocked', status_counts.get('blocked', 0)),
+            ('Failed', status_counts.get('failed', 0)),
+            ('Skipped', status_counts.get('skipped', 0)),
+            ('Retry Cache', retry_cache_domain_count + retry_cache_url_count)
+        ] %}
+        <div class="metric">
+            <div class="metric-label">{{ label }}</div>
+            <div class="metric-value">{{ value }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="card">
+        <div style="padding: 20px 20px 0 20px;">
+            <div class="section-title">Recent Problem Domains</div>
+            <div class="section-subtitle">Worst blocked, failed, and fallback domains from the last {{ telemetry_window_hours }} hours.</div>
+        </div>
+        {% if recent_problem_domains %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Domain</th>
+                    <th>Issues</th>
+                    <th>Blocked</th>
+                    <th>Failed</th>
+                    <th>Fallback</th>
+                    <th>Success</th>
+                    <th>Last Seen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in recent_problem_domains %}
+                <tr>
+                    <td><strong>{{ row.domain }}</strong></td>
+                    <td>{{ row.issue_total }}</td>
+                    <td>{{ row.blocked }}</td>
+                    <td>{{ row.failed }}</td>
+                    <td>{{ row.fallback }}</td>
+                    <td>{{ row.success }}</td>
+                    <td style="color: var(--text-faint); white-space: nowrap;">{{ row.last_seen.strftime('%Y-%m-%d %H:%M') if row.last_seen else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">No recent scrape telemetry yet.</div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div style="padding: 20px 20px 0 20px;">
+            <div class="section-title">Retry Cache</div>
+            <div class="section-subtitle">{{ retry_cache_domain_count }} deferred domains and {{ retry_cache_url_count }} deferred URLs are currently cached.</div>
+        </div>
+        {% if retry_cache_domains or retry_cache_urls %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Scope</th>
+                    <th>Target</th>
+                    <th>Status</th>
+                    <th>Failures</th>
+                    <th>Reason</th>
+                    <th>Defer Until</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in retry_cache_domains %}
+                <tr>
+                    <td>Domain</td>
+                    <td><strong>{{ row.domain }}</strong></td>
+                    <td>{{ row.status or '—' }}</td>
+                    <td>{{ row.failure_count }}</td>
+                    <td style="color: var(--text-muted);">{{ row.failure_reason or '—' }}</td>
+                    <td style="color: var(--text-faint); white-space: nowrap;">{{ row.defer_until or '—' }}</td>
+                </tr>
+                {% endfor %}
+                {% for row in retry_cache_urls %}
+                <tr>
+                    <td>URL</td>
+                    <td style="max-width: 320px; overflow-wrap: anywhere;"><strong>{{ row.url }}</strong></td>
+                    <td>{{ row.status or '—' }}</td>
+                    <td>{{ row.failure_count }}</td>
+                    <td style="color: var(--text-muted);">{{ row.failure_reason or '—' }}</td>
+                    <td style="color: var(--text-faint); white-space: nowrap;">{{ row.defer_until or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">Retry cache is empty. It will populate after real scrape failures hit the new cooldown logic.</div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div style="padding: 20px 20px 0 20px;">
+            <div class="section-title">Blocklist Entries</div>
+            <div class="section-subtitle">Recent scrape counts are shown per blocked domain for the last {{ telemetry_window_hours }} hours.</div>
+        </div>
+        {% if entries %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Domain</th>
+                    <th>Reason</th>
+                    <th>24h Telemetry</th>
+                    <th>Hits</th>
+                    <th>Added</th>
+                    <th>Type</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in entries %}
+                {% set entry = row.entry %}
+                <tr>
+                    <td><strong>{{ entry.domain }}</strong></td>
+                    <td style="color: var(--text-muted);">{{ entry.reason }}</td>
+                    <td style="color: var(--text-muted);">
+                        b {{ row.blocked }} · f {{ row.failed }} · fb {{ row.fallback }} · ok {{ row.success }}
+                        <div style="color: var(--text-faint); font-size: 12px; margin-top: 4px;">
+                            Last seen: {{ row.last_seen.strftime('%Y-%m-%d %H:%M') if row.last_seen else '—' }}
+                        </div>
+                    </td>
+                    <td style="color: var(--text-faint); white-space: nowrap;">
+                        {% if entry.is_permanent %}
+                            —
+                        {% else %}
+                            {{ entry.hit_count }}/{{ row.hit_threshold }}
+                            <div style="color: var(--text-faint); font-size: 12px; margin-top: 4px;">
+                                {% if row.is_active %}
+                                    Expires: {{ entry.expires_at.strftime('%Y-%m-%d %H:%M') if entry.expires_at else '—' }}
+                                {% else %}
+                                    Not yet blocked
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td style="color: var(--text-faint); white-space: nowrap;">
+                        {{ entry.added_at.strftime('%Y-%m-%d') if entry.added_at else '—' }}
+                    </td>
+                    <td>
+                        {% if entry.is_permanent %}
+                            <span class="tag-permanent">Permanent</span>
+                        {% elif row.is_active %}
+                            <span class="tag-auto">Auto-blocked</span>
+                        {% else %}
+                            <span class="tag-auto" style="opacity: 0.6;">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not entry.is_permanent %}
+                        <form method="POST" action="/unblock-domain" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="domain" value="{{ entry.domain }}">
+                            <button type="submit" class="unblock-btn">Unblock</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">No blocked domains yet.</div>
+        {% endif %}
+    </div>
+</div>
+
+</body>
+</html>

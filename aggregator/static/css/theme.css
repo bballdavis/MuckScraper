@@ -1,0 +1,202 @@
+/*
+ * Colour tokens for the aggregator app (port 5000), one place for both themes.
+ * Every page links this before its own <style>, so a page can still override
+ * a token locally (story.html and article.html keep a bigger card shadow).
+ *
+ * Text tokens meet WCAG AA (4.5:1) against --bg, --surface and --summary-bg
+ * in their theme. Check the pair before changing one.
+ * Not used by muckscraper.news (public_app.py / private_site/).
+ */
+
+:root {
+    /* Type scale. --fs-label is the smallest size anything a reader must
+       read uses (chips, uppercase labels, metadata); nothing goes below it.
+       Keep uppercase for labels of a word or two. */
+    --fs-label:       12px;
+    --fs-meta:        13px;
+    --fs-body:        15px;
+    --fs-card-title:  20px;
+    --fs-page-title:  26px;
+
+    /* Content widths, one per page type, centred in the space beside the
+       sidebar: story lists, reading pages (story, article), wide tables. */
+    --width-list:     1000px;
+    --width-read:     900px;
+    --width-table:    1400px;
+
+    /* Accent: --accent is for backgrounds and borders (white text on it);
+       --accent-text is for text in the accent colour. Indigo, matching the
+       sidebar (Regis, 2026-10-06; was olive #5a5f52). Blue is avoided on
+       purpose: it would read as Left. */
+    --accent:         #4c4c8f;
+    --accent-light:   #7474b8;
+    --accent-dark:    #3a3a72;
+    --accent-text:    #4c4c8f;
+
+    --bg:             #f8f9fa;
+    --surface:        #ffffff;
+    --summary-bg:     #fdfbff;
+    --text:           #1a1a1a;
+    --text-muted:     #555;
+    --text-faint:     #6c6c6c;
+    --border:         #eef0f2;
+    --input-border:   #dde1e7;
+    --btn-muted-bg:   #f0f2f5;
+    --btn-muted-text: #4a5568;
+    --shadow:         0 2px 8px rgba(0,0,0,0.05);
+
+    --topbar-bg:      #1e1e2e;
+    --topbar-text:    #cdd6f4;
+
+    /* Sidebar (sidebar_styles.html) */
+    --sidebar-bg:          #1e1e2e;
+    --sidebar-bg-end:      #50507b;
+    --sidebar-text:        #cdd6f4;
+    --sidebar-muted:       #c3c8dc;
+    --sidebar-accent-text: #c9cbff;
+    --sidebar-hover:       #ffffff;
+    --sidebar-active-bg:   #2a2a3e;
+
+    /* Bias, 1 = Left ... 5 = Right (blue / grey / red, see CLAUDE.md).
+       Chips: same in both themes; -fg is the text colour on that chip. */
+    --bias-1-bg: #1a6bb5;  --bias-1-fg: #ffffff;
+    --bias-2-bg: #6aaee0;  --bias-2-fg: #1a1a1a;
+    --bias-3-bg: #6c6c6c;  --bias-3-fg: #ffffff;
+    --bias-4-bg: #e07b6a;  --bias-4-fg: #1a1a1a;
+    --bias-5-bg: #b51a1a;  --bias-5-fg: #ffffff;
+    --bias-unrated-bg: #64748b;
+    /* Left / Center / Right as text, and for thin rules beside it */
+    --bias-left-text:   #1a6bb5;
+    --bias-center-text: #6c6c6c;
+    --bias-right-text:  #b51a1a;
+}
+
+[data-theme="dark"] {
+    --accent-text:    #a8abf0;
+
+    --bg:             #0f0f17;
+    --surface:        #1a1a26;
+    --summary-bg:     #222230;
+    --text:           #e2e8f0;
+    --text-muted:     #a0aec0;
+    --text-faint:     #8b97ab;
+    --border:         #2d2d3f;
+    --input-border:   #3f3f5a;
+    --btn-muted-bg:   #2d2d3f;
+    --btn-muted-text: #cbd5e0;
+    --shadow:         0 4px 12px rgba(0,0,0,0.25);
+
+    --sidebar-bg:          #030308;
+    --sidebar-bg-end:      #262665;
+    --sidebar-muted:       #a6adc8;
+    --sidebar-active-bg:   #121220;
+
+    --bias-unrated-bg: #4a5568;
+    --bias-left-text:   #5b9be0;
+    --bias-center-text: #a0aec0;
+    --bias-right-text:  #ef6b6b;
+}
+
+/* Bias chips (story_card_macros.html bias_tag). Base .bias-tag sizing is per page. */
+.bias-1 { background-color: var(--bias-1-bg); color: var(--bias-1-fg); }
+.bias-2 { background-color: var(--bias-2-bg); color: var(--bias-2-fg); }
+.bias-3 { background-color: var(--bias-3-bg); color: var(--bias-3-fg); }
+.bias-4 { background-color: var(--bias-4-bg); color: var(--bias-4-fg); }
+.bias-5 { background-color: var(--bias-5-bg); color: var(--bias-5-fg); }
+
+/* Inline SVG icons (templates/icons.html) */
+.icon { display: inline-block; vertical-align: -0.125em; flex-shrink: 0; }
+
+/* Theme button label: one of the two spans shows, by theme */
+.theme-when-light, .theme-when-dark { display: inline-flex; align-items: center; gap: 0.4em; }
+.theme-when-dark { display: none; }
+[data-theme="dark"] .theme-when-light { display: none; }
+[data-theme="dark"] .theme-when-dark { display: inline-flex; }
+
+/* Page navigation (templates/pagination.html) */
+.pager { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; padding: 32px 0 64px; }
+.page-btn {
+    background: var(--surface); color: var(--text); border: 1px solid var(--input-border);
+    padding: 9px 16px; border-radius: 12px; text-decoration: none; font-size: 14px; font-weight: 600;
+    box-shadow: var(--shadow); transition: border-color 0.2s, color 0.2s, transform 0.2s;
+}
+.page-btn:hover { border-color: var(--accent); color: var(--accent-text); transform: translateY(-1px); }
+.page-jump label { font-size: 14px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.page-jump input {
+    width: 4.5em; padding: 7px 6px; margin: 0 4px; text-align: center; font: inherit; color: var(--text);
+    background: var(--surface); border: 1px solid var(--text-faint); border-radius: 8px;
+    -moz-appearance: textfield; appearance: textfield;
+}
+.page-jump input::-webkit-outer-spin-button, .page-jump input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.page-jump input:focus { outline: 2px solid var(--accent-text); outline-offset: 1px; border-color: transparent; }
+
+/* Account control, top right (templates/account_menu.html). Sits on both the
+   dark top bar and the light page header, so it carries its own colours. */
+.account-area { display: inline-flex; align-items: center; }
+.account-menu { position: relative; }
+.account-button {
+    width: 36px; height: 36px; border-radius: 50%; padding: 0; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 18px;
+    background: var(--accent); color: #fff; border: 2px solid rgba(255, 255, 255, 0.35);
+    box-shadow: var(--shadow);
+}
+.account-button:hover { background: var(--accent-dark); }
+.account-button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+.account-dropdown {
+    position: absolute; right: 0; top: calc(100% + 8px); z-index: 300; min-width: 210px; padding: 6px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18); text-align: left;
+}
+.account-dropdown[hidden] { display: none; }
+.account-who { padding: 8px 12px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.account-who strong { display: block; color: var(--text); font-size: 14px; }
+.account-who span { color: var(--text-muted); font-size: var(--fs-label); }
+.account-menu .account-dropdown a,
+.account-menu .account-dropdown button {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border-radius: 8px;
+    background: none; border: none; cursor: pointer; text-decoration: none; text-align: left;
+    color: var(--text); font: inherit; font-size: 14px; font-weight: 500;
+}
+.account-menu .account-dropdown a:hover,
+.account-menu .account-dropdown button:hover { background: var(--btn-muted-bg); color: var(--accent-text); }
+.account-area a.account-signin {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 12px;
+    background: var(--accent); color: #fff; text-decoration: none; font-size: 13px; font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.account-area a.account-signin:hover { background: var(--accent-dark); }
+
+/* Back link in the top bar (templates/breadcrumb.html). The bar is dark in
+   both themes, so one link colour serves both. */
+.crumb-bar { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.topbar a.crumb {
+    color: #89b4fa;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.topbar a.crumb:hover { text-decoration: underline; }
+
+/* Right side of a dark top bar: Light/Dark button + account menu. Base
+   button style; pages with their own .theme-toggle rule override it. */
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.theme-toggle {
+    display: inline-flex; align-items: center;
+    background: none;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: var(--topbar-text);
+    padding: 6px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Phones: config-page tables scroll sideways inside their card instead of
+   being clipped or squeezing columns to a word per line (mobile pass). */
+@media (max-width: 768px) {
+    .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .card table { min-width: 560px; }
+    .card .url-cell { min-width: 220px; }
+}

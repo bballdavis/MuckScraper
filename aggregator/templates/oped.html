@@ -1,0 +1,289 @@
+{% from 'story_card_macros.html' import bias_tag with context %}
+{% from 'account_menu.html' import account_menu with context %}
+{% from 'pagination.html' import pager %}
+{% from 'icons.html' import icon, theme_toggle_label %}
+{% from 'oped_columns.html' import oped_columns, oped_roundup %}
+{#- Op/Ed list (admin.oped_list, blueprints/admin/oped.py). Laid out like
+    All Stories (articles.html); cards reuse story_card.css. -#}
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_32.png') }}">
+    <link rel="icon" type="image/png" sizes="128x128" href="{{ url_for('static', filename='favicon_128.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192.png') }}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
+    <title>Op/Ed | MuckScraper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/story_card.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/oped_columns.css') }}">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            transition: background 0.2s, color 0.2s;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        {% include 'sidebar_styles.html' %}
+
+        .main {
+            flex: 1;
+            min-width: 0;
+            padding: 0 40px;
+            max-width: var(--width-list);
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .main-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            position: sticky;
+            top: 0;
+            background: var(--topbar-bg);
+            padding: 16px 40px;
+            margin-bottom: 20px;
+            z-index: 100;
+        }
+
+        h1 { font-size: 18px; font-weight: 800; color: var(--topbar-text); letter-spacing: -0.5px; }
+
+        .header-controls { display: flex; align-items: center; gap: 12px; }
+
+        .theme-toggle {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: var(--topbar-text);
+            padding: 6px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .page-title { font-size: var(--fs-page-title); font-weight: 800; margin-bottom: 6px; }
+        .page-intro { font-size: var(--fs-meta); color: var(--text-muted); margin-bottom: 20px; max-width: 70ch; line-height: 1.5; }
+
+        .search-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+        .search-bar input {
+            padding: 12px 16px;
+            flex: 1;
+            max-width: 400px;
+            font-size: 15px;
+            border: 1px solid var(--input-border);
+            border-radius: 12px;
+            background: var(--surface);
+            color: var(--text);
+            box-shadow: var(--shadow);
+        }
+        .search-bar input:focus { outline: none; border-color: var(--accent); }
+        .search-bar button {
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 600;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        .search-bar button:hover { background: var(--accent-dark); }
+        .search-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .clear-search { font-size: 13px; font-weight: 700; color: var(--accent-text); text-decoration: none; }
+
+        .filter-row { margin-bottom: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .filter-label {
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+        }
+        .filter-link {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .filter-link.active { color: var(--text); border-color: var(--accent); }
+
+        .result-count { font-size: var(--fs-meta); color: var(--text-muted); margin: 8px 0 18px; }
+
+        .oped-excerpt { font-size: var(--fs-body); color: var(--text-muted); line-height: 1.5; margin-top: 4px; }
+        .oped-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: var(--fs-meta); color: var(--text-muted); }
+        /* Same chip shape as articles.html (colours come from theme.css). */
+        .bias-tag {
+            display: inline-block;
+            font-size: var(--fs-label);
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .bias-none { background-color: #ddd; color: #666; }
+        .outlet-name { color: var(--text-muted); font-size: 13px; font-weight: 600; }
+        .external-mark { display: inline-block; font-size: var(--fs-label); color: var(--text-faint); margin-left: 4px; }
+
+        .by-story { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 20px 24px; margin-bottom: 20px; }
+        .by-story h2 { font-size: var(--fs-card-title); font-weight: 800; line-height: 1.3; margin-bottom: 4px; }
+        .by-story h2 a { color: var(--text); text-decoration: none; }
+        .by-story h2 a:hover { color: var(--accent-text); }
+        .by-story .by-story-meta { font-size: var(--fs-meta); color: var(--text-muted); margin-bottom: 16px; }
+
+        .empty { text-align: center; padding: 80px 0; color: var(--text-faint); font-style: italic; }
+
+        @media (max-width: 900px) {
+            .main { padding: 0 20px; }
+            .main-header { padding: 16px 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="layout">
+
+    {% include 'sidebar_nav.html' %}
+
+    <div class="page-body">
+    <div class="main-header">
+        <h1>MuckScraper</h1>
+        <div class="header-controls">
+            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">{{ theme_toggle_label() }}</button>
+            {{ account_menu() }}
+        </div>
+    </div>
+
+    <div class="main">
+        <h2 class="page-title">Op/Ed</h2>
+        <p class="page-intro">Opinion columns, op-eds and editorials from the outlets MuckScraper reads. They're kept out of the news stories and editions and collected here instead. Each one opens on the publisher's site.</p>
+
+        <div class="filter-row">
+            <span class="filter-label">View</span>
+            <a href="{{ url_for('admin.oped_list', range=active_range, leaning=active_leaning, q=active_search_query or '') }}"
+               class="filter-link {% if active_view == 'latest' %}active{% endif %}">Latest</a>
+            <a href="{{ url_for('admin.oped_list', view='story') }}"
+               class="filter-link {% if active_view == 'story' %}active{% endif %}">By story</a>
+        </div>
+
+        {% if active_view == 'story' %}
+        <p class="result-count">The news stories with the most columns about them, newest first among equals. Each column is filed under its outlet's leaning; the line under it says what it argues.</p>
+        {% for story, columns in by_story %}
+        <div class="by-story">
+            <h2><a href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ story.display_headline }}</a></h2>
+            <p class="by-story-meta">{{ story.articles|length }} news article{{ 's' if story.articles|length != 1 else '' }} · {{ columns.values()|map('length')|sum }} column{{ 's' if columns.values()|map('length')|sum != 1 else '' }}</p>
+            {{ oped_roundup(story) }}
+            {{ oped_columns(columns) }}
+        </div>
+        {% else %}
+        <div class="empty"><p>No columns are linked to a news story yet.</p></div>
+        {% endfor %}
+        {% else %}
+        <form method="GET" action="{{ url_for('admin.oped_list') }}" class="search-bar">
+            <input type="hidden" name="range" value="{{ active_range }}">
+            <input type="hidden" name="leaning" value="{{ active_leaning or '' }}">
+            <input type="text" name="q" value="{{ active_search_query or '' }}" placeholder="Search titles and outlets...">
+            <div class="search-actions">
+                <button type="submit">Search</button>
+                {% if active_search_query %}
+                <a href="{{ url_for('admin.oped_list', range=active_range, leaning=active_leaning) }}" class="clear-search">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+
+        <div class="filter-row">
+            <span class="filter-label">Time Range</span>
+            {% for value, label in time_ranges %}
+                <a href="{{ url_for('admin.oped_list', range=value, leaning=active_leaning, q=active_search_query or '') }}"
+                   class="filter-link {% if active_range == value %}active{% endif %}">{{ label }}</a>
+            {% endfor %}
+        </div>
+
+        <div class="filter-row">
+            <span class="filter-label">Outlet Leaning</span>
+            <a href="{{ url_for('admin.oped_list', range=active_range, q=active_search_query or '') }}"
+               class="filter-link {% if not active_leaning %}active{% endif %}">All</a>
+            {% for value, label in leanings %}
+                <a href="{{ url_for('admin.oped_list', range=active_range, leaning=value, q=active_search_query or '') }}"
+                   class="filter-link {% if active_leaning == value %}active{% endif %}">{{ label }}</a>
+            {% endfor %}
+        </div>
+
+        <p class="result-count">{{ '{:,}'.format(total) }} piece{{ 's' if total != 1 else '' }}</p>
+
+        {% if pieces %}
+            {% for piece in pieces %}
+            <div class="story" id="oped-{{ piece.id }}">
+                <div class="story-layout">
+                    <div class="story-image">
+                        {% if piece.image_url %}
+                            <img src="{{ piece.image_url }}" alt="" loading="lazy">
+                        {% else %}
+                            <div class="story-image-placeholder">{{ icon('newspaper') }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="story-content">
+                        <h2><a href="{{ piece.url }}" target="_blank" rel="noopener noreferrer">{{ piece.title }}<span class="external-mark" aria-label="(opens the publisher's site)">↗</span></a></h2>
+                        {% if excerpts.get(piece.id) %}
+                            <p class="oped-excerpt">{{ excerpts[piece.id] }}</p>
+                        {% endif %}
+                        <div class="oped-meta">
+                            <span class="outlet-name">{{ piece.outlet.name if piece.outlet else piece.source }}</span>
+                            {{ bias_tag(piece.bias_score) }}
+                            {% if piece.date %}
+                                <span class="meta-item"><span class="local-date" data-utc="{{ piece.date.isoformat() }}Z">{{ piece.date.strftime('%Y-%m-%d %H:%M') }} UTC</span></span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty">
+                <p>No opinion pieces in this window. Try a longer time range.</p>
+            </div>
+        {% endif %}
+
+        {{ pager(page, total_pages) }}
+        {% endif %}
+    </div>
+    </div>
+</div>
+
+<script>
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+    }
+
+    function toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('muckscraper-theme', next);
+        applyTheme(next);
+    }
+
+    applyTheme(localStorage.getItem('muckscraper-theme') || 'light');
+
+    {% include 'sidebar_script.html' %}
+</script>
+
+<script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
+</body>
+</html>

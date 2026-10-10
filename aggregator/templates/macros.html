@@ -1,0 +1,36 @@
+{% macro bias_label(score) %}
+  {%- if score is not none -%}
+    {%- if score <= 1.5 -%}Left
+    {%- elif score <= 2.5 -%}Center-Left
+    {%- elif score <= 3.5 -%}Center
+    {%- elif score <= 4.5 -%}Center-Right
+    {%- else -%}Right
+    {%- endif -%}
+  {%- endif -%}
+{% endmacro %}
+
+{% macro bias_color_class(score) %}
+  {%- if score is not none -%}
+    {%- if score <= 2.5 -%}bias-left
+    {%- elif score <= 3.5 -%}bias-center
+    {%- else -%}bias-right
+    {%- endif -%}
+  {%- endif -%}
+{% endmacro %}
+
+{% macro bias_badge(outlet) %}
+  {% if outlet %}
+    <span class="bias-tag-group">
+      <span class="outlet-name-box">{{ outlet.name }}</span>
+      {% if outlet.bias_score is not none %}
+        {% set b_class = bias_color_class(outlet.bias_score) %}
+        <span class="bias-label-box {{ b_class }}">{{ bias_label(outlet.bias_score) }}</span>
+        {% if outlet.bias_source == 'allsides' %}
+          <span class="source-badge" title="AllSides rating">AS</span>
+        {% else %}
+          <span class="source-badge" title="AI generated rating">AI</span>
+        {% endif %}
+      {% endif %}
+    </span>
+  {% endif %}
+{% endmacro %}

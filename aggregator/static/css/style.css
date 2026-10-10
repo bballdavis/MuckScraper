@@ -1,0 +1,110 @@
+/* Bias display components */
+.bias-tag-group {
+  display: inline-flex !important;
+  align-items: center;
+  border: 1px solid var(--paper-border, #333);
+  margin: 4px 12px 6px 0;
+  overflow: hidden;
+  height: 24px;
+  vertical-align: middle;
+  white-space: nowrap;
+  background-color: rgba(0,0,0,0.02);
+  border-radius: 2px;
+  max-width: 100%;  /* never wider than its column (phones) */
+  transition: all 0.15s ease-out;
+  text-decoration: none;
+}
+
+.bias-tag-group:hover {
+  transform: translateY(-1px);
+  box-shadow: 2px 2px 0px rgba(0,0,0,0.1);
+  border-color: #000;
+}
+
+[data-theme="dark"] .bias-tag-group {
+  background-color: rgba(255,255,255,0.03);
+}
+
+.outlet-name-box {
+  /* Block-level inside the flex group so a long outlet name can end in an
+     ellipsis instead of pushing the page wider than a phone screen. */
+  display: block;
+  line-height: 22px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  background-color: transparent;
+  height: 100%;
+  border-right: 1px solid var(--paper-border, #333);
+  color: var(--paper-text);
+}
+
+.bias-label-box {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 700;
+  height: 100%;
+  border-right: 1px solid var(--paper-border, #333);
+  color: var(--paper-text);
+}
+
+.bias-left {
+  background-color: #2c5282 !important;
+  color: #fff !important;
+}
+
+.bias-center {
+  background-color: #718096 !important;
+  color: #fff !important;
+}
+
+.bias-right {
+  background-color: #c53030 !important;
+  color: #fff !important;
+}
+
+.source-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 100%;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  background-color: rgba(0,0,0,0.06);
+  color: var(--paper-text);
+}
+
+[data-theme="dark"] .source-badge {
+  background-color: rgba(255,255,255,0.08);
+}
+
+/* ── Aged newspaper look (Sepia) ─────────────────────────── */
+
+html {
+  /* Lower sepia for less yellow, lower brightness, and reduced saturation for a neutral aged feel */
+  filter: sepia(0.3) contrast(1.05) brightness(0.9) saturate(0.8) !important;
+  background-color: #dcdbd3 !important; /* Neutral grey-beige aged color */
+}
+
+/* Images get compensated to stay crisp and correctly toned */
+img {
+  filter: grayscale(100%) sepia(0.2) contrast(0.9) brightness(0.8) !important;
+}
+
+/* ── End aged newspaper look ────────────────────────────── */
+
+
+
+
+
