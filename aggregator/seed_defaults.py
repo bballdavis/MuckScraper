@@ -347,28 +347,48 @@ Rules:
 - No markdown, no extra formatting
 - Do not add any text before or after the structure above"""
 
-PROMPT_DEEP_REPORT_SPORTS = """You are a sports journalist writing a factual recap and analysis of a sports story.
+PROMPT_DEEP_REPORT_SPORTS = """You are a sports journalist writing a factual report and analysis of a sports story.
 
 Below are articles covering the same story:
 
 {combined}
 
-Write a detailed report using this EXACT format:
+First decide what the story is about:
+- GAME: the coverage reports on a specific game, match, race, bout, or tournament round that has already been played.
+- OTHER: anything else -- injuries, trades, signings, contracts, coaching, previews of games not yet played, rankings, off-field incidents, legal or business news, disputes, or commentary.
 
-What happened: [2-3 sentences with the key facts — scores, results, or news]
+If it is a GAME, write a report using EXACTLY this format:
 
-Key performances: [Standout players, teams, or moments from the coverage. If not a game recap, describe the key people involved.]
+What happened: [2-3 sentences with the result and the decisive moments]
 
-The bigger picture: [What this means for standings, playoffs, championships, contracts, or the sport more broadly]
+Key performances: [Standout players, teams, or moments from the coverage]
 
-By the numbers: [Key stats, records, or figures mentioned in the coverage. If none available, say "Detailed statistics not available in current coverage."]
+The bigger picture: [What this means for standings, playoffs, championships, or the season]
 
-What's next: [One sentence on upcoming games, decisions, or developments to watch]
+By the numbers: [Key stats or records mentioned in the coverage. If none, say "Detailed statistics not available in current coverage."]
+
+What's next: [One sentence on the next game or development to watch]
+
+If it is OTHER, write a report using EXACTLY this format:
+
+What happened: [2-3 sentences with the key facts of the news]
+
+Who's involved: [The people and organisations involved and what each has said or done]
+
+How it's being covered: [Where the coverage agrees, differs, or adds its own angle]
+
+The bigger picture: [What this means for the team, league, players, or the sport more broadly]
+
+What's next: [One sentence on the decision, hearing, return, or development to watch]
 
 Rules:
-- Use EXACTLY the labels shown above including the colon
+- Use EXACTLY the labels of the format you chose, including the colon
+- Do not say which format you chose
+- For OTHER, do not describe a game result, score, or performance unless the coverage reports one
+- Never invent scores, statistics, or results; use only figures that appear in the coverage
 - Focus on facts and context over opinion
 - No markdown, no extra formatting
+- Only state a person's title or office (e.g. "coach," "commissioner," "owner," "president") if it is explicitly written in the source text above -- never infer, assume, or invent one from your own knowledge, even if it seems likely
 - Do not add any text before or after the structure above"""
 
 PROMPT_DEEP_REPORT_BUSINESS = """You are a financial journalist writing a detailed report on a business or markets story.
@@ -603,6 +623,76 @@ Rules:
 - Do not include source names or outlet names
 - Respond with ONLY the headline, nothing else"""
 
+PROMPT_ARTICLE_DEEP_ANALYSIS_DEFAULT = """You are a professional news analyst writing a focused article analysis.
+
+Analyze this news article using EXACTLY this format:
+
+Core facts: [2-3 sentences on what happened, who is involved, and where things stand, using only what the article reports]
+
+Why it matters: [Who is affected and what is at stake]
+
+How it frames the issue: [What the article emphasizes, whose perspective it centres, and any loaded or one-sided language]
+
+What evidence it relies on: [The main sources, documents, officials, or data the article cites, and how well supported its key claims are]
+
+What to question or watch: [Unanswered questions, missing perspectives, or what future reporting should clarify]
+
+Rules:
+- Use EXACTLY the labels shown above including the colon
+- Stay analytical, not partisan
+- No markdown, no extra formatting
+- Only state a person's title or office (e.g. "president," "former president," "senator," "CEO") if it is explicitly written in the source text above -- never infer, assume, or invent one from your own knowledge, even if it seems likely
+- Do not add any text before or after the structure above
+
+Article title: {article_title}
+
+Article content:
+{clean_content}
+
+Analysis:"""
+
+PROMPT_ARTICLE_DEEP_ANALYSIS_SPORTS = """You are a sports journalist writing a focused article analysis.
+
+First decide what the article is about:
+- GAME: it reports on a specific game, match, race, bout, or tournament round that has already been played.
+- OTHER: anything else -- injuries, trades, signings, contracts, coaching, previews of games not yet played, rankings, off-field incidents, legal or business news, disputes, or commentary.
+
+If it is a GAME, use EXACTLY this format:
+
+What happened: [2-3 sentences on who played, the result, and the decisive moments]
+
+Key performances: [Standout players or units, with any figures the article gives]
+
+The bigger picture: [What the result means for standings, playoffs, or the season]
+
+What to question or watch: [Open questions or what comes next]
+
+If it is OTHER, use EXACTLY this format:
+
+What happened: [2-3 sentences on the news itself]
+
+Who's involved: [The people and organisations involved and their stated positions]
+
+The bigger picture: [What this means for the team, league, or sport]
+
+What to question or watch: [Unresolved questions or what future reporting should clarify]
+
+Rules:
+- Use EXACTLY the labels of the format you chose, including the colon
+- Do not say which format you chose
+- For OTHER, do not describe a game result, score, or performance unless the article reports one
+- Never invent scores, statistics, or results; use only figures that appear in the article
+- No markdown, no extra formatting
+- Only state a person's title or office (e.g. "coach," "commissioner," "owner," "president") if it is explicitly written in the source text above -- never infer, assume, or invent one from your own knowledge, even if it seems likely
+- Do not add any text before or after the structure above
+
+Article title: {article_title}
+
+Article content:
+{clean_content}
+
+Analysis:"""
+
 PROMPT_OPINION_LINK_CHECK = """You are matching an opinion column to a news story.
 
 Opinion column:
@@ -650,6 +740,8 @@ SEED_PROMPTS = [
     ('article_deep_analysis.politics', 'Per-article deep analysis — political articles', PROMPT_ARTICLE_DEEP_ANALYSIS_POLITICS),
     ('article_deep_analysis.science', 'Per-article deep analysis — science/tech articles', PROMPT_ARTICLE_DEEP_ANALYSIS_SCIENCE),
     ('article_deep_analysis.business', 'Per-article deep analysis — business articles', PROMPT_ARTICLE_DEEP_ANALYSIS_BUSINESS),
+    ('article_deep_analysis.sports', 'Per-article deep analysis for sports; game recap only when a game was actually played.', PROMPT_ARTICLE_DEEP_ANALYSIS_SPORTS),
+    ('article_deep_analysis.default', 'Per-article deep analysis for general news (anything not politics, science, business or sports).', PROMPT_ARTICLE_DEEP_ANALYSIS_DEFAULT),
     ('topic_classifier', 'Topic classification prompt', PROMPT_TOPIC_CLASSIFIER),
     ('outlet_bias.by_name', 'Outlet bias rating by outlet name', PROMPT_OUTLET_BIAS_BY_NAME),
     ('outlet_bias.by_article', 'Outlet bias rating by article content', PROMPT_OUTLET_BIAS_BY_ARTICLE),
