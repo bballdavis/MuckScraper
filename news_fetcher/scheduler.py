@@ -93,6 +93,23 @@ def run_optional_headline_ranking():
     return {"status": "ok"}
 
 
+def run_optional_daily_horoscope():
+    """
+    Run the private daily-horoscope plugin when it exists locally. It writes
+    at most once per day, so calling it on every full run is cheap.
+    """
+    try:
+        from news_fetcher.horoscope import run_daily_horoscope
+    except ImportError as e:
+        logging.info(f"--- Daily horoscope skipped ({e}) ---")
+        return {
+            "status": "skipped",
+            "reason": str(e),
+        }
+
+    return run_daily_horoscope()
+
+
 def run_optional_static_export(extra_edition_ids=None, opinion_story_ids=None):
     """
     Export optional static output when an additional exporter is available.
@@ -1066,6 +1083,14 @@ def run_all_fetches(run_full_pipeline=True):
                 run_metrics["status"] = "partial_error"
                 run_metrics["steps"]["opinion_roundups"] = {"status": "error", "reason": str(e)}
 
+            logging.info("--- Daily horoscope ---")
+            try:
+                run_metrics["steps"]["daily_horoscope"] = run_optional_daily_horoscope()
+            except Exception as e:
+                db.session.rollback()
+                logging.error(f"Error writing the daily horoscope: {e}")
+                run_metrics["steps"]["daily_horoscope"] = {"status": "error", "reason": str(e)}
+
             logging.info("--- Exporting static site ---")
             try:
                 backfilled_edition_ids = run_metrics["steps"]["process_current_edition"].get(
@@ -1100,6 +1125,7 @@ def run_all_fetches(run_full_pipeline=True):
             run_metrics["steps"]["publish_edition"] = {"status": "skipped", "reason": "fetch_only_run"}
             run_metrics["steps"]["process_current_edition"] = {"status": "skipped", "reason": "fetch_only_run"}
             run_metrics["steps"]["opinion_roundups"] = {"status": "skipped", "reason": "fetch_only_run"}
+            run_metrics["steps"]["daily_horoscope"] = {"status": "skipped", "reason": "fetch_only_run"}
             run_metrics["steps"]["static_export"] = {"status": "skipped", "reason": "fetch_only_run"}
 
         run_metrics["steps"]["search_index"] = _update_search_index(
