@@ -29,7 +29,7 @@ import logging
 import re
 from datetime import datetime, timedelta
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 
 from aggregator.models import OpinionPiece, Story, db
 from aggregator.opinion import leaning
@@ -176,12 +176,22 @@ def _candidate_stories(vector):
     return stories
 
 
+def _is_duplicate_column(piece, story_id):
+    """The same column under a second URL (the NYT publishes some as an
+    article and again as a podcast or video page), already linked here."""
+    return db.session.query(OpinionPiece.id).filter(
+        OpinionPiece.story_id == story_id,
+        OpinionPiece.id != piece.id,
+        func.lower(OpinionPiece.title) == (piece.title or "").lower(),
+    ).first() is not None
+
+
 def link_new_opinion_pieces(now=None):
     """Step 1: link each unchecked recent piece to at most one story."""
     from news_fetcher.story_grouper import strip_video_prefix
 
     now = now or datetime.utcnow()
-    metrics = {"checked": 0, "linked": 0, "letters": 0, "no_embedding": 0, "llm_errors": 0}
+    metrics = {"checked": 0, "linked": 0, "letters": 0, "duplicates": 0, "no_embedding": 0, "llm_errors": 0}
     pieces = (OpinionPiece.query
               .filter(OpinionPiece.link_checked_at.is_(None),
                       OpinionPiece.fetched_at >= now - timedelta(hours=LINK_LOOKBACK_HOURS))
@@ -224,6 +234,9 @@ def link_new_opinion_pieces(now=None):
                     llm_failed = True
                     break
                 if parse_link_answer(answer):
+                    if _is_duplicate_column(piece, story_id):
+                        metrics["duplicates"] += 1
+                        break
                     piece.story_id = story_id
                     piece.link_similarity = round(sim, 4)
                     metrics["linked"] += 1
