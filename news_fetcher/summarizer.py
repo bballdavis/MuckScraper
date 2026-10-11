@@ -90,7 +90,10 @@ def _select_story_prompt_articles(story, limit=10):
     they don't happen to land in the collection's native DB order.
     """
     from datetime import datetime as _dt
-    sorted_articles = sorted(story.articles, key=lambda a: getattr(a, "date", None) or _dt.min, reverse=True)
+    from aggregator.article_copies import original_articles
+    # A copy of another article in the story adds no reporting, and the
+    # model would otherwise report it as a second outlet's coverage.
+    sorted_articles = sorted(original_articles(story.articles), key=lambda a: getattr(a, "date", None) or _dt.min, reverse=True)
     articles = sorted_articles[:limit]
     if len(articles) < 3:
         return articles, []

@@ -8,6 +8,7 @@ from aggregator.article_signals import bias_bucket_for_score, is_independent_sou
 from aggregator.models import AppSetting, PipelineSchedule, ScheduledFetch
 from news_fetcher.fetch_and_store_articles import fetch_and_store_articles, process_current_edition, review_ambiguous_grouping_matches, sync_allsides_ratings, publish_edition, retry_unrated_outlets, clear_stale_single_article_headlines
 from news_fetcher.headline_generator import generate_headlines_for_stale_stories
+from news_fetcher.copy_detector import mark_recent_copies
 from news_fetcher.opinion_linker import link_opinion_and_write_roundups
 from news_fetcher.rss_fetcher import (
     fetch_and_store_rss,
@@ -1028,6 +1029,19 @@ def run_all_fetches(run_full_pipeline=True):
             # model at a time, so batching here means it loads once and stays
             # loaded for the summary phase instead of being swapped in and out
             # around every grouping and classification call.
+            # Copies (one outlet republishing another, or the same wire text
+            # under two names) are marked after membership has settled and
+            # before headlines, ranking and the edition, which all count
+            # sources without them (aggregator/article_copies.py).
+            logging.info("--- Marking copied articles ---")
+            try:
+                run_metrics["steps"]["article_copies"] = mark_recent_copies()
+            except Exception as e:
+                db.session.rollback()
+                logging.error(f"Error marking copied articles: {e}")
+                run_metrics["status"] = "partial_error"
+                run_metrics["steps"]["article_copies"] = {"status": "error", "reason": str(e)}
+
             logging.info("--- Generating headlines ---")
             try:
                 run_metrics["steps"]["headline_generation"] = generate_headlines_for_stale_stories()

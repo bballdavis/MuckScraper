@@ -349,6 +349,10 @@
                                 Limited By Publisher Block
                             {% endif %}
                         </div>
+                        {% set copy_note = copy_label(article) %}
+                        {% if copy_note %}
+                        <div class="scrape-note copy-note" title="This article is mostly the same text as another one in the story, so it is not counted as a separate source in the edition, summary or analysis.">{{ copy_note }} · not counted as a separate source</div>
+                        {% endif %}
 
 	                    <div style="display: flex; gap: 12px; margin-top: 16px; align-items: center;">
                         <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="btn-view">{{ 'Read Summary & Text →' if current_user.is_authenticated else 'Read Summary →' }}</a>

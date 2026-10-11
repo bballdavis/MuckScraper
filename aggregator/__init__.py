@@ -53,7 +53,8 @@ def create_app():
         from aggregator.models import ROLE_LABELS
         from aggregator.permissions import can, public_read_enabled
         from aggregator import navigation
-        return {"can": can, "public_read": public_read_enabled(), "role_labels": ROLE_LABELS,
+        from aggregator.article_copies import copy_label
+        return {"can": can, "copy_label": copy_label, "public_read": public_read_enabled(), "role_labels": ROLE_LABELS,
                 "current_back": navigation.current_back, "incoming_back": navigation.incoming_back,
                 "feed_back_url": navigation.feed_back_url, "menu_back": navigation.menu_back}
 
