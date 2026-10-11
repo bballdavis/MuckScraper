@@ -4,12 +4,15 @@ from aggregator.article_signals import is_independent_source
 from aggregator.constants import AGGREGATORS
 
 
-def apply_aggregator_filter(story):
+def apply_aggregator_filter(story, drop_copies=False):
+    """drop_copies: leave out articles that copy another article in the
+    story (muckscraper.news, 2026-10-11). The aggregator keeps them."""
     originals = []
     aggregators = []
     has_good_original = False
     seen_articles = set()
-    sorted_articles = sorted(story.articles, key=lambda x: x.date or dt.min, reverse=True)
+    articles = story.site_articles if drop_copies else story.articles
+    sorted_articles = sorted(articles, key=lambda x: x.date or dt.min, reverse=True)
     for art in sorted_articles:
         key = (art.title, art.outlet_id)
         if key in seen_articles:

@@ -84,6 +84,13 @@ class Story(db.Model):
         return max((a.date for a in self.articles if a.date), default=self.created_at)
 
     @property
+    def site_articles(self):
+        """The story's articles without copies of another article in it
+        (aggregator/article_copies.py): what muckscraper.news shows."""
+        from aggregator.article_copies import original_articles
+        return original_articles(self.articles)
+
+    @property
     def has_ai_headline(self):
         return len(self.articles) >= 2 and bool((self.headline or "").strip())
 
@@ -126,8 +133,15 @@ class Article(db.Model):
     grouping_candidate_story_ids = db.Column(db.Text, nullable=True)
     grouping_needs_review = db.Column(db.Boolean, default=False, nullable=False, server_default='false')
     grouping_reviewed_at = db.Column(db.DateTime, nullable=True)
+    # Same text as another article in the story (republished, or the same
+    # wire copy); set by news_fetcher/copy_detector.py. The aggregator still
+    # lists it; muckscraper.news leaves it out (aggregator/article_copies.py).
+    copy_of_id = db.Column(db.Integer, db.ForeignKey("articles.id", ondelete="SET NULL"), nullable=True, index=True)
+    copy_overlap = db.Column(db.Float, nullable=True)
+    copy_checked_at = db.Column(db.DateTime, nullable=True)
 
     topics = db.relationship("Topic", secondary=article_topics, back_populates="articles")
+    copy_of = db.relationship("Article", remote_side=[id], foreign_keys=[copy_of_id])
 
     @property
     def last_updated(self):

@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta
 import numpy as np
 from aggregator import db
+from aggregator.article_copies import original_articles
 from aggregator.article_signals import ROUNDUP_TITLE_PATTERNS, bias_bucket_for_score
 from news_fetcher.story_grouper import normalize_title_tokens, titles_are_near_duplicates
 
@@ -212,7 +213,7 @@ def _story_balance_bucket(story):
         "rightish": 0,
         "unrated": 0,
     }
-    for article in story.articles:
+    for article in original_articles(story.articles):
         score = article.bias_score
         if score is None and article.outlet:
             score = article.outlet.bias_score
@@ -250,7 +251,7 @@ def _story_has_left_and_right_coverage(story):
     has_leftish = False
     has_rightish = False
 
-    for article in story.articles:
+    for article in original_articles(story.articles):
         score = article.bias_score
         if score is None and article.outlet:
             score = article.outlet.bias_score
@@ -269,7 +270,7 @@ def _story_has_left_and_right_coverage(story):
 
 def _story_primary_outlet(story):
     outlet_counts = {}
-    for article in story.articles:
+    for article in original_articles(story.articles):
         if not article.outlet or not article.outlet.name:
             continue
         key = article.outlet.name.strip()
@@ -285,7 +286,7 @@ def _story_outlet_count(story):
     """Distinct outlets among a story's articles (articles with no outlet
     count by their source name, so an unlinked article isn't ignored)."""
     keys = set()
-    for article in story.articles:
+    for article in original_articles(story.articles):
         if article.outlet_id is not None:
             keys.add(("id", article.outlet_id))
         elif article.source:

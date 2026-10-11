@@ -126,7 +126,10 @@ def generate_story_headline(story):
     # story with more than 10 articles doesn't silently drop its newest
     # developments from the prompt just because they land later in the
     # collection's native DB order.
-    sorted_articles = sorted(story.articles, key=lambda a: getattr(a, "date", None) or datetime.min, reverse=True)
+    # Copies are left out: a repeated title is a vote for the topic, and a
+    # republished article is not a second outlet's vote.
+    from aggregator.article_copies import original_articles
+    sorted_articles = sorted(original_articles(story.articles), key=lambda a: getattr(a, "date", None) or datetime.min, reverse=True)
 
     titles = "\n".join(
         f"- {article.title}" for article in sorted_articles[:10]
