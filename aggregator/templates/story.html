@@ -212,7 +212,7 @@
 <div class="topbar">
     <div class="topbar-left crumb-bar">
         <span class="topbar-title">MuckScraper</span>
-        {{ back_link(feed_back_url(), 'Back to Feed') }}
+        {{ back_link(feed_back_url('story-%d' % story.id), 'Back to Feed') }}
     </div>
     <div style="display:flex; align-items:center; gap:12px;">
         <button id="theme-toggle" onclick="toggleTheme()"

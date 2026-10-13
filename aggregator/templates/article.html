@@ -351,7 +351,7 @@
         {% if article.story_id %}
         {{ back_link(url_for('public.view_story', story_id=article.story_id, back=incoming_back()), 'Back to Story') }}
         {% else %}
-        {{ back_link(feed_back_url(), 'Back to Feed') }}
+        {{ back_link(feed_back_url(article_back_anchor(article)), 'Back to Feed') }}
         {% endif %}
     </div>
     <div style="display:flex; align-items:center; gap:12px;">

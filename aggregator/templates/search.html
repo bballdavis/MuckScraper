@@ -174,6 +174,12 @@
             border-bottom: 1px solid var(--input-border);
             white-space: nowrap;
         }
+        /* "Back to Feed" lands on #story-<id> / #article-<id>: clear the
+           sticky page header plus the sticky table header. */
+        table.results tbody tr[id], table.results .row-anchor { scroll-margin-top: calc(var(--sticky-header-height, 0px) + 56px); }
+        /* Articles tab: the first row of each story also answers to #story-<id>,
+           for Story -> Back to Feed. */
+        table.results .row-anchor { display: inline-block; width: 0; height: 0; vertical-align: top; }
         table.results thead th:first-child { border-top-left-radius: 12px; }
         table.results thead th:last-child { border-top-right-radius: 12px; }
         table.results th a { color: inherit; text-decoration: none; }
@@ -276,9 +282,10 @@
                     </tr>
                 </thead>
                 <tbody>
+                {% set anchors = namespace(stories=[]) %}
                 {% for row in rows %}
                     {% if tab == 'stories' %}
-                    <tr>
+                    <tr id="story-{{ row.id }}">
                         <td class="col-title"><a href="{{ url_for('public.view_story', story_id=row.id, back=current_back()) }}">{{ row.headline }}</a></td>
                         <td class="col-topics">{{ row.topics|join(', ') }}</td>
                         <td class="col-num">{{ row.articles }}</td>
@@ -290,8 +297,8 @@
                         <td class="col-date">{{ row.updated | local_datetime }}</td>
                     </tr>
                     {% else %}
-                    <tr>
-                        <td class="col-title"><a href="{{ url_for('public.view_article', article_id=row.id, back=current_back()) }}">{{ row.title }}</a></td>
+                    <tr id="article-{{ row.id }}">
+                        <td class="col-title">{% if row.story_id and row.story_id not in anchors.stories %}{% set anchors.stories = anchors.stories + [row.story_id] %}<span class="row-anchor" id="story-{{ row.story_id }}"></span>{% endif %}<a href="{{ url_for('public.view_article', article_id=row.id, back=current_back()) }}">{{ row.title }}</a></td>
                         <td class="col-outlet">{{ row.outlet_name }}</td>
                         <td class="col-date">{{ row.date | local_datetime }}</td>
                         {% set chip_label, chip_tooltip, chip_class = row.bias_chip %}<td class="col-num"><span class="bias {{ chip_class }}" title="{{ chip_tooltip }}" aria-label="{{ chip_tooltip }}">{{ chip_label }}</span></td>
