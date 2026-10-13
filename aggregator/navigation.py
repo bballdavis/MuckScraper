@@ -44,9 +44,23 @@ def incoming_back():
     return safe_back(request.args.get("back"))
 
 
-def feed_back_url():
-    """Where "Back to Feed" goes: the list the reader came from, else Headlines."""
-    return incoming_back() or url_for("public.headlines_feed")
+def feed_back_url(anchor=None):
+    """Where "Back to Feed" goes: the list the reader came from, else Headlines.
+    `anchor` (an element id such as "story-123") is added as a fragment so the
+    list opens at the card the reader left from, not at the top."""
+    url = incoming_back() or url_for("public.headlines_feed")
+    if anchor and "#" not in url:
+        url = f"{url}#{anchor}"
+    return url
+
+
+def article_back_anchor(article):
+    """Card to return to from an article page: the article's own row on the
+    search page's Articles tab, else its story's card."""
+    back = incoming_back() or ""
+    if "tab=articles" in back:
+        return f"article-{article.id}"
+    return f"story-{article.story_id}" if article.story_id else None
 
 
 def menu_back():

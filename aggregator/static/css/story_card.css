@@ -6,6 +6,9 @@
  */
 
 .story {
+    /* "Back to Feed" lands on #story-<id>; clear the sticky top bar
+       (65px desktop, 80px phone). */
+    scroll-margin-top: 96px;
     background: var(--surface);
     border-radius: 16px;
     margin-bottom: 28px;
