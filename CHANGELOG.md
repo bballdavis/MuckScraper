@@ -21,6 +21,51 @@ All notable changes to MuckScraper are documented here.
   is mounted read-only, and HTTP access needs a bearer token (`MCP_TOKEN`).
 - `docker-restart-proxy` lists each container's start time and restart count,
   and has a bounded, read-only log route (`GET /containers/<name>/logs`).
+- **Op/Ed.** Opinion pieces are still kept out of the news, but they are now
+  saved to their own table instead of being dropped, and listed on a new Op/Ed
+  page (sidebar, below the topics) with a time window, a Left / Center / Right
+  filter and search. A new `op_ed` RSS bucket stores every entry of an
+  opinion feed straight to Op/Ed; ten default feeds, balanced across the
+  spectrum. On full runs, each new column is linked to the news story it
+  argues about (embedding match plus a yes/no check by the fast model), and a
+  story with two or more linked columns gets a short opinion roundup saying
+  what each side argues. Letters to the editor are never linked.
+- **Copied articles are marked.** An article that shares at least half its
+  text with another outlet's article in the same story (a syndicated wire
+  story, or one outlet running another's piece) is labelled "Same report as
+  ..." on the story page, and is not counted as a separate source in story
+  selection, headlines, summaries or reports.
+- **Deep analysis for every edition article** with at least 500 characters of
+  text, shown in a Deep Analysis box on the article page. Sports reports first
+  decide whether the story is about a game, and stop assuming one.
+- **Quality check for invented titles:** the quality report flags summaries
+  and reports that call someone "former President ..." (or another former
+  office) when no source does.
+- **Signed-out article pages** say in plain words how much of the article
+  could be read ("Fully read", "Publisher blocked full-text access", ...), and
+  why there is no summary when the text couldn't be read.
+
+### Changed
+- **Ingestion refuses more junk:** fantasy-sports advice, "odds, predictions"
+  betting picks, Seeking Alpha contributor pieces and editorial cartoons (as
+  news and as Op/Ed). News about cartoons is kept. HTML tags embedded in
+  feed titles are stripped.
+- **Back to Feed returns to where you were.** Going back from a story or
+  article lands on the same card in the list, or the same row in Search,
+  instead of the top of the page.
+- On article pages, scrape details sit above the summary for signed-in readers.
+- The dark top bar spans the full page width on All Stories, Grouped Stories
+  and Search.
+- The browser tab icon is the raccoon mascot.
+- The quality checker accepts either label set when a prompt offers two
+  formats.
+- `seed_defaults()` seeds prompts as the migrations leave them, so a fresh
+  install starts with the current prompt text.
+
+### Database
+- Four migrations: `f2a6c9e4b7d1` (deep-analysis prompts), `a7d3e9f1c2b4`
+  (Op/Ed table), `b3f7c1d9e5a2` (Op/Ed links and roundups), `c5d1e8a3f7b9`
+  (copied-article columns). All are additive.
 
 ## [0.8.0] - 2026-10-05
 
