@@ -229,6 +229,8 @@ An optional, read-only [MCP](https://modelcontextprotocol.io) server lets an AI 
 - NewsAPI and GNews support
 - RSS ingestion support
 - Duplicate article detection by URL and normalized title/outlet checks
+- Copied articles (wire copies, one outlet running another's piece) marked and not counted as extra sources
+- Junk filtered before storage: betting picks, fantasy advice, roundups, editorial cartoons, plus your own source and title blocks
 - Full-text search across articles and stories via Meilisearch, updated automatically after every run
 
 ### Scraping and reliability
@@ -244,13 +246,15 @@ An optional, read-only [MCP](https://modelcontextprotocol.io) server lets an AI 
 - LLM-assisted borderline match handling
 - AI story headlines for grouped stories
 - Story summaries and deeper reports
-- Per-article summaries
+- Per-article summaries and deep analysis for edition articles
+- Op/Ed kept apart from the news: its own page, opinion RSS feeds, columns linked to the stories they argue about, and a short opinion roundup per story
 - Stable-story skipping so unchanged stories do not keep reprocessing
 
 ### Reading and search
 - Headlines, Grouped Stories (two or more articles) and All Stories views, with topic filters
 - Time windows (24 hours, 7 days, 30 days, all time) on the story lists and search
 - Search page with sortable Stories and Articles tables and custom date ranges
+- Back to Feed returns to the card or search row you left
 - Relative timestamps ("3 hours ago") with the exact local time on hover
 - Light and dark themes
 - Reader, Scraper and Admin accounts, and optional public read-only access
