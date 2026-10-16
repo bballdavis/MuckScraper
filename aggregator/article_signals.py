@@ -188,6 +188,9 @@ OPINION_URL_HINTS = (
 # from it too (Regis, 2026-10-09): stock tips, not op-eds.
 LOW_VALUE_URL_PREFIXES = (
     "seekingalpha.com/article/",
+    # AP section index pages ("MLB | Latest News, Stats, and Scores"), which its
+    # Google News feed lists alongside articles (2026-10-16).
+    "apnews.com/hub/",
 )
 
 # Host + path prefixes for outlets that are opinion throughout. National

@@ -6,6 +6,7 @@ from collections import Counter
 from datetime import datetime
 from datetime import timedelta
 from aggregator.article_signals import bias_bucket_for_score
+from news_fetcher import google_news
 from news_fetcher.fetch_and_store_articles import merge_count_maps
 from news_fetcher.story_grouper import normalize_title_tokens, titles_are_near_duplicates
 
@@ -53,6 +54,21 @@ def _extract_image(entry):
     return None
 
 
+def _title_already_stored(title, source_name, days=4):
+    """True when this headline is already in articles or opinion_pieces.
+
+    Lets a Google News entry we already have skip its lookup. Matching on
+    the title alone is deliberate: the outlet name on an article is the
+    normalized one, which can differ from Google's spelling.
+    """
+    from aggregator.models import Article, OpinionPiece
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    for model in (Article, OpinionPiece):
+        if model.query.filter(model.title == title, model.fetched_at >= cutoff).first() is not None:
+            return True
+    return False
+
+
 def fetch_feed(feed_url, max_entries=30):
     """
     Fetch a single RSS feed.
@@ -65,10 +81,20 @@ def fetch_feed(feed_url, max_entries=30):
             if feed.feed else feed_url.split("/")[2]
         )
 
+        google_feed = google_news.is_google_news_feed(feed_url)
         articles = []
         for entry in feed.entries[:max_entries]:
             title = entry.get("title", "").strip()
             url = entry.get("link", "").strip()
+            entry_source = source_name
+            if google_feed:
+                # A Google News search feed mixes outlets in principle and
+                # titles every entry "<headline> - <Outlet>"; the outlet is
+                # the entry's <source>, not the feed's own title.
+                entry_source = (entry.get("source") or {}).get("title") or ""
+                title = google_news.strip_source_suffix(title, entry_source)
+                if not entry_source:
+                    continue
             if not title or not url:
                 continue
 
@@ -79,11 +105,19 @@ def fetch_feed(feed_url, max_entries=30):
                 "title":        title,
                 "content":      content,
                 "url":          url,
-                "source_name":  source_name,
+                "source_name":  entry_source,
                 "published_at": _parse_published(entry),
                 "image_url":    _extract_image(entry),
             })
 
+        if google_feed:
+            articles, stats = google_news.resolve_entries(articles, already_stored=_title_already_stored)
+            source_name = articles[0]["source_name"] if articles else source_name
+            logger.info(
+                f"  [RSS] Google News {feed_url[:80]}: {stats['entries']} entries, "
+                f"{stats['already_stored']} already stored, {stats['resolved']} resolved, "
+                f"{stats['failed']} unresolved"
+            )
         logger.info(f"  [RSS] Got {len(articles)} articles from {feed_url[:60]}")
         return source_name, articles
 
