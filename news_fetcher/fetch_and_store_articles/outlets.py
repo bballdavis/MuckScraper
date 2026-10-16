@@ -87,6 +87,10 @@ DOMAIN_SOURCE_OVERRIDES = {
     # Op-Eds & News Commentary | New York Post") don't normalize (2026-10-09).
     "nypost.com": "New York Post",
     "washingtonexaminer.com": "Washington Examiner",
+    # Feeds added 2026-10-16: the Free Beacon feed has an empty title, and the
+    # Dispatch was split across "The Dispatch" and "Thedispatch.com".
+    "freebeacon.com": "Washington Free Beacon",
+    "thedispatch.com": "The Dispatch",
 }
 
 
@@ -131,6 +135,7 @@ def normalize_source_name(name):
     domain_names = {
         "cnn.com": "CNN",
         "nypost.com": "New York Post",
+        "thedispatch.com": "The Dispatch",
         "washingtonpost.com": "Washington Post",
         "usatoday.com": "USA Today",
         "huffpost.com": "HuffPost",

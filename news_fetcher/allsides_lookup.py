@@ -76,8 +76,10 @@ ALLSIDES_BIAS = {
     "National Review": 4,
     "Fox Business": 4,
     "Reason": 4,
+    "The Dispatch": 4,  # Lean Right (AllSides blind survey, 2024); added 2026-10-16
 
     # Right
+    "Washington Free Beacon": 5,  # added 2026-10-16 with its feed
     "Fox News": 5,
     "Breitbart": 5,
     "Breitbart News": 5,
