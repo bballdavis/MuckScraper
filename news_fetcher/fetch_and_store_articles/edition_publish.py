@@ -10,7 +10,7 @@ import numpy as np
 from aggregator import db
 from aggregator.article_copies import original_articles
 from aggregator.article_signals import ROUNDUP_TITLE_PATTERNS, bias_bucket_for_score
-from news_fetcher.story_grouper import normalize_title_tokens, titles_are_near_duplicates
+from news_fetcher.story_grouper import COUNTRY_TOKENS, normalize_title_tokens, titles_are_near_duplicates
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +146,26 @@ def _distinctive_shared_tokens(tokens_a, tokens_b):
     }
 
 
+# Countries and the leaders who headline most days. Two stories about different
+# events in the same war routinely share all three of russia/trump/ukraine (and
+# their embeddings sit near 0.80 too): edition 683 and 684 both dropped
+# "Ukraine resumes attacks on Russian oil refineries" as a duplicate of a
+# Starlink story on exactly those words. They still count, since "Netanyahu
+# fiery UN speech" or "Trump, Xi, Beijing" can be what marks a real duplicate,
+# but a match made of names alone is not enough: at least one shared word must
+# be something else. Demonyms are already folded into these by
+# normalize_title_tokens (russian -> russia, chinese -> china).
+EDITION_DEDUPE_NAME_TOKENS = COUNTRY_TOKENS | {
+    "america", "american", "americans", "britain", "british", "europe",
+    "european", "trump", "biden", "vance", "putin", "zelensky", "zelenskyy",
+    "netanyahu", "xi_jinping", "starmer", "carney", "modi", "macron",
+}
+
+
+def _has_non_name_token(tokens):
+    return any(token not in EDITION_DEDUPE_NAME_TOKENS for token in tokens)
+
+
 # Shared title words alone over-match: by 2026-10-03 the remaining wrong skips
 # shared real content words (arrests/charged/fbi, trump/republicans,
 # college/football) that no word list should ignore. A word match now also
@@ -198,6 +218,8 @@ def stories_look_duplicate_for_edition(story_a, story_b):
     shared_tokens = tokens_a & tokens_b
     distinctive_shared = _distinctive_shared_tokens(tokens_a, tokens_b)
     word_match = len(distinctive_shared) >= 3
+    if not _has_non_name_token(distinctive_shared):
+        return False
     if not word_match:
         outlets_a = {((article.outlet.name or "").strip().lower()) for article in story_a.articles if article.outlet and article.outlet.name}
         outlets_b = {((article.outlet.name or "").strip().lower()) for article in story_b.articles if article.outlet and article.outlet.name}
