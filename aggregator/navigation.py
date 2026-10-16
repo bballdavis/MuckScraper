@@ -20,6 +20,8 @@ FEED_ENDPOINTS = {
     "admin.multi_article_stories",
     "admin.search_page",
     "admin.fetch_page",
+    "admin.oped_list",
+    "admin.oped_piece",
 }
 
 

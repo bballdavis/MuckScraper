@@ -1,0 +1,316 @@
+{% from 'story_card_macros.html' import bias_tag with context %}
+{% from 'account_menu.html' import account_menu with context %}
+{% from 'icons.html' import icon, theme_toggle_label %}
+{% from 'breadcrumb.html' import back_link %}
+{#- One Op/Ed piece (admin.oped_piece, blueprints/admin/oped.py), laid out like
+    article.html: what it argues, the news story it is linked to, its text and
+    the publisher link. Signed-out visitors get no text, as on article pages. -#}
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_32.png') }}">
+    <link rel="icon" type="image/png" sizes="128x128" href="{{ url_for('static', filename='favicon_128.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192.png') }}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
+    <title>{{ piece.title }} — Op/Ed — MuckScraper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <style>
+        :root { --shadow: 0 10px 30px rgba(0,0,0,0.08); }
+        [data-theme="dark"] { --shadow: 0 15px 40px rgba(0,0,0,0.4); }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            transition: background 0.2s, color 0.2s;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .topbar {
+            background: var(--topbar-bg);
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .topbar a { color: #89b4fa; text-decoration: none; font-size: 14px; font-weight: 600; }
+        .topbar-title { color: var(--topbar-text); font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+        /* The top bar is dark in both themes, so the button keeps light text. */
+        .theme-toggle { background: none; border: 1px solid #444; color: #cdd6f4; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
+
+        .container { max-width: var(--width-read); margin: 60px auto; padding: 0 20px; }
+
+        .article-card {
+            background: var(--surface);
+            border-radius: 24px;
+            padding: 48px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .article-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+        .outlet-name { font-size: 14px; font-weight: 700; color: var(--text-muted); }
+        .article-date { font-size: 14px; font-weight: 500; color: var(--text-faint); }
+        .opinion-chip {
+            font-size: var(--fs-label);
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+        .bias-tag {
+            display: inline-block;
+            font-size: var(--fs-label);
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .bias-none { background-color: #ddd; color: #666; }
+
+        h1 { font-size: 36px; font-weight: 800; color: var(--text); margin-bottom: 24px; line-height: 1.2; letter-spacing: -1px; }
+        h1 a { color: inherit; text-decoration: none; }
+
+        .piece-image { width: 100%; border-radius: 16px; margin-bottom: 32px; box-shadow: var(--shadow); }
+
+        .divider { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+        .summary {
+            background: var(--summary-bg);
+            border-left: 5px solid var(--accent);
+            padding: 24px 32px;
+            margin-bottom: 32px;
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--text);
+            border-radius: 0 16px 16px 0;
+        }
+        .summary-label {
+            font-size: var(--fs-label);
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--accent-text);
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+        }
+        .summary-note { font-size: var(--fs-label); color: var(--text-faint); margin-top: 10px; }
+        .summary a { color: var(--accent-text); font-weight: 700; text-decoration: none; }
+        .summary a:hover { text-decoration: underline; }
+        .muted { font-style: italic; color: var(--text-muted); }
+
+        .scrape-panel {
+            margin: 0 0 28px;
+            padding: 16px 18px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: var(--summary-bg);
+        }
+        .scrape-panel-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+        .scrape-label { font-size: var(--fs-label); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+        .scrape-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: rgba(0,0,0,0.03);
+            font-size: var(--fs-label);
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .scrape-chip.scrape-full { color: #1d6f42; border-color: rgba(29,111,66,0.25); background: rgba(29,111,66,0.08); }
+        .scrape-chip.scrape-teaser { color: #8a5a00; border-color: rgba(138,90,0,0.25); background: rgba(138,90,0,0.09); }
+        .scrape-chip.scrape-none { color: #666; border-color: rgba(102,102,102,0.25); background: rgba(102,102,102,0.08); }
+        .scrape-panel p { color: var(--text-muted); font-size: var(--fs-meta); margin: 0; }
+
+        .btn {
+            display: inline-block;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            background: var(--accent);
+            color: white;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: var(--accent-dark); transform: translateY(-1px); }
+        .public-source { margin: 8px 0 32px; text-align: center; }
+
+        .article-body { font-size: 18px; line-height: 1.8; color: var(--text); }
+        .article-body p { margin-bottom: 1.5em; }
+        .article-body a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 4px; }
+        .article-body img { max-width: 100%; height: auto; margin: 2em 0; border-radius: 16px; }
+        .no-text {
+            padding: 40px;
+            background: var(--bg);
+            border-radius: 16px;
+            text-align: center;
+            border: 1px dashed var(--border);
+        }
+        .no-text p { color: var(--text-muted); margin-bottom: 16px; }
+
+        .source-link {
+            margin-top: 48px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
+            word-break: break-word;
+        }
+        .source-link a { color: var(--accent-text); text-decoration: none; font-weight: 700; }
+        .source-link a:hover { text-decoration: underline; }
+
+        @media (max-width: 600px) {
+            .article-card { padding: 24px; border-radius: 0; }
+            .container { margin: 0; padding: 0; }
+            h1 { font-size: 28px; }
+            .topbar { padding: 16px 20px; }
+        }
+        {% include 'sidebar_styles.html' %}
+    </style>
+</head>
+<body>
+
+<div class="layout">
+{% include 'sidebar_nav.html' %}
+<div class="page-body">
+
+<div class="topbar">
+    <div class="topbar-left crumb-bar">
+        <span class="topbar-title">MuckScraper</span>
+        {{ back_link(back_href, back_label) }}
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">{{ theme_toggle_label() }}</button>
+        {{ account_menu() }}
+    </div>
+</div>
+
+{% set outlet_name = piece.outlet.name if piece.outlet else (piece.source or 'the publisher') %}
+<div class="container">
+    <div class="article-card">
+
+        <div class="article-meta">
+            <span class="opinion-chip">Opinion</span>
+            <span class="outlet-name">{{ outlet_name }}</span>
+            {% if piece.date %}
+            <span class="article-date local-date" data-utc="{{ piece.date.isoformat() }}Z">{{ piece.date.strftime('%B %d, %Y') }}</span>
+            {% endif %}
+            {{ bias_tag(piece.bias_score) }}
+        </div>
+
+        <h1><a href="{{ piece.url }}" target="_blank" rel="noopener noreferrer">{{ piece.title }}</a></h1>
+
+        {% if piece.image_url %}
+            <img class="piece-image" src="{{ piece.image_url }}" alt="">
+        {% endif %}
+
+        <hr class="divider">
+
+        <div class="summary">
+            <div class="summary-label">What it argues</div>
+            {% if piece.stance %}
+                <p>{{ piece.stance }}</p>
+                <p class="summary-note">A one-line reading by AI, written for the story's opinion roundup. The column is filed under its outlet's leaning; this line says what it actually argues.</p>
+            {% else %}
+                <p class="muted">No reading of this column yet. MuckScraper writes one only for columns it picks for a news story's opinion roundup.</p>
+            {% endif %}
+        </div>
+
+        <div class="summary">
+            <div class="summary-label">News story</div>
+            {% if story %}
+                <p><a href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ story.display_headline }}</a></p>
+                <p class="summary-note">{{ story.articles|length }} news article{{ 's' if story.articles|length != 1 else '' }}. The column was matched to this story by AI.</p>
+            {% elif piece.link_checked_at %}
+                <p class="muted">Not linked to a news story: none of the recent stories was a match.</p>
+            {% else %}
+                <p class="muted">Not checked against the news stories. Columns are matched for 48 hours after they're fetched, and only since October 10, 2026.</p>
+            {% endif %}
+        </div>
+
+        {% set read_status = {
+            'full':   ('Full text', 'MuckScraper read the whole column.'),
+            'teaser': ("Publisher's teaser only", "Only the opening the publisher put in its feed is available here."),
+            'none':   ('No text', "The publisher's feed gave no text for this column."),
+        }[text_kind] %}
+
+        {% if current_user.is_authenticated %}
+        <div class="scrape-panel">
+            <div class="scrape-panel-header">
+                <span class="scrape-label">Text</span>
+                <span class="scrape-chip scrape-{{ text_kind }}">{{ read_status[0] }}</span>
+                {% if piece.scrape_status %}<span class="scrape-label">Scrape: {{ piece.scrape_status }}</span>{% endif %}
+            </div>
+            <p>{{ read_status[1] }}{% if text_kind == 'full' %} Paragraph breaks are approximate; the stored text has none.{% endif %}</p>
+        </div>
+
+        <div class="article-body">
+            {% if paragraphs %}
+                {% for para in paragraphs %}<p>{{ para }}</p>{% endfor %}
+            {% elif teaser_html %}
+                {{ teaser_html | clean_html }}
+            {% endif %}
+            {% if text_kind != 'full' %}
+            <div class="no-text" style="margin-top: 24px;">
+                <p>The full column is on the publisher's site.</p>
+                <a href="{{ piece.url }}" target="_blank" rel="noopener noreferrer" class="btn">Read it at {{ outlet_name }}</a>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        {#- Signed-out visitors get the reading, the story and a link, never the text. -#}
+        <div class="public-source">
+            <a href="{{ piece.url }}" target="_blank" rel="noopener noreferrer" class="btn">Read the column at {{ outlet_name }} →</a>
+        </div>
+        {% endif %}
+
+        <div class="source-link">
+            Original source: <a href="{{ piece.url }}" target="_blank" rel="noopener noreferrer">{{ piece.url }}</a>
+        </div>
+
+    </div>
+</div>
+
+</div>
+</div>
+
+<script>
+    {% include 'sidebar_script.html' %}
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+    }
+
+    function toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('muckscraper-theme', next);
+        applyTheme(next);
+    }
+
+    applyTheme(localStorage.getItem('muckscraper-theme') || 'light');
+</script>
+
+<script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
+</body>
+</html>

@@ -140,7 +140,8 @@
         }
         .bias-none { background-color: #ddd; color: #666; }
         .outlet-name { color: var(--text-muted); font-size: 13px; font-weight: 600; }
-        .external-mark { display: inline-block; font-size: var(--fs-label); color: var(--text-faint); margin-left: 4px; }
+        .external-mark { display: inline-block; font-size: var(--fs-label); color: var(--text-faint); margin-left: 6px; text-decoration: none; }
+        .external-mark:hover { color: var(--accent-text); }
 
         .by-story { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 20px 24px; margin-bottom: 20px; }
         .by-story h2 { font-size: var(--fs-card-title); font-weight: 800; line-height: 1.3; margin-bottom: 4px; }
@@ -173,7 +174,7 @@
 
     <div class="main">
         <h2 class="page-title">Op/Ed</h2>
-        <p class="page-intro">Opinion columns, op-eds and editorials from the outlets MuckScraper reads. They're kept out of the news stories and editions and collected here instead. Each one opens on the publisher's site.</p>
+        <p class="page-intro">Opinion columns, op-eds and editorials from the outlets MuckScraper reads. They're kept out of the news stories and editions and collected here instead. Open one for what it argues, the news story it's about and its text, or use ↗ to go straight to the publisher.</p>
 
         <div class="filter-row">
             <span class="filter-label">View</span>
@@ -240,7 +241,7 @@
                         {% endif %}
                     </div>
                     <div class="story-content">
-                        <h2><a href="{{ piece.url }}" target="_blank" rel="noopener noreferrer">{{ piece.title }}<span class="external-mark" aria-label="(opens the publisher's site)">↗</span></a></h2>
+                        <h2><a href="{{ url_for('admin.oped_piece', piece_id=piece.id, back=current_back()) }}">{{ piece.title }}</a><a href="{{ piece.url }}" target="_blank" rel="noopener noreferrer" class="external-mark" aria-label="Open on the publisher's site" title="Open on the publisher's site">↗</a></h2>
                         {% if excerpts.get(piece.id) %}
                             <p class="oped-excerpt">{{ excerpts[piece.id] }}</p>
                         {% endif %}

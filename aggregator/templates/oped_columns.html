@@ -13,7 +13,7 @@
         <ul>
             {% for piece in items %}
             <li>
-                <a href="{{ piece.url }}" target="_blank" rel="noopener noreferrer">{{ piece.title }}</a>
+                <a href="{{ url_for('admin.oped_piece', piece_id=piece.id, back=current_back()) }}">{{ piece.title }}</a><a href="{{ piece.url }}" target="_blank" rel="noopener noreferrer" class="oped-external" aria-label="Open on the publisher's site" title="Open on the publisher's site">↗</a>
                 <span class="oped-outlet">{{ piece.outlet.name if piece.outlet else piece.source }}{% if piece.date %} · <span class="local-date" data-utc="{{ piece.date.isoformat() }}Z">{{ piece.date.strftime('%b %d') }}</span>{% endif %}</span>
                 {% if piece.stance %}<span class="oped-stance">{{ piece.stance }}</span>{% endif %}
             </li>
