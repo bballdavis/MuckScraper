@@ -12,6 +12,8 @@
 .oped-col li { margin-bottom: 12px; line-height: 1.35; }
 .oped-col li a { color: var(--text); font-weight: 600; font-size: var(--fs-meta); text-decoration: none; }
 .oped-col li a:hover { text-decoration: underline; }
+.oped-col li a.oped-external { color: var(--text-faint); font-weight: 400; margin-left: 4px; }
+.oped-col li a.oped-external:hover { color: var(--accent-text); text-decoration: none; }
 .oped-col .oped-outlet { display: block; font-size: var(--fs-label); color: var(--text-muted); margin-top: 2px; }
 .oped-col .oped-stance { display: block; font-size: var(--fs-label); color: var(--text-muted); font-style: italic; margin-top: 3px; }
 .oped-roundup { font-size: var(--fs-body); line-height: 1.6; color: var(--text); margin-bottom: 20px; }

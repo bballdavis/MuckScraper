@@ -4,6 +4,8 @@ page's "By story" view (2026-10-10).
 The links and roundups are written by news_fetcher/opinion_linker.py during
 full runs; this module only reads them.
 """
+import re
+
 from sqlalchemy import func
 
 from aggregator.models import OpinionPiece, Story, db
@@ -57,3 +59,37 @@ def stories_with_opinion(limit=30):
     for piece in OpinionPiece.query.filter(OpinionPiece.story_id.in_(story_ids)).all():
         pieces.setdefault(piece.story_id, []).append(piece)
     return [(stories[sid], split_by_leaning(pieces[sid])) for sid in story_ids if sid in stories]
+
+
+# Scraped Op/Ed text is stored as one run of plain text (opinion_linker's
+# _plain() drops the paragraph breaks), which is unreadable as a single block
+# on the piece's page. Split it back at sentence ends into short paragraphs.
+SENTENCES_PER_PARAGRAPH = 4
+_SENTENCE_END_RE = re.compile(r'(\S*[.!?]["\u201d\u2019)]?)\s+(?=["\u201c\u2018(]?[A-Z0-9])')
+# A full stop after these is not a sentence end ("Mr. Smith", "Sen. Paul").
+_ABBREVIATIONS = {"mr.", "mrs.", "ms.", "dr.", "st.", "sen.", "rep.", "gov.", "gen.", "lt.", "col.",
+                  "jr.", "sr.", "no.", "vs.", "u.s.", "u.k.", "d.c.", "a.m.", "p.m.", "inc.", "co."}
+
+
+def _split_sentences(text):
+    def mark(match):
+        word = match.group(1)
+        if word.lower().lstrip("\"\u201c\u2018(") in _ABBREVIATIONS:
+            return match.group(0)
+        return word + "\0"
+    return [part.strip() for part in _SENTENCE_END_RE.sub(mark, text).split("\0") if part.strip()]
+
+
+def reading_paragraphs(text, per_paragraph=SENTENCES_PER_PARAGRAPH):
+    """Paragraphs for display: the text's own blank-line breaks when it has
+    them, otherwise groups of `per_paragraph` sentences."""
+    text = (text or "").strip()
+    if not text:
+        return []
+    if "\n" in text:
+        return [p.strip() for p in re.split(r"\n\s*\n|\n", text) if p.strip()]
+    sentences = _split_sentences(text)
+    return [
+        " ".join(sentences[i:i + per_paragraph])
+        for i in range(0, len(sentences), per_paragraph)
+    ]
