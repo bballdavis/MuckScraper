@@ -729,19 +729,15 @@ COLUMNS:
 {columns}
 """
 
-PROMPT_OPINION_STANCE = """You are describing one opinion column for a news site. Below are a news story and an opinion column that was linked to it. The column comes with its text, or with only a headline and a teaser.
+PROMPT_OPINION_STANCE = """You are describing one opinion column for a news site's Opinion page. Below are the news story the column was linked to and the column itself. The column comes with its text, or with only a headline and a teaser.
 
-Answer with exactly one line, in one of these two forms:
-ON | <one short phrase describing the column's own position on this story>
-OFF | <one short phrase saying what the column is about instead>
+Write one short phrase describing the column's own position: what it argues about the subject of this story.
 
-Use OFF when the column is not mainly about this news story.
-
-Rules for the phrase:
+Rules:
 - Describe what the column actually argues, not the outlet's reputation. A column in a left-leaning outlet can argue a conservative point, and the other way round.
 - If the column is marked HEADLINE ONLY, say only what its headline and teaser state. Do not guess at its argument.
 - Do not take a side and do not add facts that are not in the column.
-- At most 20 words. No quotation marks around it, no markdown.
+- At most 20 words, on one line. No label in front of it, no quotation marks, no markdown.
 
 NEWS STORY: {headline}
 {summary}
@@ -769,7 +765,7 @@ SEED_PROMPTS = [
     ('headline_generator', 'Wire-style headline generation for multi-article stories', PROMPT_HEADLINE_GENERATOR),
     ('opinion_link_check', 'Is this Op/Ed column about this news story? YES/NO, fast model. Used to link Op/Ed pieces to stories.', PROMPT_OPINION_LINK_CHECK),
     ('opinion_roundup', "The story page's opinion roundup: marks each linked column ON/OFF topic with a one-phrase position, then one paragraph.", PROMPT_OPINION_ROUNDUP),
-    ('opinion_stance', "One-phrase position for an Op/Ed column linked to a story (ON/OFF topic), for columns the roundup didn't describe. Shown on the edition's Opinion page.", PROMPT_OPINION_STANCE),
+    ('opinion_stance', "One-phrase position for an Op/Ed column linked to a story, for columns the roundup didn't describe. Shown on the edition's Opinion page.", PROMPT_OPINION_STANCE),
 ]
 
 # --- END GENERATED DATA -----------------------------------------------------
