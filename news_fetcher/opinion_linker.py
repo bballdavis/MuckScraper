@@ -17,6 +17,11 @@ the static export (`link_opinion_and_write_roundups()`):
    on/off topic, writes one phrase on what it argues, and writes the roundup
    paragraph. Columns it marks off topic are unlinked; if any were, the
    paragraph is rewritten from the remaining ones.
+4. Describe (2026-10-17): every linked column the roundup didn't describe
+   (single-column stories, columns past the roundup's ROUNDUP_MAX_COLUMNS)
+   gets its own one-phrase stance from the quality model, for the edition
+   Opinion pages. The same answer is an ON/OFF topic check, so single
+   columns are now checked too; OFF ones are unlinked.
 
 Measured before building (2026-10-10, 324 op-eds over 48 h): 91 linked, about
 80 right, 7 wrong, 7 loose; the roundup's on-topic check catches the wrong
@@ -53,6 +58,8 @@ COLUMN_TEXT_MAX = 1500
 TEASER_MAX = 300
 STORY_SUMMARY_MAX = 600
 ROUNDUP_MIN_CHARS = 150
+STANCE_LOOKBACK_HOURS = LINK_LOOKBACK_HOURS
+STANCE_MAX_CHARS = 300
 
 _LETTERS_TITLE_RE = re.compile(r"\bletters? to the editor\b", re.IGNORECASE)
 _LETTERS_URL_RE = re.compile(r"/letters(?:-to-the-editor)?/|-letters/?$", re.IGNORECASE)
@@ -60,6 +67,7 @@ _LETTERS_URL_RE = re.compile(r"/letters(?:-to-the-editor)?/|-letters/?$", re.IGN
 _LETTERS_TEASER_RE = re.compile(r"^\s*(?:<p>\s*)?(?:ny post\s+)?readers\s+(?:respond|react|are|on|discuss|weigh)\b",
                                 re.IGNORECASE)
 
+_STANCE_LINE_RE = re.compile(r"^\s*(ON|OFF)\b\s*[|:-]?\s*(.*)$", re.IGNORECASE)
 _COLUMN_LINE_RE = re.compile(r"^\s*\[?(\d+)\]?\s*[:.)-]\s*(ON|OFF)\b\s*[|:-]?\s*(.*)$", re.IGNORECASE)
 
 
@@ -135,6 +143,30 @@ def parse_roundup(output, n_columns):
             verdicts[int(match.group(1))] = (match.group(2).upper() == "ON", match.group(3).strip() or None)
     paragraph = " ".join(line for line in paragraph_lines if line).strip()
     return verdicts, paragraph
+
+
+def parse_stance(output):
+    """(on_topic, phrase) from an opinion_stance answer, or None.
+
+    The first non-empty line must start with ON or OFF. An ON phrase that is
+    empty or reads like a refusal counts as no answer (the column keeps no
+    stance and is tried again next run).
+    """
+    from news_fetcher.headline_generator import _looks_like_llm_failure
+
+    for line in (output or "").splitlines():
+        stripped = line.strip().strip("*").strip()
+        if not stripped:
+            continue
+        match = _STANCE_LINE_RE.match(stripped)
+        if not match:
+            return None
+        on_topic = match.group(1).upper() == "ON"
+        phrase = match.group(2).strip().strip('"').strip()
+        if on_topic and (not phrase or _looks_like_llm_failure(phrase)):
+            return None
+        return on_topic, phrase[:STANCE_MAX_CHARS] or None
+    return None
 
 
 def roundup_rejection(paragraph):
@@ -376,8 +408,55 @@ def write_stale_roundups():
     return metrics
 
 
+def describe_linked_columns(now=None):
+    """Step 4: a stance for each recently linked column that has none."""
+    now = now or datetime.utcnow()
+    metrics = {"columns": 0, "described": 0, "unlinked": 0, "no_answer": 0, "errors": 0, "story_ids": []}
+    pieces = (OpinionPiece.query
+              .filter(OpinionPiece.story_id.isnot(None),
+                      OpinionPiece.stance.is_(None),
+                      OpinionPiece.link_checked_at >= now - timedelta(hours=STANCE_LOOKBACK_HOURS))
+              .order_by(OpinionPiece.id).all())
+    for piece in pieces:
+        metrics["columns"] += 1
+        try:
+            story = db.session.get(Story, piece.story_id)
+            prompt = render_prompt(
+                "opinion_stance",
+                headline=story.headline or story.title,
+                summary=_plain(story.summary)[:STORY_SUMMARY_MAX] or "(none)",
+                column=format_columns([piece]).split("] ", 1)[1],
+            )
+            if prompt is None:
+                raise RuntimeError("opinion_stance prompt missing")
+            answer = parse_stance(llm_client.generate_text(prompt, timeout=90, tier=llm_client.TIER_QUALITY))
+            if answer is None:
+                metrics["no_answer"] += 1
+                continue
+            on_topic, phrase = answer
+            if piece.story_id not in metrics["story_ids"]:
+                metrics["story_ids"].append(piece.story_id)
+            if on_topic:
+                piece.stance = phrase
+                metrics["described"] += 1
+            else:
+                logger.info("  [OpEd] Unlinking off-topic column %s '%s' from story %s (%s)",
+                            piece.id, piece.title[:60], piece.story_id, (phrase or "")[:80])
+                piece.story_id = None
+                metrics["unlinked"] += 1
+            db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            logger.error("  [OpEd] Describing column %s failed: %s", piece.id, exc)
+            metrics["errors"] += 1
+    logger.info("  [OpEd] Described %(described)s of %(columns)s linked columns, "
+                "%(unlinked)s unlinked as off topic", metrics)
+    return metrics
+
+
 def link_opinion_and_write_roundups():
-    """The full-run step: link, scrape, then write roundups.
+    """The full-run step: link, scrape, write roundups, then describe the
+    columns the roundups left without a stance.
 
     `changed_story_ids` lists every story whose Op/Ed columns, stances or
     roundup may have changed, so a static exporter can refresh just their
@@ -388,10 +467,12 @@ def link_opinion_and_write_roundups():
     link = link_new_opinion_pieces()
     scrape = scrape_linked_pieces()
     roundups = write_stale_roundups()
+    stances = describe_linked_columns()
     return {
         "status": "ok",
         "link": link,
         "scrape": scrape,
         "roundups": roundups,
-        "changed_story_ids": sorted(set(link["story_ids"]) | set(roundups["story_ids"])),
+        "stances": stances,
+        "changed_story_ids": sorted(set(link["story_ids"]) | set(roundups["story_ids"]) | set(stances["story_ids"])),
     }
