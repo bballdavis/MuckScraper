@@ -62,12 +62,21 @@ def article_id(link):
     return match.group(1) if match else None
 
 
-def strip_source_suffix(title, source_title):
-    """Google appends " - <Outlet>" to every title; remove exactly that."""
+def strip_source_suffix(title, source_title, same_outlet=None):
+    """Remove the " - <Outlet>" Google appends to every title.
+
+    The suffix doesn't always spell the outlet the way <source> does ("- WSJ"
+    with source "The Wall Street Journal"), so a last " - " segment is also
+    removed when `same_outlet(segment, source_title)` says it names the same
+    outlet. Any other " - " in a headline is left alone.
+    """
     title = (title or "").strip()
     suffix = f" - {source_title}" if source_title else ""
     if suffix and title.endswith(suffix):
         return title[: -len(suffix)].rstrip()
+    head, sep, tail = title.rpartition(" - ")
+    if sep and head and same_outlet and len(tail) <= 40 and same_outlet(tail.strip(), source_title):
+        return head.rstrip()
     return title
 
 
