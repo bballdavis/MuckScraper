@@ -20,8 +20,8 @@ the static export (`link_opinion_and_write_roundups()`):
 4. Describe (2026-10-17): every linked column the roundup didn't describe
    (single-column stories, columns past the roundup's ROUNDUP_MAX_COLUMNS)
    gets its own one-phrase stance from the quality model, for the edition
-   Opinion pages. The same answer is an ON/OFF topic check, so single
-   columns are now checked too; OFF ones are unlinked.
+   Opinion pages. Describe only: a first version also asked ON/OFF topic
+   and unlinked 10 of 29 columns, 8 of them wrongly (2026-10-17).
 
 Measured before building (2026-10-10, 324 op-eds over 48 h): 91 linked, about
 80 right, 7 wrong, 7 loose; the roundup's on-topic check catches the wrong
@@ -67,7 +67,9 @@ _LETTERS_URL_RE = re.compile(r"/letters(?:-to-the-editor)?/|-letters/?$", re.IGN
 _LETTERS_TEASER_RE = re.compile(r"^\s*(?:<p>\s*)?(?:ny post\s+)?readers\s+(?:respond|react|are|on|discuss|weigh)\b",
                                 re.IGNORECASE)
 
-_STANCE_LINE_RE = re.compile(r"^\s*(ON|OFF)\b\s*[|:-]?\s*(.*)$", re.IGNORECASE)
+# A label the model may put first. "ON" only in capitals and followed by a
+# separator, so "On immigration, argues..." keeps its first word.
+_STANCE_LABEL_RE = re.compile(r"^(?:ON\s*[|:-]|(?i:position|stance)\s*[|:-])\s*")
 _COLUMN_LINE_RE = re.compile(r"^\s*\[?(\d+)\]?\s*[:.)-]\s*(ON|OFF)\b\s*[|:-]?\s*(.*)$", re.IGNORECASE)
 
 
@@ -146,26 +148,21 @@ def parse_roundup(output, n_columns):
 
 
 def parse_stance(output):
-    """(on_topic, phrase) from an opinion_stance answer, or None.
+    """The phrase from an opinion_stance answer, or None.
 
-    The first non-empty line must start with ON or OFF. An ON phrase that is
-    empty or reads like a refusal counts as no answer (the column keeps no
-    stance and is tried again next run).
+    Takes the first non-empty line and drops a leading label ("ON |",
+    "Position:") and wrapping quotes. Empty output or a refusal counts as no
+    answer: the column keeps no stance and is tried again next run.
     """
     from news_fetcher.headline_generator import _looks_like_llm_failure
 
     for line in (output or "").splitlines():
-        stripped = line.strip().strip("*").strip()
-        if not stripped:
+        phrase = _STANCE_LABEL_RE.sub("", line.strip().strip("*").strip()).strip().strip('"').strip()
+        if not phrase:
             continue
-        match = _STANCE_LINE_RE.match(stripped)
-        if not match:
+        if _looks_like_llm_failure(phrase):
             return None
-        on_topic = match.group(1).upper() == "ON"
-        phrase = match.group(2).strip().strip('"').strip()
-        if on_topic and (not phrase or _looks_like_llm_failure(phrase)):
-            return None
-        return on_topic, phrase[:STANCE_MAX_CHARS] or None
+        return phrase[:STANCE_MAX_CHARS]
     return None
 
 
@@ -411,7 +408,7 @@ def write_stale_roundups():
 def describe_linked_columns(now=None):
     """Step 4: a stance for each recently linked column that has none."""
     now = now or datetime.utcnow()
-    metrics = {"columns": 0, "described": 0, "unlinked": 0, "no_answer": 0, "errors": 0, "story_ids": []}
+    metrics = {"columns": 0, "described": 0, "no_answer": 0, "errors": 0, "story_ids": []}
     pieces = (OpinionPiece.query
               .filter(OpinionPiece.story_id.isnot(None),
                       OpinionPiece.stance.is_(None),
@@ -429,28 +426,20 @@ def describe_linked_columns(now=None):
             )
             if prompt is None:
                 raise RuntimeError("opinion_stance prompt missing")
-            answer = parse_stance(llm_client.generate_text(prompt, timeout=90, tier=llm_client.TIER_QUALITY))
-            if answer is None:
+            phrase = parse_stance(llm_client.generate_text(prompt, timeout=90, tier=llm_client.TIER_QUALITY))
+            if phrase is None:
                 metrics["no_answer"] += 1
                 continue
-            on_topic, phrase = answer
+            piece.stance = phrase
+            metrics["described"] += 1
             if piece.story_id not in metrics["story_ids"]:
                 metrics["story_ids"].append(piece.story_id)
-            if on_topic:
-                piece.stance = phrase
-                metrics["described"] += 1
-            else:
-                logger.info("  [OpEd] Unlinking off-topic column %s '%s' from story %s (%s)",
-                            piece.id, piece.title[:60], piece.story_id, (phrase or "")[:80])
-                piece.story_id = None
-                metrics["unlinked"] += 1
             db.session.commit()
         except Exception as exc:
             db.session.rollback()
             logger.error("  [OpEd] Describing column %s failed: %s", piece.id, exc)
             metrics["errors"] += 1
-    logger.info("  [OpEd] Described %(described)s of %(columns)s linked columns, "
-                "%(unlinked)s unlinked as off topic", metrics)
+    logger.info("  [OpEd] Described %(described)s of %(columns)s linked columns", metrics)
     return metrics
 
 
