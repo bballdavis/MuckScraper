@@ -7,7 +7,7 @@ from datetime import datetime
 from datetime import timedelta
 from aggregator.article_signals import bias_bucket_for_score
 from news_fetcher import google_news
-from news_fetcher.fetch_and_store_articles import merge_count_maps
+from news_fetcher.fetch_and_store_articles import merge_count_maps, normalize_source_name
 from news_fetcher.story_grouper import normalize_title_tokens, titles_are_near_duplicates
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,10 @@ def _extract_image(entry):
     return None
 
 
+def _same_outlet(name_a, name_b):
+    return bool(name_a and name_b) and normalize_source_name(name_a) == normalize_source_name(name_b)
+
+
 def _title_already_stored(title, source_name, days=4):
     """True when this headline is already in articles or opinion_pieces.
 
@@ -92,7 +96,10 @@ def fetch_feed(feed_url, max_entries=30):
                 # titles every entry "<headline> - <Outlet>"; the outlet is
                 # the entry's <source>, not the feed's own title.
                 entry_source = (entry.get("source") or {}).get("title") or ""
-                title = google_news.strip_source_suffix(title, entry_source)
+                # Twice: some publisher titles already end "- AP News", and
+                # Google adds its own on top.
+                for _ in range(2):
+                    title = google_news.strip_source_suffix(title, entry_source, same_outlet=_same_outlet)
                 if not entry_source:
                     continue
             if not title or not url:
@@ -100,6 +107,12 @@ def fetch_feed(feed_url, max_entries=30):
 
             # Pass description as fallback content — scraper will attempt full text first
             content = entry.get("summary", "") or entry.get("description", "") or ""
+            if google_feed:
+                # Google's description is only a link back to news.google.com
+                # and the outlet name. Kept, it became the "fallback" text of
+                # every article the publisher blocks (AP 403, Reuters 401) and
+                # was summarized as if it were the article (2026-10-17).
+                content = ""
 
             articles.append({
                 "title":        title,
