@@ -8,7 +8,7 @@ import re
 
 from sqlalchemy import func
 
-from aggregator.models import OpinionPiece, Story, db
+from aggregator.models import Edition, OpinionPiece, Story, db
 
 # Same three buckets as story_bias_totals() and the Op/Ed page filter.
 LEFT_MAX = 2.5
@@ -38,6 +38,54 @@ def opinion_for_story(story_id):
     """{left, center, right, unrated: [OpinionPiece]} for one story, or None."""
     pieces = OpinionPiece.query.filter_by(story_id=story_id).all()
     return split_by_leaning(pieces) if pieces else None
+
+
+def edition_opinion_window(edition):
+    """(start, end) of the Op/Ed links that belong to an edition.
+
+    Columns are linked in the full run that publishes the edition, after it
+    is published (opinion_linker runs after process_current_edition), so a
+    column belongs to the edition whose created_at is the latest one before
+    its link_checked_at. `end` is the next published edition's created_at, or
+    None for the newest edition.
+    """
+    following = (Edition.query
+                 .filter(Edition.published.is_(True), Edition.created_at > edition.created_at)
+                 .order_by(Edition.created_at)
+                 .first())
+    return edition.created_at, (following.created_at if following else None)
+
+
+def edition_opinion_cards(edition):
+    """[(Story, [OpinionPiece])] for the stories that got new columns in this
+    edition, most new columns first, then newest column. Pieces are ordered
+    left, center, unrated, right, newest first within a side."""
+    start, end = edition_opinion_window(edition)
+    query = OpinionPiece.query.filter(OpinionPiece.story_id.isnot(None),
+                                      OpinionPiece.link_checked_at >= start)
+    if end is not None:
+        query = query.filter(OpinionPiece.link_checked_at < end)
+    by_story = {}
+    for piece in query.all():
+        by_story.setdefault(piece.story_id, []).append(piece)
+    if not by_story:
+        return []
+    stories = {s.id: s for s in Story.query.filter(Story.id.in_(list(by_story))).all()}
+    order = {"left": 0, "center": 1, "unrated": 2, "right": 3}
+
+    def newest(piece):
+        return piece.date or piece.fetched_at
+
+    cards = []
+    for story_id, pieces in by_story.items():
+        story = stories.get(story_id)
+        if story is None:
+            continue
+        pieces.sort(key=newest, reverse=True)
+        pieces.sort(key=lambda p: order[leaning(p.bias_score)])
+        cards.append((story, pieces))
+    cards.sort(key=lambda card: (len(card[1]), max(newest(p) for p in card[1])), reverse=True)
+    return cards
 
 
 def stories_with_opinion(limit=30):

@@ -36,6 +36,7 @@ KNOWN_VARS = {
     "headline_generator": {"titles"},
     "opinion_link_check": {"title", "teaser", "headline", "summary"},
     "opinion_roundup": {"headline", "summary", "columns"},
+    "opinion_stance": {"headline", "summary", "column"},
 }
 
 
