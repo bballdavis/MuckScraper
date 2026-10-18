@@ -160,6 +160,7 @@ def fetch_feed(feed_url, max_entries=30, fallback_url=None):
             source_name = articles[0]["source_name"] if articles else source_name
             logger.info(
                 f"  [RSS] Google News {feed_url[:80]}: {stats['entries']} entries, "
+                f"{stats['too_old']} too old, "
                 f"{stats['already_stored']} already stored, {stats['resolved']} resolved, "
                 f"{stats['failed']} unresolved"
             )

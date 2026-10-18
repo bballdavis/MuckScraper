@@ -26,6 +26,7 @@ import json
 import logging
 import re
 import time
+from datetime import datetime, timedelta
 from urllib.parse import quote
 
 import requests
@@ -46,6 +47,11 @@ HEADERS = {
 REQUEST_TIMEOUT = 15
 LOOKUP_SPACING_SECONDS = 0.3
 MAX_CONSECUTIVE_FAILURES = 3
+# Google's when:1d is loose: a section-limited Economist search returned
+# pieces from 2025 (2026-10-18), and WSJ's once brought a June puzzles page.
+# Older entries are dropped before any lookup. 7 days, the grouping window: The
+# Economist publishes weekly (Thursdays), so 3 days dropped most of its issue.
+MAX_ENTRY_AGE_DAYS = 7
 # Links resolved by this process, so a feed read more than once in a run (the
 # enrichment passes re-read their feeds) doesn't repeat the lookups.
 _RESOLVED_CACHE = {}
@@ -144,19 +150,26 @@ def resolve_link(link, session):
     return parse_batch_response(answer.text)
 
 
-def resolve_entries(articles, already_stored=None, session=None, sleep=time.sleep):
+def resolve_entries(articles, already_stored=None, session=None, sleep=time.sleep, now=None):
     """Replace each article's Google link with the publisher's URL.
 
     `articles` are fetch_feed() dicts whose `title` and `source_name` have
     already been taken from the entry. `already_stored(title, source_name)`
     returns True for an entry we have, which is then dropped without a lookup.
+    Entries published more than MAX_ENTRY_AGE_DAYS ago are dropped too.
     Returns (resolved articles, stats).
     """
     session = session or requests.Session()
-    stats = {"entries": len(articles), "already_stored": 0, "resolved": 0, "failed": 0, "stopped_early": False}
+    cutoff = (now or datetime.utcnow()) - timedelta(days=MAX_ENTRY_AGE_DAYS)
+    stats = {"entries": len(articles), "too_old": 0, "already_stored": 0, "resolved": 0, "failed": 0,
+             "stopped_early": False}
     resolved = []
     failures_in_a_row = 0
     for index, article in enumerate(articles):
+        published = article.get("published_at")
+        if published is not None and published < cutoff:
+            stats["too_old"] += 1
+            continue
         if already_stored and already_stored(article["title"], article["source_name"]):
             stats["already_stored"] += 1
             continue
