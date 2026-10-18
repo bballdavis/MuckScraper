@@ -10,8 +10,22 @@ from langfuse.decorators import observe, langfuse_context
 from news_fetcher import llm_client
 from news_fetcher.llm_client import check_llm_status as check_ollama_status
 from news_fetcher.prompt_registry import render_prompt
+from news_fetcher.quality_checks import fix_current_officeholder_titles
 
 logger = logging.getLogger(__name__)
+
+
+def _fix_titles(text, source_texts, what):
+    """fix_current_officeholder_titles(), logged when it changes something.
+
+    Every writing prompt forbids titles the sources don't give, and the model
+    still writes "former President Trump" (training years) now and then.
+    """
+    fixed = fix_current_officeholder_titles(text, source_texts)
+    if fixed != text:
+        logger.info("  [Summarizer] Fixed 'former' officeholder title in %s", what)
+        langfuse_context.update_current_observation(metadata={"fixed_former_title": True})
+    return fixed
 
 langfuse = Langfuse(
     public_key=os.environ.get("LANGFUSE_PUBLIC_KEY", ""),
@@ -395,6 +409,7 @@ def summarize_story(story):
         return None
 
     if summary:
+        summary = _fix_titles(summary, [combined], f"story {story.id} summary")
         logger.info(f"  Generated {analysis_type} summary for story: {story.title[:60]}...")
         return summary
     return None
@@ -565,6 +580,7 @@ def generate_deep_report(story):
     report = llm_client.generate_text(prompt, timeout=180)
     langfuse_context.update_current_observation(output=report)
     if report:
+        report = _fix_titles(report, [combined], f"story {story.id} deep report")
         logger.info(f"  Generated {analysis_type} deep report for: {story.title[:60]}...")
         return report
     return None
@@ -610,6 +626,7 @@ def summarize_article(article):
     summary = llm_client.generate_text(prompt, timeout=120)
     langfuse_context.update_current_observation(output=summary)
     if summary:
+        summary = _fix_titles(summary, [article.title, clean_content], f"article {article.id} summary")
         logger.info(f"  Generated {analysis_type} summary for article: {article.title[:60]}...")
         return summary
     return None
@@ -651,6 +668,7 @@ def generate_article_deep_analysis(article):
     analysis = llm_client.generate_text(prompt, timeout=150)
     langfuse_context.update_current_observation(output=analysis)
     if analysis:
+        analysis = _fix_titles(analysis, [article.title, clean_content], f"article {article.id} analysis")
         logger.info(f"  Generated {analysis_type} article analysis: {article.title[:60]}...")
         return analysis
     return None

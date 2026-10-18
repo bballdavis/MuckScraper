@@ -201,6 +201,17 @@ OPINION_URL_PREFIXES = (
     "nationalreview.com/",
 )
 
+# Op/Ed feeds whose outlet keeps every column under one path. The NYT Opinion
+# feed also carries some news reports (/us/elections/..., /us/...-takeaways),
+# and the op_ed bucket stores every entry as opinion, so one reached a
+# published Opinion page as a "column" (2026-10-17, Regis). An entry from
+# these hosts outside the path is not stored. WaPo's /opinions/ is here for
+# its Google News fallback feed.
+OPED_FEED_SECTION_PATHS = {
+    "nytimes.com": "/opinion/",
+    "washingtonpost.com": "/opinions/",
+}
+
 # Editorial cartoons (2026-10-09). Checked against every stored title/URL
 # containing "cartoon": 73 opinion rows (Toronto Sun /opinion/cartoons/, WaPo
 # "matt-davies-cartoon-...") and ~30 news rows (Economist "Cartoon: ...",
@@ -329,6 +340,16 @@ def is_opinion_article(title=None, url=None):
         return True
     host_path = parsed.netloc.lower().removeprefix("www.") + parsed_path
     return any(host_path.startswith(prefix) for prefix in OPINION_URL_PREFIXES)
+
+
+def is_off_section_oped(url=None):
+    """True for an Op/Ed feed entry outside its outlet's opinion path."""
+    parsed = urlparse(url or "")
+    host = parsed.netloc.lower().removeprefix("www.")
+    for domain, section in OPED_FEED_SECTION_PATHS.items():
+        if host == domain or host.endswith("." + domain):
+            return section not in parsed.path.lower()
+    return False
 
 
 def is_promotional_article(title=None, url=None):

@@ -466,6 +466,17 @@ _OFFICE_FORMS = {"gov": "gov|governor", "governor": "gov|governor", "sen": "sen|
                  "representative": "rep|representative"}
 
 
+def _former_title_supported(office, surname, haystack):
+    """A folded source text pairs "former" with this office and surname."""
+    forms = _OFFICE_FORMS.get(office, re.escape(office).replace(r"\ ", r"[ -]"))
+    office_re = rf"(?:{forms})\.?"
+    near = (
+        rf"\bformer\s+(?:\S+\s+){{0,2}}{office_re}\b.{{0,40}}?\b{re.escape(surname)}\b"
+        rf"|\b{re.escape(surname)}\b.{{0,40}}?\bformer\s+(?:\S+\s+){{0,2}}{office_re}\b"
+    )
+    return re.search(near, haystack) is not None
+
+
 def unsupported_former_titles(text, source_texts):
     """'former <office> <Name>' phrases in `text` that no source supports.
 
@@ -484,14 +495,63 @@ def unsupported_former_titles(text, source_texts):
         surname = re.sub(r"['\u2019]s?$", "", _fold(match.group(2).split()[-1]))
         if not surname[:1].isalpha():
             continue
-        forms = _OFFICE_FORMS.get(office, re.escape(office).replace(r"\ ", r"[ -]"))
-        office_re = rf"(?:{forms})\.?"
-        near = (
-            rf"\bformer\s+(?:\S+\s+){{0,2}}{office_re}\b.{{0,40}}?\b{re.escape(surname)}\b"
-            rf"|\b{re.escape(surname)}\b.{{0,40}}?\bformer\s+(?:\S+\s+){{0,2}}{office_re}\b"
-        )
-        if not re.search(near, haystack):
+        if not _former_title_supported(office, surname, haystack):
             phrase = " ".join(match.group(0).split())
             if phrase not in found:
                 found.append(phrase)
     return found
+
+
+# People who hold the office now, so "former <office> <Name>" about them is
+# always the model's training years talking unless a source says it (a source
+# can, about 2021-2024: "then-former President Trump"). The detector above only
+# reported it; the 12B kept writing it after the 2026-10-07 clean-up (11 times
+# by 10-18, e.g. story 83852's deep report), so fix_current_officeholder_titles()
+# rewrites it before the text is stored. Update this when an office changes
+# hands; keep it to people whose current office is certain.
+CURRENT_OFFICEHOLDERS = {
+    "trump": "president",
+    "vance": "vice president",
+}
+_CURRENT_TITLE_RE = re.compile(
+    r"\b(?:(?P<article>(?i:the))\s+)?(?P<former>(?i:former))\s+"
+    r"(?P<country>(?:U\.?S\.?|US|American)\s+)?"
+    r"(?P<office>(?i:vice[ -]president|president))\s+"
+    r"(?P<name>(?:(?:[A-Z]\.|[A-Z][\w'\u2019-]+)\s+){0,2}?(?P<surname>"
+    + "|".join(name.title() for name in CURRENT_OFFICEHOLDERS) + r"))\b"
+)
+
+
+def fix_current_officeholder_titles(text, source_texts):
+    """Drop an unsupported "former" from a current officeholder's title.
+
+    "the former U.S. President Donald Trump" -> "U.S. President Donald Trump",
+    "Former president Trump's" -> "President Trump's". Left alone when a
+    source pairs "former" with that office and name, when the office isn't the
+    one the person holds now ("former Vice President Trump"), and for unnamed
+    references ("the former president").
+    """
+    if not text:
+        return text
+    haystack = None
+
+    def replace(match):
+        nonlocal haystack
+        surname = match.group("surname").lower()
+        office = " ".join(_fold(match.group("office")).replace("-", " ").split())
+        if CURRENT_OFFICEHOLDERS.get(surname) != office:
+            return match.group(0)
+        if haystack is None:
+            haystack = " ".join(_fold(s) for s in (source_texts or []))
+        if _former_title_supported(office, surname, haystack):
+            return match.group(0)
+        title = " ".join(word.capitalize() for word in office.split())
+        fixed = f"{match.group('country') or ''}{title} {match.group('name')}"
+        # Keep a capital where the sentence started: "Former president" or
+        # "The former president" at the start of a sentence.
+        lead = match.group("article") or match.group("former")
+        if lead[0].isupper() and fixed[0].islower():
+            fixed = fixed[0].upper() + fixed[1:]
+        return fixed
+
+    return _CURRENT_TITLE_RE.sub(replace, text)

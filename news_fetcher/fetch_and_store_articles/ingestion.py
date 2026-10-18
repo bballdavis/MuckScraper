@@ -11,7 +11,9 @@ from datetime import datetime, timedelta
 import json
 import os
 from aggregator import db
-from aggregator.article_signals import bias_bucket_for_score, is_roundup_article, low_value_article_reason
+from aggregator.article_signals import (
+    bias_bucket_for_score, is_off_section_oped, is_roundup_article, low_value_article_reason,
+)
 from aggregator.html_safety import strip_title_tags
 from aggregator.models import Article, OpinionPiece, Outlet, Story, Topic, IngestionBlock
 from news_fetcher.allsides_lookup import get_allsides_score
@@ -250,7 +252,9 @@ def store_opinion_feed(articles_data):
     is not needed and would miss outlets whose column URLs carry no /opinion/
     (Washington Times, National Review, ...). Everything else still applies:
     source and title blocks, and the other low-value reasons (betting,
-    roundups, video, promo). Nothing here reaches `articles`.
+    roundups, video, promo), and an entry from an outlet in
+    OPED_FEED_SECTION_PATHS outside its opinion path is skipped (news the
+    NYT Opinion feed carries). Nothing here reaches `articles`.
     """
     metrics = {"input_articles": len(articles_data), "saved": 0, "skipped": {}}
 
@@ -275,6 +279,9 @@ def store_opinion_feed(articles_data):
         reason = low_value_article_reason(title, url)
         if reason and reason != "opinion":
             skip(reason)
+            continue
+        if is_off_section_oped(url):
+            skip("not_opinion_section")
             continue
         source_name = source_name_from_url(raw_url) or normalize_source_name(article.get("source_name", "Unknown"))
         if save_opinion_piece(title, url, source_name, article.get("published_at") or datetime.utcnow(),
