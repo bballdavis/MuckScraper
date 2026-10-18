@@ -1,11 +1,12 @@
 import logging
+from collections import OrderedDict
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify
 from flask_login import current_user
 from aggregator.permissions import public_or_login, public_read_enabled
 from aggregator.search import healthcheck as meili_healthcheck
 from aggregator.models import Article, Story, Topic, RawArticlePayload, Edition, EditionStory
-from aggregator.opinion import opinion_for_story
+from aggregator.opinion import opinion_for_story, published_edition_opinion_cards, split_by_leaning
 from aggregator.story_view import apply_aggregator_filter, annotate_edition_story_flags
 from news_fetcher.llm_client import check_llm_status as check_ollama_status, TIER_QUALITY
 
@@ -38,11 +39,19 @@ def headlines_feed():
     full pipeline (publish_edition()/process_current_edition() already run
     this — this route just reads what they wrote). Falls back to a live
     top-stories query if no edition has been published yet (fresh install).
+
+    ?edition=<id> shows an earlier published edition (Regis, 2026-10-18).
+    Its stories are read live, so articles and op-eds added since it was
+    published show up too.
     """
     per_page = 10
     page = max(1, request.args.get("page", 1, type=int) or 1)
 
-    latest_edition = Edition.query.filter_by(published=True).order_by(Edition.created_at.desc()).first()
+    newest_edition = Edition.query.filter_by(published=True).order_by(Edition.created_at.desc()).first()
+    latest_edition = newest_edition
+    edition_id = request.args.get("edition", type=int)
+    if edition_id:
+        latest_edition = Edition.query.filter_by(id=edition_id, published=True).first_or_404()
 
     if latest_edition:
         all_edition_stories = latest_edition.edition_stories.order_by(EditionStory.rank).all()
@@ -76,8 +85,71 @@ def headlines_feed():
         stories=stories,
         edition_label=edition_label,
         edition=latest_edition,
+        is_past_edition=bool(newest_edition and latest_edition and latest_edition.id != newest_edition.id),
+        opinion_count=len(published_edition_opinion_cards(latest_edition)) if latest_edition else 0,
         page=page,
         total_pages=total_pages,
+        topics=Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all(),
+        active_nav="headlines",
+    )
+
+
+@public.route("/headlines/opinion")
+@public_or_login
+def edition_opinion():
+    """The edition's Opinion page, like muckscraper.news's: the stories that
+    got new columns in this edition, each with those columns and what they
+    argue. ?edition=<id>, else the newest edition. Read live."""
+    newest_edition = Edition.query.filter_by(published=True).order_by(Edition.created_at.desc()).first()
+    edition = newest_edition
+    edition_id = request.args.get("edition", type=int)
+    if edition_id:
+        edition = Edition.query.filter_by(id=edition_id, published=True).first_or_404()
+    cards = []
+    if edition:
+        cards = [(story, split_by_leaning(pieces)) for story, pieces in published_edition_opinion_cards(edition)]
+    return render_template(
+        "edition_opinion.html",
+        cards=cards,
+        edition=edition,
+        edition_label=(f"{edition.edition_type.title()} Edition — {edition.date.strftime('%B %d, %Y')}"
+                       if edition else ""),
+        is_past_edition=bool(edition and newest_edition and edition.id != newest_edition.id),
+        topics=Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all(),
+        active_nav="headlines",
+    )
+
+
+def editions_by_month(editions):
+    """[(month label, [(day label, [editions, morning first])])], newest first."""
+    months = OrderedDict()
+    for edition in editions:
+        days = months.setdefault(edition.date.strftime("%B %Y"), OrderedDict())
+        days.setdefault(edition.date.strftime("%A, %B %d"), []).append(edition)
+    order = {"morning": 0, "evening": 1}
+    return [
+        (month, [(day, sorted(eds, key=lambda e: order.get(e.edition_type, 2))) for day, eds in days.items()])
+        for month, days in months.items()
+    ]
+
+
+@public.route("/editions")
+@public_or_login
+def editions_archive():
+    """Every published edition, by month, each linking to its Headlines page."""
+    from sqlalchemy import func
+    editions = Edition.query.filter_by(published=True).order_by(
+        Edition.date.desc(), Edition.created_at.desc()
+    ).all()
+    counts = dict(
+        Edition.query.session.query(EditionStory.edition_id, func.count(EditionStory.id))
+        .group_by(EditionStory.edition_id).all()
+    )
+    return render_template(
+        "editions.html",
+        months=editions_by_month(editions),
+        story_counts=counts,
+        latest_id=editions[0].id if editions else None,
         topics=Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all(),
         active_nav="headlines",
     )
