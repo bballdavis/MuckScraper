@@ -91,6 +91,13 @@ DOMAIN_SOURCE_OVERRIDES = {
     # Dispatch was split across "The Dispatch" and "Thedispatch.com".
     "freebeacon.com": "Washington Free Beacon",
     "thedispatch.com": "The Dispatch",
+    # Feed titles that never matched the AllSides name, so the outlets were
+    # AI-rated instead (2026-10-18): "Reason Magazine" (Center, 737 articles,
+    # beside an AllSides-rated "Reason"), "Newsmax - Newsfront" (Lean Right),
+    # "The Daily Wire - Breaking News, Videos & Podcasts".
+    "reason.com": "Reason",
+    "newsmax.com": "Newsmax",
+    "dailywire.com": "The Daily Wire",
 }
 
 
@@ -123,7 +130,10 @@ def normalize_source_name(name):
         "the wall street journal": "WSJ",
         "the new york times": "New York Times",
         "the washington post": "Washington Post",
-        
+        "reason magazine": "Reason",
+        "newsmax - newsfront": "Newsmax",
+        "the daily wire - breaking news, videos & podcasts": "The Daily Wire",
+
     }
 
     # Direct match in mapping
