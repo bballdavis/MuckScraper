@@ -200,3 +200,14 @@
     .card table { min-width: 560px; }
     .card .url-cell { min-width: 220px; }
 }
+
+/* Phones: the top bar keeps its title, theme button and account control on
+   one line (2026-10-18). Body-scoped to win over each page's own .topbar. */
+@media (max-width: 600px) {
+    body .topbar { padding-left: 16px; padding-right: 16px; gap: 8px; }
+    body .topbar .header-controls { gap: 8px; }
+}
+@media (max-width: 400px) {
+    body .topbar .topbar-title { font-size: 16px; }
+    body .topbar .theme-toggle, body .topbar .account-signin { padding-left: 10px; padding-right: 10px; }
+}
