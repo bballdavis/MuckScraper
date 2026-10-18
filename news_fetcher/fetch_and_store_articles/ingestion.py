@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, timedelta
 import json
 import os
+import re
 from aggregator import db
 from aggregator.article_signals import (
     bias_bucket_for_score, is_off_section_oped, is_roundup_article, low_value_article_reason,
@@ -245,6 +246,9 @@ def save_opinion_piece(title, url, source_name, published_at, content, image_url
         return False
 
 
+_OPINION_TITLE_PREFIX = re.compile(r"^\s*opinion\s*[|:]\s*", re.IGNORECASE)
+
+
 def store_opinion_feed(articles_data):
     """Store every entry of an Op/Ed feed (RssFeed bucket `op_ed`) as opinion.
 
@@ -265,6 +269,9 @@ def store_opinion_feed(articles_data):
     seen_urls = set()
     for article in articles_data:
         title = strip_title_tags(article.get("title"))
+        # Everything here is opinion already; Google News titles WaPo's
+        # columns "Opinion | <headline>" where its own feed did not.
+        title = _OPINION_TITLE_PREFIX.sub("", title or "")
         raw_url = article.get("url")
         if not title or not raw_url:
             skip("missing_required")
