@@ -70,6 +70,7 @@
         }
         input.label-input { width: 160px; }
         input.url-input { width: 320px; }
+        input.fallback-input { width: 100%; max-width: 380px; margin-top: 6px; font-size: var(--fs-label); }
         .save-btn, .add-btn { background: var(--accent); }
         .save-btn, .add-btn, .delete-btn {
             color: white;
@@ -108,7 +109,7 @@
 
 <div class="container">
     <h1>RSS Feeds</h1>
-    <p class="subtitle">General ingestion runs every fetch. Right/left enrichment feeds are used to backfill bias-skewed stories. Everything in an Op Ed feed goes to the Op/Ed section, never the news. A feed URL can appear in more than one bucket.</p>
+    <p class="subtitle">General ingestion runs every fetch. Right/left enrichment feeds are used to backfill bias-skewed stories. Everything in an Op Ed feed goes to the Op/Ed section, never the news. A feed URL can appear in more than one bucket. A fallback feed (e.g. a Google News <code>site:</code> search) is fetched instead whenever the feed answers with an error.</p>
 
     {% for bucket in buckets %}
     <div class="card">
@@ -130,7 +131,8 @@
                 <tr class="{{ 'disabled' if not feed.enabled else '' }}">
                     <form method="POST" action="{{ url_for('admin.update_rss_feed', feed_id=feed.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <td class="url-cell">{{ feed.url }}</td>
+                        <td class="url-cell">{{ feed.url }}
+                            <input type="url" class="fallback-input" name="fallback_url" value="{{ feed.fallback_url or '' }}" placeholder="Fallback feed if this one fails (optional)" aria-label="Fallback feed URL"></td>
                         <td><input type="text" class="label-input" name="label" value="{{ feed.label or '' }}" placeholder="Label"></td>
                         <td><input type="checkbox" name="enabled" {{ 'checked' if feed.enabled else '' }}></td>
                         <td><button type="submit" class="save-btn">Save</button></td>
@@ -161,6 +163,7 @@
                 {% endfor %}
             </select>
             <input type="text" class="label-input" name="label" placeholder="Label (optional)">
+            <input type="url" class="url-input" name="fallback_url" placeholder="Fallback feed if it fails (optional)" aria-label="Fallback feed URL">
             <button type="submit" class="add-btn">+ Add Feed</button>
         </form>
     </div>

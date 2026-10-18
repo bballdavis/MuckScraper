@@ -22,6 +22,27 @@ def _active_feed_urls(bucket):
     return [f.url for f in RssFeed.query.filter_by(bucket=bucket, enabled=True).all()]
 
 
+def _feed_fallback_url(feed_url):
+    """The fallback_url set on any RssFeed row for this URL, or None."""
+    from aggregator.models import RssFeed
+    row = (RssFeed.query.filter(RssFeed.url == feed_url, RssFeed.fallback_url.isnot(None))
+           .with_entities(RssFeed.fallback_url).first())
+    return row[0] if row and row[0] else None
+
+
+def _fetch_with_fallback(feed_url, **kwargs):
+    """fetch_feed() with the feed's fallback_url, if one is set."""
+    return fetch_feed(feed_url, fallback_url=_feed_fallback_url(feed_url), **kwargs)
+
+
+def _feed_failed(feed):
+    """True when feedparser got an HTTP error, or nothing it could parse."""
+    status = feed.get("status")
+    if status is not None and status >= 400:
+        return True
+    return not feed.entries and bool(feed.get("bozo"))
+
+
 def _parse_published(entry):
     """Convert feedparser's published_parsed struct_time to datetime."""
     try:
@@ -73,13 +94,24 @@ def _title_already_stored(title, source_name, days=4):
     return False
 
 
-def fetch_feed(feed_url, max_entries=30):
+def fetch_feed(feed_url, max_entries=30, fallback_url=None):
     """
     Fetch a single RSS feed.
     Returns (source_name, list of normalized article dicts).
+
+    When the feed answers with an HTTP error or can't be read and a
+    `fallback_url` is given (a Google News search feed for the same outlet),
+    that is fetched instead. Washington Post's feeds started answering 502 on
+    2026-10-14 and took its op-eds out of the Op/Ed mix.
     """
     try:
         feed = feedparser.parse(feed_url)
+        if fallback_url and _feed_failed(feed):
+            logger.warning(
+                f"  [RSS] {feed_url[:60]} failed (HTTP {feed.get('status', '-')}); "
+                f"using fallback {fallback_url[:80]}"
+            )
+            return fetch_feed(fallback_url, max_entries=max_entries)
         source_name = (
             feed.feed.get("title", feed_url.split("/")[2])
             if feed.feed else feed_url.split("/")[2]
@@ -136,6 +168,9 @@ def fetch_feed(feed_url, max_entries=30):
 
     except Exception as e:
         logger.warning(f"  [RSS] Failed to fetch {feed_url[:60]}: {e}")
+        if fallback_url:
+            logger.warning(f"  [RSS] Using fallback {fallback_url[:80]}")
+            return fetch_feed(fallback_url, max_entries=max_entries)
         return None, []
 
 
@@ -154,7 +189,7 @@ def fetch_and_store_oped_rss():
     metrics = {"status": "ok", "feeds_attempted": len(feed_urls), "input_articles": 0,
                "saved": 0, "skipped": {}, "per_feed": []}
     for feed_url in feed_urls:
-        source_name, articles = fetch_feed(feed_url)
+        source_name, articles = _fetch_with_fallback(feed_url)
         feed_metrics = store_opinion_feed(articles) if articles else {"input_articles": 0, "saved": 0}
         metrics["input_articles"] += feed_metrics.get("input_articles", 0)
         metrics["saved"] += feed_metrics.get("saved", 0)
@@ -212,7 +247,7 @@ def fetch_and_store_rss():
     }
 
     for feed_url in feed_urls:
-        source_name, articles = fetch_feed(feed_url, max_entries=max_entries)
+        source_name, articles = _fetch_with_fallback(feed_url, max_entries=max_entries)
         if articles:
             feed_metrics = store_articles(articles, "Global News", provider="rss")
             metrics["feeds_with_articles"] += 1
@@ -429,7 +464,7 @@ def _enrich_stories_with_feed_set(
     recent_cutoff = datetime.utcnow() - timedelta(hours=lookback_hours)
     feed_articles = []
     for feed_url in feed_urls:
-        source_name, articles = fetch_feed(feed_url)
+        source_name, articles = _fetch_with_fallback(feed_url)
         recent_articles = [article for article in articles if article.get("published_at") and article["published_at"] >= recent_cutoff]
         if recent_articles:
             metrics["feeds_with_articles"] += 1

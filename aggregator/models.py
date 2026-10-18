@@ -366,6 +366,9 @@ class RssFeed(db.Model):
     label      = db.Column(db.String, nullable=True)
     enabled    = db.Column(db.Boolean, default=True, nullable=False)
     added_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    # Fetched instead when `url` answers with an HTTP error or can't be
+    # parsed; normally a Google News search feed for the same outlet/section.
+    fallback_url = db.Column(db.String, nullable=True)
 
 
 class PromptTemplate(db.Model):

@@ -40,6 +40,7 @@ from aggregator.models import OpinionPiece, Story, db
 from aggregator.opinion import leaning
 from news_fetcher import llm_client
 from news_fetcher.prompt_registry import render_prompt
+from news_fetcher.quality_checks import fix_current_officeholder_titles
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +372,15 @@ def write_roundup(story, now=None):
             if i in verdicts and verdicts[i][1]:
                 col.stance = verdicts[i][1][:300]
 
+    if paragraph:
+        sources = [format_columns(columns), _plain(story.summary)]
+        fixed = fix_current_officeholder_titles(paragraph, sources)
+        if fixed != paragraph:
+            logger.info("  [OpEd] Fixed 'former' officeholder title in story %s roundup", story.id)
+            paragraph = fixed
+        for col in columns:
+            if col.stance:
+                col.stance = fix_current_officeholder_titles(col.stance, sources)
     reason = roundup_rejection(paragraph)
     if reason:
         # Keep the previous roundup (if any) and leave the timestamp alone so
@@ -430,7 +440,7 @@ def describe_linked_columns(now=None):
             if phrase is None:
                 metrics["no_answer"] += 1
                 continue
-            piece.stance = phrase
+            piece.stance = fix_current_officeholder_titles(phrase, [prompt])
             metrics["described"] += 1
             if piece.story_id not in metrics["story_ids"]:
                 metrics["story_ids"].append(piece.story_id)

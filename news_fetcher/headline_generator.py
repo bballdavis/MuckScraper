@@ -11,7 +11,7 @@ from langfuse.decorators import observe, langfuse_context
 
 from news_fetcher import llm_client
 from news_fetcher.prompt_registry import render_prompt
-from news_fetcher.quality_checks import fix_acronym_casing
+from news_fetcher.quality_checks import fix_acronym_casing, fix_current_officeholder_titles
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +170,10 @@ def generate_story_headline(story):
         fixed = fix_acronym_casing(headline)
         if fixed != headline:
             logger.info(f"Fixed acronym casing: '{headline}' -> '{fixed}'")
+            headline = fixed
+        fixed = fix_current_officeholder_titles(headline, [titles])
+        if fixed != headline:
+            logger.info(f"Fixed 'former' officeholder title: '{headline}' -> '{fixed}'")
             headline = fixed
         logger.info(f"Generated headline: '{headline}'")
         return headline
