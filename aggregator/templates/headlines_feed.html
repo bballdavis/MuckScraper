@@ -51,6 +51,9 @@
         .main-header { padding: 24px 0 8px; }
         h1 { font-size: var(--fs-page-title); font-weight: 800; color: var(--accent-text); letter-spacing: -0.5px; margin-bottom: 4px; }
         .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 8px; }
+        .main-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+        .edition-links { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 6px; }
+        .past-note { color: var(--text-muted); font-size: var(--fs-meta); margin: 0 0 16px; }
 
         .empty { text-align: center; padding: 80px 0; color: var(--text-faint); font-style: italic; }
 
@@ -78,9 +81,23 @@
 
 <div class="main">
     <div class="main-header">
-        <h1>Headlines</h1>
-        <div class="subtitle">{{ edition_label }}</div>
+        <div>
+            <h1>Headlines</h1>
+            <div class="subtitle">{{ edition_label }}</div>
+        </div>
+        <div class="edition-links">
+            {% if is_past_edition %}
+            <a href="{{ url_for('public.headlines_feed') }}" class="btn btn-muted">Latest edition</a>
+            {% endif %}
+            {% if edition %}
+            <a href="{{ url_for('public.edition_opinion', edition=edition.id if is_past_edition else none) }}" class="btn btn-muted">{{ icon('newspaper') }} Opinion ({{ opinion_count }})</a>
+            {% endif %}
+            <a href="{{ url_for('public.editions_archive') }}" class="btn btn-muted">{{ icon('calendar') }} Past editions</a>
+        </div>
     </div>
+    {% if is_past_edition %}
+    <p class="past-note">An earlier edition, shown as its stories stand now: articles and opinion added since it was published are included.</p>
+    {% endif %}
 
     {% if stories %}
         {% for story in stories %}

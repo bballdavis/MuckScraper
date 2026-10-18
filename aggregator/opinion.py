@@ -8,7 +8,7 @@ import re
 
 from sqlalchemy import func
 
-from aggregator.models import Edition, OpinionPiece, Story, db
+from aggregator.models import Edition, EditionStory, OpinionPiece, Story, db
 
 # Same three buckets as story_bias_totals() and the Op/Ed page filter.
 LEFT_MAX = 2.5
@@ -86,6 +86,29 @@ def edition_opinion_cards(edition):
         cards.append((story, pieces))
     cards.sort(key=lambda card: (len(card[1]), max(newest(p) for p in card[1])), reverse=True)
     return cards
+
+
+def stories_published_by(edition, story_ids):
+    """The ids among story_ids that ran in a published edition up to and
+    including this one."""
+    if not story_ids:
+        return set()
+    rows = (db.session.query(EditionStory.story_id)
+            .join(Edition, Edition.id == EditionStory.edition_id)
+            .filter(EditionStory.story_id.in_(list(story_ids)),
+                    Edition.published.is_(True),
+                    Edition.created_at <= edition.created_at)
+            .distinct().all())
+    return {row[0] for row in rows}
+
+
+def published_edition_opinion_cards(edition):
+    """edition_opinion_cards() limited to stories that ran in this edition or
+    an earlier one (Regis, 2026-10-17: columns about stories that never made
+    an edition stay off the edition's Opinion page)."""
+    cards = edition_opinion_cards(edition)
+    published = stories_published_by(edition, {story.id for story, _ in cards})
+    return [(story, pieces) for story, pieces in cards if story.id in published]
 
 
 def stories_with_opinion(limit=30):

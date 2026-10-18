@@ -1,0 +1,133 @@
+{% from 'account_menu.html' import account_menu with context %}
+{% from 'icons.html' import icon, theme_toggle_label %}
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_32.png') }}">
+    <link rel="icon" type="image/png" sizes="128x128" href="{{ url_for('static', filename='favicon_128.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192.png') }}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
+    <title>Past editions — MuckScraper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+        }
+        .topbar {
+            background: var(--topbar-bg);
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .topbar a { color: #89b4fa; text-decoration: none; font-size: 14px; font-weight: 600; }
+        .topbar-title { color: var(--topbar-text); font-size: 18px; font-weight: 800; }
+        .header-controls { display: flex; align-items: center; gap: 12px; }
+        .theme-toggle {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: var(--topbar-text);
+            padding: 6px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .main { max-width: var(--width-list); margin: 0 auto; padding: 0 40px; }
+        .main-header { padding: 24px 0 8px; }
+        h1 { font-size: var(--fs-page-title); font-weight: 800; color: var(--accent-text); letter-spacing: -0.5px; margin-bottom: 4px; }
+        .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 8px; }
+
+        .month { margin: 24px 0 8px; }
+        .month h2 { font-size: var(--fs-card-title); font-weight: 800; color: var(--text); padding-bottom: 6px; border-bottom: 2px solid var(--input-border); margin-bottom: 4px; }
+        .day { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+        .day-name { font-size: var(--fs-body); color: var(--text); }
+        .day-editions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .edition-chip { display: inline-block; padding: 5px 12px; border-radius: 10px; background: var(--btn-muted-bg); color: var(--btn-muted-text); font-size: var(--fs-meta); font-weight: 700; text-decoration: none; }
+        .edition-chip:hover { background: var(--accent); color: #fff; }
+        .edition-chip .count { font-weight: 400; opacity: 0.8; }
+        .latest-tag { font-weight: 700; }
+        .empty { text-align: center; padding: 80px 0; color: var(--text-faint); font-style: italic; }
+
+        @media (max-width: 900px) {
+            .main { padding: 0 20px; }
+        }
+        {% include 'sidebar_styles.html' %}
+    </style>
+</head>
+<body>
+<div class="layout">
+{% include 'sidebar_nav.html' %}
+<div class="page-body">
+
+<div class="topbar">
+    <div>
+        <span class="topbar-title">MuckScraper</span>
+    </div>
+    <div class="header-controls">
+        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">{{ theme_toggle_label() }}</button>
+        {{ account_menu() }}
+    </div>
+</div>
+
+<div class="main">
+    <div class="main-header">
+        <h1>Past editions</h1>
+        <div class="subtitle">Every published edition. Each opens as its stories stand now, with any articles and opinion added since.</div>
+    </div>
+
+    {% for month, days in months %}
+    <section class="month">
+        <h2>{{ month }}</h2>
+        {% for day, editions in days %}
+        <div class="day">
+            <span class="day-name">{{ day }}</span>
+            <span class="day-editions">
+                {% for edition in editions %}
+                <a class="edition-chip" href="{{ url_for('public.headlines_feed', edition=edition.id) if edition.id != latest_id else url_for('public.headlines_feed') }}">
+                    {{ edition.edition_type | title }} <span class="count">· {{ story_counts.get(edition.id, 0) }} stories</span>{% if edition.id == latest_id %} <span class="latest-tag">· Latest</span>{% endif %}
+                </a>
+                {% endfor %}
+            </span>
+        </div>
+        {% endfor %}
+    </section>
+    {% else %}
+    <div class="empty">No editions have been published yet.</div>
+    {% endfor %}
+</div>
+
+</div>
+</div>
+
+<script>
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+    }
+
+    function toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('muckscraper-theme', next);
+        applyTheme(next);
+    }
+
+    const savedTheme = localStorage.getItem('muckscraper-theme') || 'light';
+    applyTheme(savedTheme);
+
+    {% include 'sidebar_script.html' %}
+</script>
+<script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
+</body>
+</html>

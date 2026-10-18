@@ -1,0 +1,136 @@
+{% from 'account_menu.html' import account_menu with context %}
+{% from 'icons.html' import icon, theme_toggle_label %}
+{% from 'oped_columns.html' import oped_columns with context %}
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_32.png') }}">
+    <link rel="icon" type="image/png" sizes="128x128" href="{{ url_for('static', filename='favicon_128.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192.png') }}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
+    <title>Opinion — MuckScraper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/story_card.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/oped_columns.css') }}">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+        }
+        .topbar {
+            background: var(--topbar-bg);
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .topbar a { color: #89b4fa; text-decoration: none; font-size: 14px; font-weight: 600; }
+        .topbar-title { color: var(--topbar-text); font-size: 18px; font-weight: 800; }
+        .header-controls { display: flex; align-items: center; gap: 12px; }
+        .theme-toggle {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: var(--topbar-text);
+            padding: 6px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .main { max-width: var(--width-list); margin: 0 auto; padding: 0 40px; }
+        .main-header { padding: 24px 0 8px; }
+        h1 { font-size: var(--fs-page-title); font-weight: 800; color: var(--accent-text); letter-spacing: -0.5px; margin-bottom: 4px; }
+        .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 8px; }
+
+        .main-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+        .edition-links { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 6px; }
+        .intro { color: var(--text-muted); font-size: var(--fs-meta); margin: 0 0 16px; }
+        .by-story { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 20px 24px; margin-bottom: 20px; }
+        .by-story h2 { font-size: var(--fs-card-title); font-weight: 800; line-height: 1.3; margin-bottom: 4px; }
+        .by-story h2 a { color: var(--text); text-decoration: none; }
+        .by-story h2 a:hover { color: var(--accent-text); }
+        .by-story .by-story-meta { font-size: var(--fs-meta); color: var(--text-muted); margin-bottom: 16px; }
+        @media (max-width: 900px) { .by-story { padding: 16px; } }
+        .empty { text-align: center; padding: 80px 0; color: var(--text-faint); font-style: italic; }
+
+        @media (max-width: 900px) {
+            .main { padding: 0 20px; }
+        }
+        {% include 'sidebar_styles.html' %}
+    </style>
+</head>
+<body>
+<div class="layout">
+{% include 'sidebar_nav.html' %}
+<div class="page-body">
+
+<div class="topbar">
+    <div>
+        <span class="topbar-title">MuckScraper</span>
+    </div>
+    <div class="header-controls">
+        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">{{ theme_toggle_label() }}</button>
+        {{ account_menu() }}
+    </div>
+</div>
+
+<div class="main">
+    <div class="main-header">
+        <div>
+            <h1>Opinion</h1>
+            <div class="subtitle">{{ edition_label }}</div>
+        </div>
+        <div class="edition-links">
+            {% if edition %}
+            <a href="{{ url_for('public.headlines_feed', edition=edition.id if is_past_edition else none) }}" class="btn btn-muted">{{ icon('newspaper') }} Headlines</a>
+            {% endif %}
+            <a href="{{ url_for('public.editions_archive') }}" class="btn btn-muted">{{ icon('calendar') }} Past editions</a>
+        </div>
+    </div>
+    <p class="intro">News stories that got new opinion columns in this edition. Each column is filed under its outlet's leaning; the line under it says what it argues.</p>
+
+    {% for story, columns in cards %}
+    <div class="by-story">
+        <h2><a href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ story.display_headline }}</a></h2>
+        {% set n = columns.values()|map('length')|sum %}
+        <p class="by-story-meta">{{ story.articles|length }} news article{{ 's' if story.articles|length != 1 else '' }} · {{ n }} new column{{ 's' if n != 1 else '' }}</p>
+        {{ oped_columns(columns) }}
+    </div>
+    {% else %}
+    <div class="empty">No opinion columns were linked to stories in this edition.</div>
+    {% endfor %}
+</div>
+
+</div>
+</div>
+
+<script>
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+    }
+
+    function toggleTheme() {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('muckscraper-theme', next);
+        applyTheme(next);
+    }
+
+    const savedTheme = localStorage.getItem('muckscraper-theme') || 'light';
+    applyTheme(savedTheme);
+
+    {% include 'sidebar_script.html' %}
+</script>
+<script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
+</body>
+</html>
