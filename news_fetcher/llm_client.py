@@ -254,6 +254,25 @@ def _probe_ollama_host(host):
         return False
 
 
+def _ollama_host_hung(host):
+    """True when the host accepts the connection but /api/tags never answers.
+
+    A box that resumed or booted badly can keep port 11434 open while Ollama
+    is frozen (2026-10-11: every call hung for 2 h 10 min). A read timeout
+    after a successful connect is that state; a refused or timed-out connect
+    is a box that is asleep or off.
+    """
+    if not host:
+        return False
+    try:
+        requests.get(f"{host}/api/tags", timeout=_OLLAMA_PROBE_TIMEOUT)
+    except requests.exceptions.ReadTimeout:
+        return True
+    except Exception:
+        return False
+    return False
+
+
 def _ollama_host_candidates():
     """Ordered hosts to try for the next Ollama call, preferring the primary
     when it is known-good and the fallback otherwise.
@@ -336,13 +355,19 @@ def probe_ollama_inference():
     """Make one real embedding call against each reachable Ollama host.
 
     True  -- some host embedded successfully.
-    False -- a host answers HTTP but none can embed (inference wedged).
+    False -- a host answers HTTP but none can embed, or a host accepts the
+             connection but never answers (inference wedged).
     None  -- no host answers at all (asleep or down), which the ordinary
              reachability checks already handle.
     """
     reachable = False
     for host in (OLLAMA_HOST, OLLAMA_FALLBACK_HOST):
-        if not host or not _probe_ollama_host(host):
+        if not host:
+            continue
+        if not _probe_ollama_host(host):
+            if _ollama_host_hung(host):
+                logger.info(f"  [llm_client] {host} accepts connections but does not answer")
+                reachable = True
             continue
         reachable = True
         for attempt in range(1, _INFERENCE_PROBE_ATTEMPTS + 1):
