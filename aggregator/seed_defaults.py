@@ -121,10 +121,15 @@ SEED_PIPELINE_SCHEDULE = [{'hour': 7, 'run_full_pipeline': True},
 
 # RSS feeds: 6153a50aa8fb's lists, less f7a1d3c5e8b2's RETIRED_FEEDS, plus its
 # NEW_FEEDS (which also brings the op_ed bucket, labels and fallbacks).
+# RSS feeds: 6153a50aa8fb's lists, less f7a1d3c5e8b2's RETIRED_FEEDS, plus its
+# NEW_FEEDS (which also brings the op_ed bucket, labels and fallbacks).
+# RSS feeds: 6153a50aa8fb's lists, less f7a1d3c5e8b2's RETIRED_FEEDS, plus its
+# NEW_FEEDS (which also brings the op_ed bucket, labels and fallbacks).
+# RSS feeds: 6153a50aa8fb's lists, less f7a1d3c5e8b2's RETIRED_FEEDS, plus its
+# NEW_FEEDS (which also brings the op_ed bucket, labels and fallbacks).
 SEED_RSS_GENERAL = ['https://feeds.bbci.co.uk/news/rss.xml',
  'https://feeds.npr.org/1001/rss.xml',
  'https://www.pbs.org/newshour/feeds/rss/headlines',
- 'https://www.economist.com/the-world-this-week/rss.xml',
  'https://feeds.nbcnews.com/nbcnews/public/news',
  'https://feeds.washingtonpost.com/rss/world',
  'https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/world/rss.xml',
@@ -146,6 +151,7 @@ SEED_RSS_GENERAL = ['https://feeds.bbci.co.uk/news/rss.xml',
  'https://news.google.com/rss/search?q=site:apnews.com+when:1d&hl=en-US&gl=US&ceid=US:en',
  'https://news.google.com/rss/search?q=site:reuters.com+when:1d&hl=en-US&gl=US&ceid=US:en',
  'https://news.google.com/rss/search?q=site:wsj.com+when:1d&hl=en-US&gl=US&ceid=US:en',
+ 'https://news.google.com/rss/search?q=%28site%3Aeconomist.com%2Funited-states+OR+site%3Aeconomist.com%2Finternational+OR+site%3Aeconomist.com%2Fbusiness+OR+site%3Aeconomist.com%2Ffinance-and-economics+OR+site%3Aeconomist.com%2Feurope+OR+site%3Aeconomist.com%2Fasia+OR+site%3Aeconomist.com%2Fchina+OR+site%3Aeconomist.com%2Fmiddle-east-and-africa+OR+site%3Aeconomist.com%2Fthe-americas+OR+site%3Aeconomist.com%2Fbritain+OR+site%3Aeconomist.com%2Fscience-and-technology+OR+site%3Aeconomist.com%2Fbriefing%29+when%3A7d&hl=en-US&gl=US&ceid=US:en',
  'https://www.washingtonexaminer.com/rss',
  'https://thedispatch.com/feed/',
  'https://freebeacon.com/feed/',
@@ -185,6 +191,12 @@ SEED_RSS_LABELS = {('https://dailycaller.com/feed/', 'general'): 'The Daily Call
  ('https://feeds.washingtonpost.com/rss/opinions', 'op_ed'): 'Washington Post Opinions (Op/Ed)',
  ('https://freebeacon.com/feed/', 'general'): 'Washington Free Beacon',
  ('https://moxie.foxnews.com/google-publisher/opinion.xml', 'op_ed'): 'Fox News Opinion (Op/Ed)',
+ ('https://news.google.com/rss/search?q=%28site%3Aeconomist.com%2Funited-states+OR+site%3Aeconomist.com%2Finternational+OR+site%3Aeconomist.com%2Fbusiness+OR+site%3Aeconomist.com%2Ffinance-and-economics+OR+site%3Aeconomist.com%2Feurope+OR+site%3Aeconomist.com%2Fasia+OR+site%3Aeconomist.com%2Fchina+OR+site%3Aeconomist.com%2Fmiddle-east-and-africa+OR+site%3Aeconomist.com%2Fthe-americas+OR+site%3Aeconomist.com%2Fbritain+OR+site%3Aeconomist.com%2Fscience-and-technology+OR+site%3Aeconomist.com%2Fbriefing%29+when%3A7d&hl=en-US&gl=US&ceid=US:en', 'general'): 'The '
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              'Economist '
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              '(Google '
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              'News, '
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              'news '
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              'sections)',
  ('https://news.google.com/rss/search?q=site:apnews.com+when:1d&hl=en-US&gl=US&ceid=US:en', 'general'): 'AP '
                                                                                                         '(Google '
                                                                                                         'News)',
