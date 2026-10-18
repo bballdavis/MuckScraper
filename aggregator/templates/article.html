@@ -443,12 +443,7 @@
         <div class="summary">
             <div class="summary-label">Executive Summary</div>
             {% if article.summary %}
-                {% for line in article.summary.split('\n') %}
-                    {% set l = line.strip() %}
-                    {% if l %}
-                        <p>{{ l }}</p>
-                    {% endif %}
-                {% endfor %}
+                <p>{{ article.summary | summary_paragraph }}</p>
             {% elif summary_blocked_reason and not (article.content and article.content|length > 100) %}
                 <p style="font-style: italic; color: var(--text-muted);">{{ summary_blocked_reason }} Read it at the source below.</p>
             {% elif not ollama_online %}

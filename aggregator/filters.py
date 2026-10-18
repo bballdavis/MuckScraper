@@ -1,5 +1,36 @@
+import re
+
 from aggregator.display_time import local_datetime
 from aggregator.html_safety import clean_html, plain_text_br
+
+# Section labels article summaries are written with (Smart Brevity, and the
+# older "What's happening" format). Only these are stripped, so a line that
+# starts with a quoted speaker ("Trump: ...") keeps its name.
+SUMMARY_LABELS = (
+    "The big picture", "Why it matters", "Quick analysis", "What's next",
+    "What's happening", "Between the lines", "The bottom line", "Bottom line",
+)
+_SUMMARY_LABEL_RE = re.compile(
+    r"^\**\s*(?:%s)\s*:\s*\**\s*" % "|".join(re.escape(label) for label in SUMMARY_LABELS),
+    re.IGNORECASE,
+)
+_BULLET_RE = re.compile(r"^(?:[•\-*]|\d+[.)])\s+")
+
+
+def summary_paragraph(summary):
+    """An article summary as one plain paragraph: section labels and bullet
+    markers dropped, the parts joined with spaces (Regis, 2026-10-18)."""
+    if not summary:
+        return ""
+    parts = []
+    for line in summary.splitlines():
+        text = _BULLET_RE.sub("", _SUMMARY_LABEL_RE.sub("", line.strip())).strip()
+        if not text:
+            continue
+        if text[-1] not in ".!?\"'”’)":
+            text += "."
+        parts.append(text)
+    return " ".join(parts)
 
 
 def register_filters(app):
@@ -10,6 +41,9 @@ def register_filters(app):
 
     # Stored timestamps are naive UTC; show them in DISPLAY_TIMEZONE.
     app.add_template_filter(local_datetime, "local_datetime")
+
+    # Article summaries read as one paragraph, without section labels.
+    app.add_template_filter(summary_paragraph, "summary_paragraph")
 
     @app.template_filter("get_whats_happening")
     def get_whats_happening(summary):
