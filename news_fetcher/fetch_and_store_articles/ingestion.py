@@ -13,7 +13,8 @@ import os
 import re
 from aggregator import db
 from aggregator.article_signals import (
-    bias_bucket_for_score, is_off_section_oped, is_roundup_article, low_value_article_reason,
+    bias_bucket_for_score, is_media_oped, is_off_section_oped, is_roundup_article,
+    low_value_article_reason,
 )
 from aggregator.html_safety import strip_title_tags
 from aggregator.models import Article, OpinionPiece, Outlet, Story, Topic, IngestionBlock
@@ -258,7 +259,8 @@ def store_opinion_feed(articles_data):
     source and title blocks, and the other low-value reasons (betting,
     roundups, video, promo), and an entry from an outlet in
     OPED_FEED_SECTION_PATHS outside its opinion path is skipped (news the
-    NYT Opinion feed carries). Nothing here reaches `articles`.
+    NYT Opinion feed carries), as is a video/audio/podcast page
+    (is_media_oped()). Nothing here reaches `articles`.
     """
     metrics = {"input_articles": len(articles_data), "saved": 0, "skipped": {}}
 
@@ -289,6 +291,9 @@ def store_opinion_feed(articles_data):
             continue
         if is_off_section_oped(url):
             skip("not_opinion_section")
+            continue
+        if is_media_oped(url):
+            skip("media")
             continue
         source_name = source_name_from_url(raw_url) or normalize_source_name(article.get("source_name", "Unknown"))
         if save_opinion_piece(title, url, source_name, article.get("published_at") or datetime.utcnow(),

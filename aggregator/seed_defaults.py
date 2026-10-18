@@ -119,24 +119,21 @@ SEED_PIPELINE_SCHEDULE = [{'hour': 7, 'run_full_pipeline': True},
  {'hour': 17, 'run_full_pipeline': True},
  {'hour': 22, 'run_full_pipeline': False}]
 
-SEED_RSS_GENERAL = ['https://feeds.apnews.com/rss/topnews',
- 'https://feeds.reuters.com/reuters/topNews',
- 'https://feeds.bbci.co.uk/news/rss.xml',
+# RSS feeds: 6153a50aa8fb's lists, less f7a1d3c5e8b2's RETIRED_FEEDS, plus its
+# NEW_FEEDS (which also brings the op_ed bucket, labels and fallbacks).
+SEED_RSS_GENERAL = ['https://feeds.bbci.co.uk/news/rss.xml',
  'https://feeds.npr.org/1001/rss.xml',
  'https://www.pbs.org/newshour/feeds/rss/headlines',
  'https://www.economist.com/the-world-this-week/rss.xml',
- 'https://rss.cnn.com/rss/edition.rss',
  'https://feeds.nbcnews.com/nbcnews/public/news',
  'https://feeds.washingtonpost.com/rss/world',
  'https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/world/rss.xml',
  'https://www.theguardian.com/world/rss',
  'https://moxie.foxnews.com/google-publisher/latest.xml',
  'https://moxie.foxbusiness.com/google-publisher/latest.xml',
- 'https://feeds.a.dj.com/rss/RSSWorldNews.xml',
  'https://nypost.com/feed/',
  'https://www.washingtontimes.com/rss/headlines/news/politics/',
  'https://reason.com/feed/',
- 'https://www.nationalreview.com/feed/',
  'https://thehill.com/feed/',
  'https://api.axios.com/feed/',
  'https://rss.politico.com/politics-news.xml',
@@ -144,25 +141,83 @@ SEED_RSS_GENERAL = ['https://feeds.apnews.com/rss/topnews',
  'https://nationalpost.com/feed/',
  'https://torontosun.com/feed/',
  'https://feeds.abcnews.com/abcnews/topstories',
- 'https://www.cbsnews.com/latest/rss/main']
+ 'https://www.cbsnews.com/latest/rss/main',
+ 'https://news.google.com/rss/search?q=site:cnn.com+when:1d&hl=en-US&gl=US&ceid=US:en',
+ 'https://news.google.com/rss/search?q=site:apnews.com+when:1d&hl=en-US&gl=US&ceid=US:en',
+ 'https://news.google.com/rss/search?q=site:reuters.com+when:1d&hl=en-US&gl=US&ceid=US:en',
+ 'https://news.google.com/rss/search?q=site:wsj.com+when:1d&hl=en-US&gl=US&ceid=US:en',
+ 'https://www.washingtonexaminer.com/rss',
+ 'https://thedispatch.com/feed/',
+ 'https://freebeacon.com/feed/',
+ 'https://dailycaller.com/feed/',
+ 'https://feeds.feedburner.com/breitbart']
 
 SEED_RSS_RIGHT_ENRICHMENT = ['https://moxie.foxnews.com/google-publisher/latest.xml',
- 'https://feeds.a.dj.com/rss/RSSWorldNews.xml',
  'https://nypost.com/feed/',
  'https://www.washingtonexaminer.com/rss',
  'https://www.washingtontimes.com/rss/headlines/news/politics/',
- 'https://www.nationalreview.com/feed/',
  'https://moxie.foxbusiness.com/google-publisher/latest.xml',
  'https://www.newsmax.com/rss/Newsfront/16/',
- 'https://www.dailywire.com/feeds/rss.xml']
+ 'https://www.dailywire.com/feeds/rss.xml',
+ 'https://news.google.com/rss/search?q=site:wsj.com+when:1d&hl=en-US&gl=US&ceid=US:en']
 
-SEED_RSS_LEFT_ENRICHMENT = ['https://rss.cnn.com/rss/edition.rss',
- 'https://feeds.nbcnews.com/nbcnews/public/news',
+SEED_RSS_LEFT_ENRICHMENT = ['https://feeds.nbcnews.com/nbcnews/public/news',
  'https://feeds.washingtonpost.com/rss/world',
  'https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/world/rss.xml',
  'https://www.theguardian.com/world/rss',
  'https://feeds.npr.org/1001/rss.xml',
- 'https://www.cbsnews.com/latest/rss/main']
+ 'https://www.cbsnews.com/latest/rss/main',
+ 'https://news.google.com/rss/search?q=site:cnn.com+when:1d&hl=en-US&gl=US&ceid=US:en']
+
+SEED_RSS_OP_ED = ['https://rss.nytimes.com/services/xml/rss/nyt/Opinion.xml',
+ 'https://www.theguardian.com/commentisfree/rss',
+ 'https://feeds.washingtonpost.com/rss/opinions',
+ 'https://www.latimes.com/opinion/rss2.0.xml',
+ 'https://nypost.com/opinion/feed/',
+ 'https://moxie.foxnews.com/google-publisher/opinion.xml',
+ 'https://www.washingtontimes.com/rss/headlines/opinion/',
+ 'https://www.washingtonexaminer.com/section/opinion/feed/',
+ 'https://www.nationalreview.com/feed/',
+ 'https://thehill.com/opinion/feed/']
+
+SEED_RSS_LABELS = {('https://dailycaller.com/feed/', 'general'): 'The Daily Caller',
+ ('https://feeds.feedburner.com/breitbart', 'general'): 'Breitbart',
+ ('https://feeds.washingtonpost.com/rss/opinions', 'op_ed'): 'Washington Post Opinions (Op/Ed)',
+ ('https://freebeacon.com/feed/', 'general'): 'Washington Free Beacon',
+ ('https://moxie.foxnews.com/google-publisher/opinion.xml', 'op_ed'): 'Fox News Opinion (Op/Ed)',
+ ('https://news.google.com/rss/search?q=site:apnews.com+when:1d&hl=en-US&gl=US&ceid=US:en', 'general'): 'AP '
+                                                                                                        '(Google '
+                                                                                                        'News)',
+ ('https://news.google.com/rss/search?q=site:cnn.com+when:1d&hl=en-US&gl=US&ceid=US:en', 'general'): 'CNN '
+                                                                                                     '(Google '
+                                                                                                     'News)',
+ ('https://news.google.com/rss/search?q=site:cnn.com+when:1d&hl=en-US&gl=US&ceid=US:en', 'left_enrichment'): 'CNN '
+                                                                                                             '(Google '
+                                                                                                             'News)',
+ ('https://news.google.com/rss/search?q=site:reuters.com+when:1d&hl=en-US&gl=US&ceid=US:en', 'general'): 'Reuters '
+                                                                                                         '(Google '
+                                                                                                         'News)',
+ ('https://news.google.com/rss/search?q=site:wsj.com+when:1d&hl=en-US&gl=US&ceid=US:en', 'general'): 'WSJ '
+                                                                                                     '(Google '
+                                                                                                     'News)',
+ ('https://news.google.com/rss/search?q=site:wsj.com+when:1d&hl=en-US&gl=US&ceid=US:en', 'right_enrichment'): 'WSJ '
+                                                                                                              '(Google '
+                                                                                                              'News)',
+ ('https://nypost.com/opinion/feed/', 'op_ed'): 'NY Post Opinion (Op/Ed)',
+ ('https://rss.nytimes.com/services/xml/rss/nyt/Opinion.xml', 'op_ed'): 'NYT Opinion (Op/Ed)',
+ ('https://thedispatch.com/feed/', 'general'): 'The Dispatch',
+ ('https://thehill.com/opinion/feed/', 'op_ed'): 'The Hill Opinion (Op/Ed)',
+ ('https://www.latimes.com/opinion/rss2.0.xml', 'op_ed'): 'LA Times Opinion (Op/Ed)',
+ ('https://www.nationalreview.com/feed/', 'op_ed'): 'National Review (Op/Ed)',
+ ('https://www.theguardian.com/commentisfree/rss', 'op_ed'): 'Guardian Comment is Free (Op/Ed)',
+ ('https://www.washingtonexaminer.com/rss', 'general'): 'Washington Examiner',
+ ('https://www.washingtonexaminer.com/section/opinion/feed/', 'op_ed'): 'Washington Examiner '
+                                                                        'Opinion (Op/Ed)',
+ ('https://www.washingtontimes.com/rss/headlines/opinion/', 'op_ed'): 'Washington Times Opinion '
+                                                                      '(Op/Ed)'}
+
+SEED_RSS_FALLBACKS = {'https://feeds.washingtonpost.com/rss/opinions': 'https://news.google.com/rss/search?q=site:washingtonpost.com/opinions+when:1d&hl=en-US&gl=US&ceid=US:en',
+ 'https://feeds.washingtonpost.com/rss/world': 'https://news.google.com/rss/search?q=site:washingtonpost.com/world+when:1d&hl=en-US&gl=US&ceid=US:en'}
 
 SEED_BLOCK_SOURCES = [('github.com', 'Developer/repo noise, not news'),
  ('github.blog', 'Developer/repo noise, not news'),
@@ -816,13 +871,16 @@ def _seed_rss_feeds(counts):
         ("general", SEED_RSS_GENERAL),
         ("right_enrichment", SEED_RSS_RIGHT_ENRICHMENT),
         ("left_enrichment", SEED_RSS_LEFT_ENRICHMENT),
+        ("op_ed", SEED_RSS_OP_ED),
     )
     now = datetime.utcnow()
     for bucket, urls in buckets:
         for url in urls:
             if RssFeed.query.filter_by(url=url, bucket=bucket).first() is not None:
                 continue
-            db.session.add(RssFeed(url=url, bucket=bucket, enabled=True, added_at=now))
+            db.session.add(RssFeed(url=url, bucket=bucket, enabled=True, added_at=now,
+                                   label=SEED_RSS_LABELS.get((url, bucket)),
+                                   fallback_url=SEED_RSS_FALLBACKS.get(url)))
             counts["rss_feeds"] += 1
 
 

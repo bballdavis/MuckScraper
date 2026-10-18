@@ -342,6 +342,20 @@ def is_opinion_article(title=None, url=None):
     return any(host_path.startswith(prefix) for prefix in OPINION_URL_PREFIXES)
 
 
+# Video/audio versions of a column. Op/Ed feeds skip the news low-value checks
+# (an opinion URL returns "opinion" before they run), so the NYT Opinion feed's
+# /video/opinion/... copy of a column was stored as a second column (31 rows,
+# one story listing the same column twice; 2026-10-18). Narrower than
+# LOW_VALUE_URL_HINTS on purpose: letters pages are kept as Op/Ed.
+OPED_MEDIA_URL_HINTS = ("/video/", "/videos/", "/watch/", "/audio/", "/podcast/", "/podcasts/", "/listen/")
+
+
+def is_media_oped(url=None):
+    """True for an Op/Ed feed entry that is a video, audio or podcast page."""
+    path = urlparse(url or "").path.lower()
+    return any(hint in path for hint in OPED_MEDIA_URL_HINTS)
+
+
 def is_off_section_oped(url=None):
     """True for an Op/Ed feed entry outside its outlet's opinion path."""
     parsed = urlparse(url or "")

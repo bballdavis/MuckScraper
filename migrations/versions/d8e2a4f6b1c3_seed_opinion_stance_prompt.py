@@ -42,13 +42,16 @@ prompt_templates = sa.table(
 )
 
 
+DESCRIPTION = "One-phrase position for an Op/Ed column linked to a story, for columns the roundup didn't describe. Shown on the edition's Opinion page."
+
+
 def upgrade():
     conn = op.get_bind()
     if conn.execute(sa.text("SELECT 1 FROM prompt_templates WHERE key = 'opinion_stance'")).first():
         return
     op.bulk_insert(prompt_templates, [{
         "key": "opinion_stance",
-        "description": "One-phrase position for an Op/Ed column linked to a story, for columns the roundup didn't describe. Shown on the edition's Opinion page.",
+        "description": DESCRIPTION,
         "default_text": OPINION_STANCE,
         "current_text": OPINION_STANCE,
         "updated_at": None,
