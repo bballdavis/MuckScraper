@@ -98,6 +98,9 @@ DOMAIN_SOURCE_OVERRIDES = {
     "reason.com": "Reason",
     "newsmax.com": "Newsmax",
     "dailywire.com": "The Daily Wire",
+    # Its feed is titled just "Politics": 299 articles AI-rated Center under
+    # that name (AllSides: Politico, Lean Left). Too generic to map by name.
+    "politico.com": "Politico",
 }
 
 
