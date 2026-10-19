@@ -5,8 +5,8 @@ flask_sqlalchemy==2.5.1
 sqlalchemy==1.4.35
 newsapi-python
 beautifulsoup4
-requests==2.31.0
-urllib3<2.0.0
+requests==2.34.2
+urllib3>=2.8.0  # 1.26.x has decompression-bomb and redirect advisories (2026-10-18)
 charset-normalizer>=2,<4
 chardet<6
 apscheduler
