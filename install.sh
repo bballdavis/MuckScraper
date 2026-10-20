@@ -18,14 +18,12 @@ die()  { printf '\033[1;31mERROR:\033[0m %s\n' "$1" >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || die "Docker is required: https://docs.docker.com/get-docker/"
 docker compose version >/dev/null 2>&1 || die "The 'docker compose' plugin (Docker Compose v2) is required."
 
+first_run=false
 if [ ! -f .env ]; then
     info "No .env found — creating one from .env.sample"
     cp .env.sample .env
     chmod 600 .env  # it will hold passwords and API keys
-    warn "Now edit .env with your Ollama host and models and an admin password"
-    warn "(news API keys are optional; the secret keys are generated for you),"
-    warn "then re-run ./install.sh to continue."
-    exit 0
+    first_run=true
 fi
 
 # Auto-generate SECRET_KEY and MEILI_MASTER_KEY if they're still the sample
@@ -47,6 +45,13 @@ if grep -Eq '^MEILI_MASTER_KEY=(replace_with_a_generated_meilisearch_key|replace
     info "Generating a Meilisearch master key"
     sed -i.bak "s/^MEILI_MASTER_KEY=.*/MEILI_MASTER_KEY=$(random_hex)/" .env && rm -f .env.bak
     ok "MEILI_MASTER_KEY set"
+fi
+
+if [ "$first_run" = true ]; then
+    warn "Now edit .env with your Ollama host and models and an admin password"
+    warn "(news API keys are optional; SECRET_KEY and MEILI_MASTER_KEY are already set),"
+    warn "then re-run ./install.sh to continue."
+    exit 0
 fi
 
 placeholders_left=false
