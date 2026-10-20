@@ -23,8 +23,14 @@ The latest published edition, with each story's Left / Center / Right coverage c
 ![Grouped Stories in dark mode](screenshots/dark_mode.png)
 
 ### Multi-Source Story View
+One story from 22 outlets: the summary up top, then every source with its outlet's leaning.
 ![Story Reader](screenshots/story_reader1.png)
-![Story Reader](screenshots/story_reader2.png)
+![Story sources](screenshots/story_reader2.png)
+
+### Opinion
+Columns are kept out of the news but linked to the story they argue about, filed by the outlet's leaning, each with a one-line stance and a short roundup of what each side is saying.
+![Opinion on a story](screenshots/story_opinion.png)
+![Op/Ed page](screenshots/oped.png)
 
 ### Bias Tags
 ![Bias Tags](screenshots/bias_tags1.png)
@@ -37,6 +43,9 @@ Stories and articles in dense, sortable tables, filtered by time window, with Le
 ### Article Reader
 ![Article Reader](screenshots/article_reader1.png)
 ![Article Reader](screenshots/article_reader2.png)
+
+### Past Editions
+![Past editions](screenshots/editions.png)
 
 ---
 
@@ -305,9 +314,8 @@ An optional, read-only [MCP](https://modelcontextprotocol.io) server lets an AI 
 - Manual scrape and rescrape actions
 - Bulk scrape-missing workflow
 - Scrape audits
-- Ollama catch-up (missing embeddings, regrouping of single-article stories, headlines) and topic reclassification
+- Ollama helpers: wake the Ollama box, and catch up after an outage (missing embeddings, regrouping of single-article stories, headlines) plus topic reclassification
 - Outlet merge tooling
-- Ollama wake and catch-up helpers
 - Topic, RSS feed, scheduled fetch and ingestion blocklist management
 - Search index rebuild
 - Editable LLM prompts, each resettable back to its original default
@@ -402,7 +410,6 @@ Important knobs include:
 ## Notes
 
 - Release history and upgrade notes: [CHANGELOG.md](CHANGELOG.md).
-
 - This repo intentionally documents the main application and ingestion pipeline, not every deployment-specific integration.
 - Optional local integrations can exist around the core stack without being required for the open-source app itself.
 
