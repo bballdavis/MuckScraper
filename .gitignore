@@ -16,7 +16,6 @@ printouts
 .claude
 .agents
 tests
-catcode.sh
 
 # Personal Headline feature files
 aggregator/public_app.py
@@ -39,7 +38,6 @@ docker-compose.private.yml
 .aider*
 fableaudit.md
 TODO.md
-catcode.sh
 TROUBLESHOOTINGHL.md
 tests
 scripts
