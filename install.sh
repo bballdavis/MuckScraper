@@ -82,8 +82,10 @@ info "Setting up the database (pgvector extension + tables) and admin user..."
 info "(retries automatically while Postgres finishes starting up)"
 docker compose exec app python bootstrap_admin.py
 
-info "Starting the scheduler..."
-docker compose up -d scheduler
+# --build: the scheduler image carries its own copy of the code and packages,
+# so without it an upgrade leaves the scheduler running the old version.
+info "Building and starting the scheduler..."
+docker compose up -d --build scheduler
 
 echo
 ok "MuckScraper is running."
