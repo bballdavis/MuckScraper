@@ -4,7 +4,20 @@ All notable changes to MuckScraper are documented here.
  
 ---
 
-## [Unreleased]
+## [1.0.0] - 2026-10-20
+
+Status: stable. MuckScraper is out of beta. From here on, upgrades within
+1.x never break your stored config or customizations (topics, RSS feeds,
+prompts, scheduled fetches, ingestion blocks); anything that would is saved
+for 2.0 and called out there. Since 0.8 this release adds **opinion
+coverage** (an Op/Ed section with columns linked to the stories they argue
+about, each with its stance, and a roundup of what each side says),
+**copied-article detection** so one wire report under three mastheads counts
+once, **deep analysis** for every edition article, **past editions**, and
+**Google News search feeds** for the big outlets whose own feeds died. It
+also makes a fresh install simpler (both secret keys generated on the first
+run) and safer (a placeholder `SECRET_KEY` is refused), and moves to current
+urllib3 and requests.
 
 ### Added
 - **`OLLAMA_THINK`** (optional, blank by default). Set it to `false` to turn
@@ -44,6 +57,9 @@ All notable changes to MuckScraper are documented here.
 - **Past editions.** A Past editions page lists every edition, grouped by
   month, and opens each one as it was published, read live from the
   database, so opinion columns added to its stories since are there too.
+- **A page for each Op/Ed piece:** what it argues, the story it's linked
+  to, its text (signed-in readers only) and a link to the publisher. The
+  Op/Ed list and the story page's columns link there.
 - **Opinion page per edition:** the stories that got new opinion columns in
   that edition, each column with a one-line stance. Every linked column now
   gets a stance, not only the ones a roundup described.
@@ -60,15 +76,29 @@ All notable changes to MuckScraper are documented here.
 
 ### Changed
 - **Ingestion refuses more junk:** fantasy-sports advice, "odds, predictions"
-  betting picks, Seeking Alpha contributor pieces and editorial cartoons (as
-  news and as Op/Ed). News about cartoons is kept. HTML tags embedded in
+  betting picks, Seeking Alpha contributor pieces, editorial cartoons (as
+  news and as Op/Ed), show and interview transcripts, and "News of the day"
+  digests. News about cartoons or transcripts is kept. HTML tags embedded in
   feed titles are stripped.
+- **Editions prefer stories covered by two or more outlets**, not two
+  articles: one outlet's pair (a transcript plus its write-up) no longer
+  jumps ahead of single-source stories.
+- **"former President" is fixed in code.** Summaries, reports, headlines and
+  opinion roundups no longer call the current President or Vice President
+  "former" unless a source does. Prompt rules alone never stopped the model
+  doing it.
 - **Back to Feed returns to where you were.** Going back from a story or
   article lands on the same card in the list, or the same row in Search,
   instead of the top of the page.
 - On article pages, scrape details sit above the summary for signed-in readers.
 - The dark top bar spans the full page width on All Stories, Grouped Stories
   and Search.
+- **Layout and navigation pass:** every page has its back link in the same
+  place ("Back to Feed" returns to the list you came from, config pages go
+  "Back to Admin Tools"); the accent colour is the sidebar's indigo (blue is
+  left for Left); every page has the Light/Dark button and follows the saved
+  theme; the Headlines and Fetch top bars are sticky; and no page is wider
+  than a phone screen, upright or sideways.
 - The browser tab icon is the raccoon mascot.
 - The quality checker accepts either label set when a prompt offers two
   formats.
@@ -87,7 +117,32 @@ All notable changes to MuckScraper are documented here.
   `install.sh` creates `.env` readable by its owner only; the optional
   Langfuse, n8n and Wake-on-LAN settings no longer print Compose warnings
   when unset; a first start no longer prints a database traceback while
-  Postgres is starting.
+  Postgres is starting. The first run of `install.sh` now generates
+  `SECRET_KEY` and `MEILI_MASTER_KEY` when it creates `.env`, so you only
+  fill in the Ollama settings and the admin password. On an upgrade it
+  rebuilds the scheduler image too (before, the scheduler kept running the
+  old code until it was rebuilt by hand).
+- **The restart proxy finds its own Compose project**, so the Admin Tools
+  restart buttons work in a clone with any folder name (it assumed
+  `muckscraper`). `COMPOSE_PROJECT_NAME` in its environment overrides it.
+- **Outlet names:** Politico, Reason, Newsmax and The Daily Wire now match
+  their AllSides entries.
+
+### Fixed
+- **A wedged Ollama no longer looks asleep.** When the port accepts a
+  connection but nothing answers, the health probe now treats the box as
+  broken and the run fails fast, instead of waiting out hundreds of timeouts.
+- **Edition dedupe:** two stories sharing only country and leader names
+  ("Russia", "Trump", "Ukraine") are no longer treated as the same event; one
+  shared word has to be something else. A six-outlet Ukraine story had been
+  dropped from two editions.
+- **Headlines ending in a quotation** keep their closing quote mark.
+
+### Removed
+- `restart.sh` (use `./install.sh`, the Admin Tools restart buttons, or
+  `docker compose up -d <service>`), `create_admin.py` (`install.sh` creates
+  the admin; add more on the Users page) and `catcode.sh` (an old code-dump
+  helper).
 
 ### Security
 - **The app refuses to start with the `.env.sample` placeholder as its
@@ -105,6 +160,35 @@ All notable changes to MuckScraper are documented here.
   (copied-article columns), `d8e2a4f6b1c3` (opinion stance prompt),
   `e4b7c2a9d6f1` (feed fallback URL), `f7a1d3c5e8b2` (new default feeds,
   added only where missing). All are additive.
+
+### Upgrade Notes
+
+- Wait for a run to finish, then pull and run the installer:
+
+  ```bash
+  git pull
+  ./install.sh
+  ```
+
+  It rebuilds the images (the scheduler and the restart proxy included),
+  applies the seven migrations and recreates the containers. By hand:
+  `docker compose up -d --build`, then
+  `docker compose exec app flask db upgrade`.
+- **If `.env` still has the sample `SECRET_KEY`**, the app now refuses to
+  start. Generate a key with
+  `python3 -c "import secrets; print(secrets.token_hex(32))"`, put it in
+  `.env`, and run `docker compose up -d app scheduler`. Everyone has to sign
+  in again afterwards.
+- **New default feeds are added; your own feeds are left alone.** So the
+  old defaults the new ones replace stay enabled: on the RSS Feeds page,
+  disable the CNN, AP, Reuters and WSJ feeds (dead), The Economist's "world
+  this week" feed (weekly round-ups only) and National Review in `general`
+  and `right_enrichment` (its columns were landing in the news; it now comes
+  in through Op/Ed). Their replacements are already in.
+- **New optional settings:** `OLLAMA_THINK` (blank keeps Ollama's default;
+  `false` turns off a thinking model's hidden reasoning) and `MCP_TOKEN` for
+  the optional MCP server
+  (`docker compose --profile mcp up -d --build mcp docker-restart-proxy`).
 
 ## [0.8.0] - 2026-10-05
 
