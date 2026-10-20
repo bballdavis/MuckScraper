@@ -90,6 +90,11 @@ All notable changes to MuckScraper are documented here.
   Postgres is starting.
 
 ### Security
+- **The app refuses to start with the `.env.sample` placeholder as its
+  `SECRET_KEY`.** It used to accept it, and since that value is public, anyone
+  could forge a login session on an install that kept it (only possible by
+  editing `.env` by hand; `install.sh` always replaced it). `.env.sample` now
+  shows the command to generate a key.
 - **urllib3 1.26.20 -> 2.8.0** (decompression-bomb and redirect advisories,
   relevant because the pipeline fetches pages from sites it doesn't control)
   and **requests 2.31.0 -> 2.34.2**. The old `urllib3<2.0.0` pin is gone.
