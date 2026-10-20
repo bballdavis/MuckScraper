@@ -1,5 +1,6 @@
 # muckscraperHeadlinesGoogleNEW/aggregator/app.py
 import logging
+import sqlalchemy.exc
 from aggregator import create_app, db
 from flask_migrate import Migrate
 
@@ -23,6 +24,13 @@ with app.app_context():
     try:
         from aggregator.blueprints.admin import reconcile_orphaned_task_statuses
         reconcile_orphaned_task_statuses()
+    except (sqlalchemy.exc.OperationalError, sqlalchemy.exc.ProgrammingError):
+        # Normal on a first install: Postgres is still starting, or the tables
+        # don't exist until bootstrap_admin.py creates them. Nothing to clean up.
+        logging.getLogger(__name__).warning(
+            "Database not ready yet; skipped the startup task-status cleanup "
+            "(normal while a new install starts)"
+        )
     except Exception:
         logging.getLogger(__name__).exception(
             "Startup task-status reconciliation failed"

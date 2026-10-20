@@ -41,6 +41,19 @@ All notable changes to MuckScraper are documented here.
 - **Quality check for invented titles:** the quality report flags summaries
   and reports that call someone "former President ..." (or another former
   office) when no source does.
+- **Past editions.** A Past editions page lists every edition, grouped by
+  month, and opens each one as it was published, read live from the
+  database, so opinion columns added to its stories since are there too.
+- **Opinion page per edition:** the stories that got new opinion columns in
+  that edition, each column with a one-line stance. Every linked column now
+  gets a stance, not only the ones a roundup described.
+- **Outlets without a working RSS feed** (CNN, AP, Reuters, WSJ) come in
+  through Google News search feeds. Each link is resolved to the publisher's
+  own URL before anything is stored; an entry that can't be resolved is
+  dropped and retried next run.
+- **Feed fallback URL:** any RSS feed can have a second URL, fetched instead
+  when the feed answers an HTTP error or can't be parsed (set it on the RSS
+  Feeds page).
 - **Signed-out article pages** say in plain words how much of the article
   could be read ("Fully read", "Publisher blocked full-text access", ...), and
   why there is no summary when the text couldn't be read.
@@ -61,11 +74,32 @@ All notable changes to MuckScraper are documented here.
   formats.
 - `seed_defaults()` seeds prompts as the migrations leave them, so a fresh
   install starts with the current prompt text.
+- Article summaries are shown as one paragraph, without the section labels.
+- Phones: the top bar keeps the title, theme button and account control on
+  one line.
+- **Default feeds:** Google News searches replace the dead CNN, AP, Reuters,
+  WSJ and The Economist feeds; more right-leaning news feeds; and ten Op/Ed
+  feeds balanced left and right (the `op_ed` bucket had none by default).
+  Existing installs get the new rows added and nothing else changed: the dead
+  feeds stay as they are, so disable them on the RSS Feeds page.
+- **Install:** `.env.sample` leaves the optional news API keys blank (no more
+  "still unedited" prompt for them) and suggests a starting model;
+  `install.sh` creates `.env` readable by its owner only; the optional
+  Langfuse, n8n and Wake-on-LAN settings no longer print Compose warnings
+  when unset; a first start no longer prints a database traceback while
+  Postgres is starting.
+
+### Security
+- **urllib3 1.26.20 -> 2.8.0** (decompression-bomb and redirect advisories,
+  relevant because the pipeline fetches pages from sites it doesn't control)
+  and **requests 2.31.0 -> 2.34.2**. The old `urllib3<2.0.0` pin is gone.
 
 ### Database
-- Four migrations: `f2a6c9e4b7d1` (deep-analysis prompts), `a7d3e9f1c2b4`
+- Seven migrations: `f2a6c9e4b7d1` (deep-analysis prompts), `a7d3e9f1c2b4`
   (Op/Ed table), `b3f7c1d9e5a2` (Op/Ed links and roundups), `c5d1e8a3f7b9`
-  (copied-article columns). All are additive.
+  (copied-article columns), `d8e2a4f6b1c3` (opinion stance prompt),
+  `e4b7c2a9d6f1` (feed fallback URL), `f7a1d3c5e8b2` (new default feeds,
+  added only where missing). All are additive.
 
 ## [0.8.0] - 2026-10-05
 
