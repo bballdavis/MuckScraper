@@ -49,21 +49,22 @@ Stories and articles in dense, sortable tables, filtered by time window, with Le
 
 ---
 
-## Why This Is Different
+## What It Does
 
-Most aggregators are just article lists. MuckScraper is story-first.
-
-- **Cross-outlet story grouping**: related coverage from multiple publishers is clustered into a single story so you can compare framing side by side.
-- **Bias visibility**: outlets are labeled on a left-to-right scale using AllSides where available and local model scoring otherwise.
-- **Local-first AI analysis**: summaries, deep reports, topic classification, and outlet scoring run against your own Ollama models by default. Gemini, Groq, and any OpenAI-compatible endpoint (OpenRouter, DeepSeek, OpenAI, a local vLLM) are supported alternatives, and the two workloads can be split across providers — see LLM behavior below.
-- **Edition workflow**: the system can publish fixed-size headline editions from the broader story pool instead of leaving everything as a raw reverse-chronological feed.
-- **Self-hosted**: no subscription requirement, no ad-tech, and no mandatory third-party cloud inference.
+MuckScraper gathers and breaks down the news so you don't have to read the same story twelve times, unless you want to. A few times a day it pulls in articles from RSS feeds (and NewsAPI/GNews if you have keys), works out which ones are about the same event, and turns each pile into a single story. Each story gets one headline, a summary, a look at how the left, center and right are covering it, and a link to every source. Twice a day it picks 20 of those stories for an edition.
 
 ---
 
-## What It Does
+## Why It's Different
 
-MuckScraper fetches articles from multiple news APIs and RSS feeds on a schedule, scrapes article text, groups related coverage into stories, classifies topics, scores outlet bias, and generates summaries or deeper reports when content is ready. It includes admin tooling for scrape review, retries, regrouping, and monitoring scrape health over time.
+Most aggregators hand you a list of links. MuckScraper is built around stories, and it does the work on your own machine.
+
+- **One story, every outlet.** Each new article is turned into an embedding (`nomic-embed-text`, stored in pgvector) and compared with recent stories. Close calls get a quick yes/no from the model. Twelve outlets reporting "Senate passes the bill" end up as one story instead of twelve links. Wire copies, where the same AP text runs under three mastheads, are spotted by text overlap and counted once.
+- **Bias you can see, and check.** Every outlet carries a left-to-right rating, from AllSides where they rate it and from the model where they don't. Each story shows how many left, center and right outlets covered it, and if one side is missing there's a button to go fetch it.
+- **Summaries of real reporting.** The model summarizes and compares articles that reporters wrote; it never writes the news. A deep report sets out how the left, center and right are each covering the story, what's contested and what's missing. Guardrails throw out cut-off summaries, model errors posing as headlines, and figures that don't appear in the sources.
+- **Opinion in its own lane.** Op-eds never count as news coverage. They're kept separately, linked to the story they argue about, and summed up side by side.
+- **Editions, not an endless feed.** Twice a day it picks a balanced edition of 20 stories, holding back repeats unless there's real new coverage. Every past edition stays readable.
+- **It's yours, and so is your reading.** It runs in Docker on your own hardware, with Ollama by default. No accounts, no ads. Your server fetches every article from every side, so your ISP, or anyone else keeping tabs, only sees you collecting all the news. When you read the scraped copies, which stories you actually read stays on your own machine.
 
 ---
 
