@@ -22,24 +22,31 @@ if [ ! -f .env ]; then
     info "No .env found — creating one from .env.sample"
     cp .env.sample .env
     chmod 600 .env  # it will hold passwords and API keys
-    warn "Now edit .env with your Ollama host and models, admin password and"
-    warn "Meilisearch key (news API keys are optional),"
+    warn "Now edit .env with your Ollama host and models and an admin password"
+    warn "(news API keys are optional; the secret keys are generated for you),"
     warn "then re-run ./install.sh to continue."
     exit 0
 fi
 
-# Auto-generate a real SECRET_KEY if it's still the sample placeholder — this
-# one is purely mechanical, unlike API keys or the admin password, which need
-# a human to actually decide.
+# Auto-generate SECRET_KEY and MEILI_MASTER_KEY if they're still the sample
+# placeholders — these are purely mechanical, unlike API keys or the admin
+# password, which need a human to actually decide.
+random_hex() {
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -hex 32
+    else
+        python3 -c "import secrets; print(secrets.token_hex(32))"
+    fi
+}
 if grep -Eq '^SECRET_KEY=(replace_with_a_generated_secret_key|generate_with_python3)' .env; then
     info "Generating a real SECRET_KEY"
-    if command -v openssl >/dev/null 2>&1; then
-        new_key=$(openssl rand -hex 32)
-    else
-        new_key=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-    fi
-    sed -i.bak "s/^SECRET_KEY=.*/SECRET_KEY=${new_key}/" .env && rm -f .env.bak
+    sed -i.bak "s/^SECRET_KEY=.*/SECRET_KEY=$(random_hex)/" .env && rm -f .env.bak
     ok "SECRET_KEY set"
+fi
+if grep -Eq '^MEILI_MASTER_KEY=(replace_with_a_generated_meilisearch_key|replace_with_a_real_meilisearch_key)' .env; then
+    info "Generating a Meilisearch master key"
+    sed -i.bak "s/^MEILI_MASTER_KEY=.*/MEILI_MASTER_KEY=$(random_hex)/" .env && rm -f .env.bak
+    ok "MEILI_MASTER_KEY set"
 fi
 
 placeholders_left=false
@@ -47,8 +54,7 @@ for pair in \
     "OLLAMA_HOST=http://your_ollama_ip:11434" \
     "OLLAMA_MODEL=your_model_name_here" \
     "EMBEDDING_MODEL=your_model_name_here" \
-    "ADMIN_PASSWORD=replace_with_a_real_admin_password" \
-    "MEILI_MASTER_KEY=replace_with_a_real_meilisearch_key"
+    "ADMIN_PASSWORD=replace_with_a_real_admin_password"
 do
     if grep -q "^${pair}" .env; then
         warn "${pair%%=*} still looks like the .env.sample placeholder"

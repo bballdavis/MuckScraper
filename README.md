@@ -180,9 +180,9 @@ cd muckscraper
 
 The first run creates `.env` from `.env.sample` and stops so you can fill it
 in. At minimum set `OLLAMA_HOST`, `OLLAMA_MODEL`, `EMBEDDING_MODEL`
-(`nomic-embed-text`), `ADMIN_PASSWORD` and `MEILI_MASTER_KEY`; pull both
-models on your Ollama box first (`ollama pull ...`). Change the Postgres
-password too. News API keys are optional. `SECRET_KEY` is generated for you.
+(`nomic-embed-text`) and `ADMIN_PASSWORD`; pull both models on your Ollama
+box first (`ollama pull ...`). Change the Postgres password too. News API
+keys are optional. `SECRET_KEY` and `MEILI_MASTER_KEY` are generated for you.
 
 Run `./install.sh` again once that's done. It builds the images (a few
 minutes the first time), sets up the database (pgvector extension + tables),
@@ -208,8 +208,8 @@ time. Change them at `/admin/pipeline-schedule` (then restart the scheduler).
 
 ```bash
 cp .env.sample .env && chmod 600 .env
-# Edit .env: Ollama host and models, admin password, Meilisearch key, and a
-# SECRET_KEY from: python3 -c "import secrets; print(secrets.token_hex(32))"
+# Edit .env: Ollama host and models, admin password, and SECRET_KEY and
+# MEILI_MASTER_KEY, each from: python3 -c "import secrets; print(secrets.token_hex(32))"
 docker compose up -d --build postgres meilisearch app
 docker compose exec app python bootstrap_admin.py
 docker compose up -d scheduler
