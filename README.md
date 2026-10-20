@@ -33,7 +33,7 @@ Columns are kept out of the news but linked to the story they argue about, filed
 ![Op/Ed page](screenshots/oped.png)
 
 ### Bias Tags
-Every card counts the left, center and right outlets covering the story; when a side is missing, a button fetches more from it.
+Every card counts the left, center and right outlets covering the story; when one side trails, a button fetches more coverage from that side.
 ![Bias Tags](screenshots/bias_tags1.png)
 ![Bias Tags](screenshots/bias_tags2.png)
 
@@ -61,7 +61,7 @@ MuckScraper gathers and breaks down the news so you don't have to read the same 
 Most aggregators hand you a list of links. MuckScraper is built around stories, and it does the work on your own machine.
 
 - **One story, every outlet.** Each new article is turned into an embedding (`nomic-embed-text`, stored in pgvector) and compared with recent stories. Close calls get a quick yes/no from the model. Twelve outlets reporting "Senate passes the bill" end up as one story instead of twelve links. Wire copies, where the same AP text runs under three mastheads, are spotted by text overlap and counted once.
-- **Bias you can see.** Every outlet carries a left-to-right rating, from AllSides where they rate it and from the model where they don't. Each story shows how many left, center and right outlets covered it, and if one side is missing there's a button to go fetch it.
+- **Bias you can see.** Every outlet carries a left-to-right rating, from AllSides where they rate it and from the model where they don't. Each story shows how many left, center and right outlets covered it, and if one side trails, there's a button to go fetch more from it.
 - **Summaries of real reporting.** The model summarizes and compares articles that reporters wrote; it never writes the news. A deep report sets out how the left, center and right are each covering the story, what's contested and what's missing. Guardrails throw out cut-off summaries and model errors posing as headlines, and a quality report flags any figure that doesn't appear in the sources.
 - **Opinion in its own lane.** Op-eds never count as news coverage. They're kept separately, linked to the story they argue about, and summed up side by side.
 - **Editions, not an endless feed.** Twice a day it picks a balanced edition of 20 stories, holding back repeats unless there's real new coverage. Every past edition stays readable.
