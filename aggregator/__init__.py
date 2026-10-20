@@ -14,6 +14,12 @@ login = LoginManager()
 login.login_view = "auth.login"
 csrf = CSRFProtect()
 
+# SECRET_KEY values shipped in .env.sample, current and earlier.
+PLACEHOLDER_SECRET_KEYS = {
+    "replace_with_a_generated_secret_key",
+    "generate_with_python3_-c_import_secrets_print_secrets.token_hex_32",
+}
+
 
 def create_app():
     app = Flask(__name__)
@@ -25,6 +31,14 @@ def create_app():
     if not secret_key:
         raise RuntimeError(
             "SECRET_KEY environment variable must be set (see .env.sample)"
+        )
+    # The .env.sample placeholders are public, so a session signed with one
+    # can be forged by anyone. install.sh replaces them; a hand-made .env may not.
+    if secret_key in PLACEHOLDER_SECRET_KEYS:
+        raise RuntimeError(
+            "SECRET_KEY is still the .env.sample placeholder. Generate one with "
+            "python3 -c \"import secrets; print(secrets.token_hex(32))\" "
+            "and put it in .env"
         )
     app.config["SECRET_KEY"] = secret_key
 

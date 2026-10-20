@@ -31,7 +31,7 @@ fi
 # Auto-generate a real SECRET_KEY if it's still the sample placeholder — this
 # one is purely mechanical, unlike API keys or the admin password, which need
 # a human to actually decide.
-if grep -q '^SECRET_KEY=generate_with_python3' .env; then
+if grep -Eq '^SECRET_KEY=(replace_with_a_generated_secret_key|generate_with_python3)' .env; then
     info "Generating a real SECRET_KEY"
     if command -v openssl >/dev/null 2>&1; then
         new_key=$(openssl rand -hex 32)

@@ -208,7 +208,8 @@ time. Change them at `/admin/pipeline-schedule` (then restart the scheduler).
 
 ```bash
 cp .env.sample .env && chmod 600 .env
-# Edit .env: Ollama host and models, admin password, Meilisearch key
+# Edit .env: Ollama host and models, admin password, Meilisearch key, and a
+# SECRET_KEY from: python3 -c "import secrets; print(secrets.token_hex(32))"
 docker compose up -d --build postgres meilisearch app
 docker compose exec app python bootstrap_admin.py
 docker compose up -d scheduler
