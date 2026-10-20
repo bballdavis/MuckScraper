@@ -178,11 +178,12 @@ cd muckscraper
 ./install.sh
 ```
 
-The first run creates `.env` from `.env.sample` and stops so you can fill it
-in. At minimum set `OLLAMA_HOST`, `OLLAMA_MODEL`, `EMBEDDING_MODEL`
+The first run creates `.env` from `.env.sample`, fills in `SECRET_KEY` and
+`MEILI_MASTER_KEY` for you, and stops so you can fill in the rest. At
+minimum set `OLLAMA_HOST`, `OLLAMA_MODEL`, `EMBEDDING_MODEL`
 (`nomic-embed-text`) and `ADMIN_PASSWORD`; pull both models on your Ollama
 box first (`ollama pull ...`). Change the Postgres password too. News API
-keys are optional. `SECRET_KEY` and `MEILI_MASTER_KEY` are generated for you.
+keys are optional.
 
 Run `./install.sh` again once that's done. It builds the images (a few
 minutes the first time), sets up the database (pgvector extension + tables),
