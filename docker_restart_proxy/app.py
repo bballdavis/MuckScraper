@@ -10,6 +10,7 @@
 
 import os
 import logging
+import socket
 import time
 
 import docker
@@ -21,8 +22,33 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 client = docker.from_env()
 
-PROJECT_NAME = os.environ.get("COMPOSE_PROJECT_NAME", "muckscraper")
 SELF_SERVICE_NAME = "docker-restart-proxy"
+
+
+def _detect_project_name():
+    """The compose project this proxy belongs to.
+
+    Compose names the project after the folder the repo was cloned into, so
+    a fixed name would find no containers in a clone called anything else.
+    Read it from this container's own labels (its hostname is its container
+    id); COMPOSE_PROJECT_NAME in the environment overrides that.
+    """
+    explicit = os.environ.get("COMPOSE_PROJECT_NAME")
+    if explicit:
+        return explicit
+    try:
+        me = client.containers.get(socket.gethostname())
+        name = me.labels.get("com.docker.compose.project")
+        if name:
+            return name
+    except Exception:
+        logger.warning("Could not read this container's compose project", exc_info=True)
+    logger.warning("Assuming compose project 'muckscraper'")
+    return "muckscraper"
+
+
+PROJECT_NAME = _detect_project_name()
+logger.info("Managing containers of compose project %r", PROJECT_NAME)
 
 MAX_LOG_LINES = 5000
 MAX_LOG_MINUTES = 7 * 24 * 60
