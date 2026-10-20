@@ -21,7 +21,9 @@ docker compose version >/dev/null 2>&1 || die "The 'docker compose' plugin (Dock
 if [ ! -f .env ]; then
     info "No .env found — creating one from .env.sample"
     cp .env.sample .env
-    warn "Now edit .env with your API keys, Ollama host, and admin login,"
+    chmod 600 .env  # it will hold passwords and API keys
+    warn "Now edit .env with your Ollama host and models, admin password and"
+    warn "Meilisearch key (news API keys are optional),"
     warn "then re-run ./install.sh to continue."
     exit 0
 fi
@@ -42,8 +44,6 @@ fi
 
 placeholders_left=false
 for pair in \
-    "NEWS_API_KEY=your_newsapi_key_here" \
-    "GNEWS_API_KEY=your_gnews_key_here" \
     "OLLAMA_HOST=http://your_ollama_ip:11434" \
     "OLLAMA_MODEL=your_model_name_here" \
     "EMBEDDING_MODEL=your_model_name_here" \
