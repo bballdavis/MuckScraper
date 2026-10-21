@@ -191,6 +191,11 @@ LOW_VALUE_URL_PREFIXES = (
     # AP section index pages ("MLB | Latest News, Stats, and Scores"), which its
     # Google News feed lists alongside articles (2026-10-16).
     "apnews.com/hub/",
+    # CNN Underscored: shopping reviews with affiliate links, not news (Regis,
+    # 2026-10-21). Its pages also answer 403, and one 403 put all of cnn.com
+    # on a 6-hour scrape hold.
+    "cnn.com/cnn-underscored/",
+    "edition.cnn.com/cnn-underscored/",
 )
 
 # Host + path prefixes for outlets that are opinion throughout. National
