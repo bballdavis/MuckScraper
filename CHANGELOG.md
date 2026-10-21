@@ -4,6 +4,21 @@ All notable changes to MuckScraper are documented here.
  
 ---
 
+## [Unreleased]
+
+### Added
+- **`APP_BIND` and `APP_PORT`** in `.env` choose where the admin app is
+  published (default `127.0.0.1:5000`, unchanged). Set `APP_BIND=0.0.0.0` to
+  reach it from other machines on your network, the same way `MCP_BIND`
+  works for the MCP server; no override file needed. Suggested on Reddit by
+  u/geo38.
+
+### Changed
+- **Meilisearch telemetry is off** (`MEILI_NO_ANALYTICS`). It sent anonymous
+  usage data to Meilisearch by default. Spotted by u/geo38. Takes effect when
+  the container is recreated (`./install.sh`, or
+  `docker compose up -d meilisearch`).
+
 ## [1.0.0] - 2026-10-20
 
 Status: stable. MuckScraper is out of beta. From here on, upgrades within

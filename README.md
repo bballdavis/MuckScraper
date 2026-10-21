@@ -194,7 +194,9 @@ instructions instead of guessing its schema version.)
 
 Then open `http://localhost:5000` and sign in with `ADMIN_USERNAME` /
 `ADMIN_PASSWORD` from `.env`. The app only listens on localhost; to reach it
-from another machine, see Security Warning above.
+from another machine, set `APP_BIND=0.0.0.0` (or a LAN address) in `.env` and
+run `docker compose up -d app`, after reading Security Warning above.
+`APP_PORT` moves it off port 5000.
 
 **What to expect on day one.** The scheduler starts a first run as soon as it
 comes up. On an empty database it has hundreds of new articles to group and
