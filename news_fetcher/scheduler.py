@@ -1150,6 +1150,14 @@ if __name__ == "__main__":
 
     with app.app_context():
         db.create_all()
+
+    # Admin bulk actions and AI tasks queued from the web app run here, in
+    # their own thread, so they start even while the startup run below is busy.
+    from aggregator.jobs import prune_finished, start_worker_thread
+    start_worker_thread(app)
+
+    with app.app_context():
+        prune_finished()
         # Only fetch on startup if enough time has passed
         if should_fetch_now():
             run_all_fetches(

@@ -157,7 +157,8 @@ def _running_operations():
             ops.append({
                 "kind": "other",
                 "label": action.replace("_", " ").title(),
-                "affects": {"app", "postgres"},
+                # Runs in the scheduler container's job worker (aggregator/jobs.py).
+                "affects": {"scheduler", "postgres"},
                 "started_at": payload.get("started_at"),
             })
 
@@ -171,7 +172,7 @@ def _running_operations():
             ops.append({
                 "kind": "other",
                 "label": f"AI task: {payload.get('task_type')} #{payload.get('resource_id')}",
-                "affects": {"app", "postgres"},
+                "affects": {"scheduler", "postgres"},
                 "started_at": payload.get("started_at"),
             })
 
