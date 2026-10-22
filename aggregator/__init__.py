@@ -80,6 +80,16 @@ def create_app():
                 "article_back_anchor": navigation.article_back_anchor, "menu_back": navigation.menu_back,
                 "sidebar_topics": _sidebar_topics}
 
+    @app.url_defaults
+    def static_version(endpoint, values):
+        # Stamp static URLs with the file's mtime so browsers fetch new CSS
+        # and JS after a deploy instead of reusing a cached copy.
+        if endpoint == "static" and "filename" in values and "v" not in values:
+            try:
+                values["v"] = int(os.path.getmtime(os.path.join(app.static_folder, values["filename"])))
+            except OSError:
+                pass
+
     @app.errorhandler(403)
     def forbidden(_error):
         from flask import render_template
