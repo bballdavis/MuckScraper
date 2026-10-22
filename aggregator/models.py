@@ -779,3 +779,19 @@ class ReadItem(db.Model):
     story = db.relationship("Story")
     article = db.relationship("Article")
     user = db.relationship("User", backref=db.backref("read_items", lazy="dynamic", cascade="all, delete-orphan"))
+
+
+class StorySkip(db.Model):
+    """A story one user passed on in the app's Swipe deck (aggregator/skips.py).
+    Scheduled runs never summarize it for that user; it can still be asked
+    for from the story page, and it drops out of their deck."""
+    __tablename__ = "story_skips"
+    __table_args__ = (db.UniqueConstraint("user_id", "story_id", name="uq_skip_user_story"),)
+
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    story_id   = db.Column(db.Integer, db.ForeignKey("stories.id", ondelete="CASCADE"), nullable=False)
+    skipped_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    story = db.relationship("Story")
+    user = db.relationship("User", backref=db.backref("story_skips", lazy="dynamic", cascade="all, delete-orphan"))

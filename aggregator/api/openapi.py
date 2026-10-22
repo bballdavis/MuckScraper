@@ -129,7 +129,8 @@ SCHEMAS["Edition"] = {"allOf": [_ref("EditionBrief"), _obj(["stories"], stories=
 SCHEMAS["StoryDetail"] = {"allOf": [_ref("StorySummary"), _obj(
     ["title", "topics", "created_at", "summary", "deep_report", "opinion_roundup", "articles", "copies_hidden", "opinion"],
     title=_S, topics=_PARAS, created_at=_NDT, summary=_PARAS, deep_report=_PARAS, opinion_roundup=_PARAS,
-    articles=_by_leaning(_ref("ArticleCard")), copies_hidden=_I, opinion=_by_leaning(_ref("OpinionPiece")))]}
+    articles=_by_leaning(_ref("ArticleCard")), copies_hidden=_I, opinion=_by_leaning(_ref("OpinionPiece")),
+    is_skipped={"type": "boolean", "description": "Passed on in Swipe: scheduled runs won't summarize it"})]}
 SCHEMAS["ArticleDetail"] = {"allOf": [_ref("ArticleCard"), _obj(
     ["topics", "analysis", "content_html"], topics=_PARAS, analysis=_PARAS,
     content_html={"type": ["string", "null"], "description": "Sanitized scraped HTML; null unless the server allows full text."},
@@ -139,6 +140,10 @@ SCHEMAS["ReadItem"] = _obj(
     kind={"type": "string", "enum": ["story", "article"]}, id=_I, read_at=_DT,
     story={"oneOf": [_ref("StorySummary"), {"type": "null"}], "description": "Set when kind is story"},
     article={"oneOf": [_ref("ArticleCard"), {"type": "null"}], "description": "Set when kind is article"})
+SCHEMAS["DeckCard"] = {"allOf": [_ref("StorySummary"), _obj(
+    ["tier"], tier={"type": "string", "enum": ["headlines", "more"],
+                    "description": "headlines: in the latest edition; more: another story from the past week"})]}
+SCHEMAS["StorySkip"] = _obj(["story_id", "skipped_at"], story_id=_I, skipped_at=_DT)
 
 
 def _json(schema, description="OK"):
@@ -243,6 +248,15 @@ PATHS = {
                 "responses": {"200": _json(_ref("ReadItem")), **_ERRORS, **_NOT_FOUND}},
         "delete": {"operationId": "markUnread", "parameters": [_READ_KIND, _path_id("item_id")],
                    "responses": {"204": {"description": "Unread (whether or not it was read)"}, **_ERRORS, **_NOT_FOUND}},
+    },
+    "/me/deck": _get("deck", _json(_page(_ref("DeckCard"))), [_CURSOR, _LIMIT]),
+    "/me/skips": _get("skips", _json(_page(_ref("StorySkip"))), [_CURSOR, _LIMIT]),
+    "/me/skips/{story_id}": {
+        "put": {"operationId": "skipStory", "description": "Pass on a story: scheduled runs won't summarize it.",
+                "parameters": [_path_id("story_id")],
+                "responses": {"200": _json(_ref("StorySkip")), **_ERRORS, **_NOT_FOUND}},
+        "delete": {"operationId": "unskipStory", "parameters": [_path_id("story_id")],
+                   "responses": {"204": {"description": "Unskipped (whether or not it was skipped)"}, **_ERRORS}},
     },
     "/me/schedules": {
         **_get("getSchedule", _json(_ref("Schedule"))),

@@ -337,3 +337,7 @@ def read_item(row):
         "story": story_summary(row.story) if row.story is not None else None,
         "article": article_card(row.article) if row.article is not None else None,
     }
+
+
+def story_skip(row):
+    return {"story_id": row.story_id, "skipped_at": iso(row.skipped_at)}

@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func
 
-from aggregator import jobs
+from aggregator import jobs, skips
 from aggregator.models import (Article, Edition, EditionStory, NewsBoxItem, Story, SummarySchedule, Topic, db)
 
 logger = logging.getLogger(__name__)
@@ -431,6 +431,8 @@ def pick_stories(user_id, settings, now=None):
     """The stories a run of `settings` adds to the user's NewsBox."""
     now = now or datetime.utcnow()
     have = {sid for (sid,) in db.session.query(NewsBoxItem.story_id).filter_by(user_id=user_id)}
+    # Stories the user passed on in Swipe are only ever run by hand.
+    have |= skips.skipped_ids(user_id)
     picked, seen = [], set()
     for rule in settings["sections"]:
         if not rule["is_enabled"]:

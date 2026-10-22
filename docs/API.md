@@ -114,6 +114,9 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 | `POST /me/newsbox/read` | Mark every item read |
 | `GET /me/read?kind=story\|article&cursor=&limit=` | Stories and articles the user marked read, newest first, each with its story card or article card |
 | `PUT`/`DELETE /me/read/stories/{id}`, `/me/read/articles/{id}` | Mark read (again moves it to the top) or unread. Shared with the web app: a read story is hidden from Headlines there and listed under Recently read. Story cards in editions and `/stories` carry `is_read`, as do `/stories/{id}` and `/articles/{id}`. |
+| `GET /me/deck?cursor=&limit=` | The Swipe deck: stories still missing a summary or analysis that the user hasn't queued or skipped. The latest edition's headlines come first by rank (`tier: "headlines"`), then the past week's other stories, newest first (`tier: "more"`). |
+| `GET /me/skips?cursor=&limit=` | Stories the user passed on in Swipe, most recent first |
+| `PUT`/`DELETE /me/skips/{story_id}` | Pass on a story, or undo it. Scheduled runs never summarize a skipped story for that user; asking from the story page still works. `/stories/{id}` carries `is_skipped`. |
 | `GET`/`PUT /me/schedules` | Scheduled summaries: run times in the user's `timezone`, sections (each with an `amount` of stories, 1 to 100: the top N of the latest edition for Headlines, the N most-covered in the last day for a topic), depth and rules. `PUT` needs `summarize`. |
 | `POST /me/schedules/run` | Run the schedule once now. Needs `summarize`. |
 | `GET /me/bookmarks` | Saved stories with their latest version, plus `used_bytes` and `quota_bytes` (null when unlimited) |
