@@ -17,6 +17,12 @@ All notable changes to MuckScraper are documented here.
   status and hiding single-article stories. "Save as my default" in the
   Filters popover stores the filters you are looking at. Stored per user in
   `app_settings`, so no migration is needed.
+- **Settings › LLM providers** (`/admin/settings/llm`): which provider and
+  model serve the main and fast tiers and embeddings, what each provider has
+  configured (keys shown as their last four characters), which pipeline task
+  runs on which tier, and a Test button that makes one short call per tier.
+  Provider settings stay in the environment. The auto article deep analysis
+  switch moved here.
 
 ### Changed
 - **New feed top bar** on Headlines, All Stories and Grouped Stories: the
@@ -74,8 +80,26 @@ All notable changes to MuckScraper are documented here.
 - **`docker-compose.yml`:** the app and scheduler share one environment block
   (`x-app-env`), so a new setting is added once. The scheduler waits for a
   Postgres health check instead of a fixed 15-second sleep.
+- **Admin Tools is now Settings**, laid out as in the settings mock: a
+  section list (General, Sources, AI, Pipeline, with counts and a "Find a
+  setting" filter) beside the content. Its Overview shows pipeline,
+  container, LLM and job-queue health, the containers as a row of chips with
+  a restart button each, and every one-off job in one table with its impact,
+  last run and a filter by impact. Users, Topics, RSS feeds, Scheduled
+  fetches, both blocklists, Prompts and the Run schedule open inside it.
+- **One page frame everywhere.** Settings, Profile, Past editions, edition
+  Opinion, Op/Ed, Search, Fetch Articles and the no-access page use the feed's
+  full-width top bar and sidebar; the old per-page top bars are gone. The
+  sidebar has a Settings link for admins, and the account menu's Admin Tools
+  is now Settings.
+- **Profile** follows its mock: the account on the left with email and
+  password changes opening in place, feed defaults on the right as
+  segmented choices, chips and a switch.
 
 ### Fixed
+- **Scrape blocklist:** "Run Scrape Audit Now" and "Unblock" posted to
+  `/audit-scrapes` and `/unblock-domain` instead of their `/admin/...`
+  routes, so both returned 404.
 - **`docker-compose.yml` now passes the OpenRouter settings and
   `LLM_FAST_PROVIDER` into the containers.** They were documented in
   `.env.sample` but never reached the app or scheduler, so setting them in

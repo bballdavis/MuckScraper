@@ -1,15 +1,9 @@
-{% from 'account_menu.html' import account_menu with context %}
-{% from 'icons.html' import icon, theme_toggle_label %}
+{% extends '_app_page.html' %}
+{% from 'icons.html' import icon %}
 {% from 'pagination.html' import pager %}
-<!DOCTYPE html>
-<html data-theme="light">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <title>MuckScraper: Search</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+{% block title %}Search{% endblock %}
+{% block section %}Search{% endblock %}
+{% block styles %}
     <style>
         :root {
             --row-hover:     #f4f6f8;
@@ -19,21 +13,10 @@
             --row-hover:     #222230;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            transition: background 0.2s, color 0.2s;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        {% include 'sidebar_styles.html' %}
 
         .main {
             flex: 1;
-            padding: 0 32px;
+            padding: 16px 32px 0;
             max-width: var(--width-table);
             margin: 0 auto;
             min-width: 0;
@@ -58,18 +41,6 @@
         }
 
         h1 { font-size: 18px; font-weight: 800; color: var(--topbar-text); letter-spacing: -0.5px; }
-
-        .theme-toggle {
-            background: none;
-            border: 1px solid rgba(255,255,255,0.2);
-            color: var(--topbar-text);
-            padding: 6px 14px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            text-decoration: none;
-        }
 
         .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
         .tab {
@@ -215,28 +186,13 @@
 
 
         @media (max-width: 900px) {
-            .main { padding: 0 16px; }
-            .main-header { padding: 16px 16px; }
+            .main { padding: 12px 16px 0; }
             .col-title { min-width: 200px; }
         }
     </style>
-</head>
-<body>
-
-<div class="layout">
-
-    {% include 'sidebar_nav.html' %}
-
-    <div class="page-body">
-    <div class="main-header">
-        <h1>Search</h1>
-        <div class="header-controls">
-            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">{{ theme_toggle_label() }}</button>
-            {{ account_menu() }}
-        </div>
-    </div>
-
-    <div class="main">
+{% endblock %}
+{% block body %}
+<div class="main">
 
         <nav class="tabs">
             <a href="{{ tab_urls.stories }}" class="tab {{ 'active' if tab == 'stories' }}">Stories</a>
@@ -317,31 +273,16 @@
         {{ pager(page, total_pages) }}
         {% endif %}
     </div>
-    </div>
-</div>
-
+{% endblock %}
+{% block scripts %}
 <script>
-    (function () {
-        const saved = localStorage.getItem('muckscraper-theme') || 'light';
-        document.documentElement.setAttribute('data-theme', saved);
-    })();
 
-    function toggleTheme() {
-        const current = document.documentElement.getAttribute('data-theme');
-        const next = current === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('muckscraper-theme', next);
-    }
-
-    // Table header rows stick just below the sticky page header
+    // Table header rows stick just below the sticky top bar
     function setStickyOffset() {
-        const header = document.querySelector('.main-header');
+        const header = document.querySelector('.feed-topbar');
         if (header) document.documentElement.style.setProperty('--sticky-header-height', header.offsetHeight + 'px');
     }
     setStickyOffset();
     window.addEventListener('resize', setStickyOffset);
-
-    {% include 'sidebar_script.html' %}
 </script>
-</body>
-</html>
+{% endblock %}

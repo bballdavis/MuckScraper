@@ -1,12 +1,10 @@
-<!DOCTYPE html>
-<html data-theme="light">
-<head>
-    <title>Users — MuckScraper</title>
-{% include '_account_page_head.html' %}
-</head>
-<body>
-{% include '_account_topbar.html' %}
-
+{% extends 'settings_base.html' %}
+{% block title %}Users{% endblock %}
+{% block settings_key %}users{% endblock %}
+{% block head %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/account_pages.css') }}">
+{% endblock %}
+{% block settings_body %}
 <div class="container wide">
     <h1>Users</h1>
     <p class="subtitle">Add accounts and choose what each one can do. You can't change your own role or disable yourself, and there must always be at least one active admin.</p>
@@ -85,9 +83,8 @@
         <div class="role-help">
             <strong>Reader</strong> can read everything, including full article text and search, but can't change anything.<br>
             <strong>Scraper</strong> can also fetch articles and run summaries, analysis, bias ratings and scrapes.<br>
-            <strong>Admin</strong> can also use Admin Tools, change all configuration, and manage users.
+            <strong>Admin</strong> can also use Settings, change all configuration, and manage users.
         </div>
     </div>
 </div>
-</body>
-</html>
+{% endblock %}
