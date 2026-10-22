@@ -1,45 +1,8 @@
-{% from 'icons.html' import theme_toggle %}
-{% from 'account_menu.html' import account_menu with context %}
-<!DOCTYPE html>
-<html data-theme="light">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_32.png') }}">
-    <link rel="icon" type="image/png" sizes="128x128" href="{{ url_for('static', filename='favicon_128.png') }}">
-    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192.png') }}">
-    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512.png') }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
-    <title>Fetch Articles — MuckScraper</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+{% extends '_app_page.html' %}
+{% block title %}Fetch Articles{% endblock %}
+{% block section %}Fetch Articles{% endblock %}
+{% block styles %}
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
-        .topbar {
-            background: var(--topbar-bg);
-            padding: 16px 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        .topbar-left { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
-        .topbar a { color: #89b4fa; text-decoration: none; font-size: 14px; font-weight: 600; }
-        .topbar-title { color: var(--topbar-text); font-size: 18px; font-weight: 800; }
-        .theme-toggle {
-            background: none;
-            border: 1px solid rgba(255,255,255,0.2);
-            color: var(--topbar-text);
-            padding: 6px 14px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-        }
         .container { max-width: 1080px; margin: 48px auto; padding: 0 20px 48px; }
         h1 { font-size: 32px; font-weight: 800; margin-bottom: 8px; }
         .subtitle { color: var(--text-muted); font-size: 15px; margin-bottom: 32px; max-width: 720px; }
@@ -128,28 +91,13 @@
             margin-bottom: 16px;
         }
         @media (max-width: 760px) {
-            .topbar { padding: 16px 18px; }
             .container { margin: 28px auto; padding: 0 14px 32px; }
             .custom-grid { grid-template-columns: 1fr; }
         }
-        {% include 'sidebar_styles.html' %}
+        
     </style>
-</head>
-<body>
-<div class="layout">
-{% include 'sidebar_nav.html' %}
-<div class="page-body">
-
-<div class="topbar">
-    <div class="topbar-left">
-        <span class="topbar-title">MuckScraper</span>
-    </div>
-    <div style="display:flex; align-items:center; gap:12px;">
-        {{ theme_toggle() }}
-        {{ account_menu() }}
-    </div>
-</div>
-
+{% endblock %}
+{% block body %}
 <div class="container">
     <h1>Fetch Articles</h1>
     <p class="subtitle">Use a preset category to pull in the same kind of coverage the scheduler uses, or run a one-off fetch with your own label and query.</p>
@@ -240,22 +188,7 @@
         </div>
     </div>
 </div>
+{% endblock %}
+{% block scripts %}
 
-</div>
-</div>
-
-<script>
-    {% include 'sidebar_script.html' %}
-
-    function toggleTheme() {
-        const current = document.documentElement.getAttribute('data-theme') || 'light';
-        const next = current === 'light' ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('muckscraper-theme', next);
-    }
-
-    const savedTheme = localStorage.getItem('muckscraper-theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-</script>
-</body>
-</html>
+{% endblock %}

@@ -62,6 +62,12 @@ def create_app():
         # A disabled account loses any session it already had.
         return user if user and user.is_active else None
 
+    def _sidebar_topics():
+        # The sidebar's topic list, for pages in the app frame (_app_page.html)
+        # that don't pass `topics` themselves.
+        from aggregator.models import Topic
+        return Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all()
+
     @app.context_processor
     def inject_permissions():
         from aggregator.models import ROLE_LABELS
@@ -71,7 +77,8 @@ def create_app():
         return {"can": can, "copy_label": copy_label, "public_read": public_read_enabled(), "role_labels": ROLE_LABELS,
                 "current_back": navigation.current_back, "incoming_back": navigation.incoming_back,
                 "feed_back_url": navigation.feed_back_url,
-                "article_back_anchor": navigation.article_back_anchor, "menu_back": navigation.menu_back}
+                "article_back_anchor": navigation.article_back_anchor, "menu_back": navigation.menu_back,
+                "sidebar_topics": _sidebar_topics}
 
     @app.errorhandler(403)
     def forbidden(_error):

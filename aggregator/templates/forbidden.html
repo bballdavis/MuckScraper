@@ -1,17 +1,15 @@
-<!DOCTYPE html>
-<html data-theme="light">
-<head>
-    <title>No access — MuckScraper</title>
-{% include '_account_page_head.html' %}
-</head>
-<body>
-{% include '_account_topbar.html' %}
-<div class="container">
+{% extends '_app_page.html' %}
+{% block title %}No access{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/account_pages.css') }}">
+{% endblock %}
+{% block body %}
+<div class="container app-main narrow">
     <div class="card">
         <h2>You don't have access to this page</h2>
         <p class="hint" style="margin: 8px 0 18px;">Your account{% if current_user.is_authenticated %} ({{ current_user.role_label }}){% endif %} can't use this page or action. Ask an admin if you need more access.</p>
         <a class="btn btn-primary" href="{{ url_for('public.headlines_feed') }}">Go to Headlines</a>
     </div>
 </div>
-</body>
-</html>
+{% endblock %}

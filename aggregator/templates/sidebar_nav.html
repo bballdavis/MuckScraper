@@ -57,6 +57,12 @@
                         <span class="full-text">Fetch Articles</span>
                     </a>
                     {%- endif %}
+                    {%- if can('admin') %}
+                    <a class="nav-link {% if active_nav == 'settings' %}active{% endif %}" href="{{ url_for('admin.tools_page') }}"{% if active_nav == 'settings' %} aria-current="page"{% endif %}>
+                        {{ icon('wrench') }}
+                        <span class="full-text">Settings</span>
+                    </a>
+                    {%- endif %}
                 </div>
             </nav>
 
