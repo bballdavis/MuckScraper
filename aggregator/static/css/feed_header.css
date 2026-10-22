@@ -19,9 +19,32 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 10px 20px;
-    /* Room on the left for the sidebar's fixed show/hide button. */
-    padding: 10px 24px 10px 48px;
+    padding: 10px 24px 10px 14px;
+    min-height: var(--ft-height);
 }
+:root { --ft-height: 60px; }
+
+/* The bar runs the full width above the sidebar (Philip, 2026-10-22), so the
+   sidebar sticks just below it. */
+.feed-layout .sidebar { top: var(--ft-height); height: calc(100vh - var(--ft-height)); }
+.feed-layout { min-height: calc(100vh - var(--ft-height)); }
+
+.ft-menu {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--topbar-text);
+    font-size: 20px;
+    cursor: pointer;
+}
+.ft-menu:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.ft-menu:focus-visible { outline: 2px solid var(--sidebar-accent-text); outline-offset: 2px; }
 
 /* Left and right take equal shares so the search sits in the middle. */
 .ft-left, .ft-right { flex: 1 1 180px; display: flex; align-items: center; min-width: 0; }
@@ -354,7 +377,7 @@
 }
 
 @media (max-width: 900px) {
-    .feed-topbar { padding: 10px 16px 10px 28px; column-gap: 12px; }
+    .feed-topbar { padding: 10px 16px 10px 8px; column-gap: 12px; }
     .ft-logo { font-size: 16px; }
     .ft-section { font-size: 14px; }
     .ft-right { gap: 8px; }
@@ -362,4 +385,13 @@
     /* Phones: logo and account on one row, search and Filters full width below. */
     .ft-center { order: 3; flex-basis: 100%; max-width: none; }
     .ft-left, .ft-right { flex-basis: auto; }
+}
+
+/* Narrow phones: the Light/Dark button shows its icon only, so the logo,
+   section name and account fit on one row. */
+@media (max-width: 480px) {
+    .feed-topbar .theme-toggle { padding: 6px 8px; }
+    .feed-topbar .theme-toggle .theme-when-light,
+    .feed-topbar .theme-toggle .theme-when-dark { font-size: 0; gap: 0; }
+    .feed-topbar .theme-toggle .icon { font-size: 15px; }
 }
