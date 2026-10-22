@@ -218,3 +218,43 @@
 .crumb-back:hover { text-decoration: underline; }
 .app-page .btn-muted { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
 .app-page .btn-muted:hover { background: var(--btn-muted-bg); }
+
+/* ── Settings lists: an add bar on top, then rows with inline fields ── */
+.add-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; padding: 12px 16px; }
+.add-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.add-field > span { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.add-field.grow { flex: 1 1 220px; }
+.add-field.grow input, .add-field.grow select { width: 100%; }
+.add-bar .btn { flex: 0 0 auto; }
+.app-page .page-body .data-table input[type="text"], .app-page .page-body .data-table input[type="url"],
+.app-page .page-body .data-table input[type="number"] { height: 30px; font-size: 13px; }
+.app-page .page-body input.w-icon { width: 64px; }
+.app-page .page-body input.w-order { width: 72px; }
+.data-table tr.is-off td > *:not(.switch):not(form) { opacity: 0.5; }
+.cell-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.cell-actions form { display: flex; }
+.app-page .page-body .add-bar input, .app-page .page-body .add-bar select,
+.app-page .page-body .add-grid input, .app-page .page-body .add-grid select { height: 30px; }
+.add-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(130px, 170px) minmax(0, 1fr); align-items: end; gap: 10px 12px; padding: 12px 16px; }
+.add-grid .add-field input, .add-grid .add-field select { width: 100%; }
+.add-grid .span-2 { grid-column: span 2; }
+.add-grid > .btn { justify-self: end; }
+@media (max-width: 700px) {
+    .add-grid { grid-template-columns: minmax(0, 1fr); }
+    .add-grid .span-2 { grid-column: auto; }
+    .add-grid > .btn { justify-self: stretch; }
+}
+.feed-url { font-size: 13px; word-break: break-all; }
+.app-page .page-body .data-table input.fallback-input { width: 100%; margin-top: 6px; height: 28px; font-size: 12px; }
+
+/* Phones: a table marked stack-sm drops its header and wraps each row,
+   the main cell on its own line, the controls beside each other below. */
+@media (max-width: 600px) {
+    .data-table.stack-sm thead { display: none; }
+    .data-table.stack-sm tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 16px; border-top: 1px solid var(--border); }
+    .data-table.stack-sm tbody tr:first-child { border-top: 0; }
+    .data-table.stack-sm td { display: block; padding: 0 !important; border: 0; }
+    .data-table.stack-sm td.cell-main { flex: 1 1 100%; width: auto !important; }
+    .data-table.stack-sm td:has(input[type="text"]) { flex: 1 1 120px; }
+    .data-table.stack-sm td:has(input[type="text"]) input { width: 100%; }
+}

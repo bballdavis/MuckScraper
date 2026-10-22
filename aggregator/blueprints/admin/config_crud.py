@@ -51,7 +51,7 @@ def update_topic(topic_id):
         topic.sort_order = sort_order
     topic.is_active = request.form.get("is_active") == "on"
     db.session.commit()
-    return redirect(url_for("admin.topics_page"))
+    return redirect(url_for("admin.topics_page", _anchor=f"topic-{topic.id}"))
 
 
 RSS_FEED_BUCKETS = ["general", "right_enrichment", "left_enrichment", "op_ed"]
@@ -90,7 +90,7 @@ def update_rss_feed(feed_id):
     feed.fallback_url = request.form.get("fallback_url", "").strip() or None
     feed.enabled = request.form.get("enabled") == "on"
     db.session.commit()
-    return redirect(url_for("admin.rss_feeds_page"))
+    return redirect(url_for("admin.rss_feeds_page", _anchor=f"feed-{feed.id}"))
 
 
 @admin.route("/rss-feeds/<int:feed_id>/delete", methods=["POST"])
