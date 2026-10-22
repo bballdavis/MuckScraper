@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/story_card.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/feed_header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/breaking.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/reads.css') }}">
     <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -59,6 +60,9 @@
         <div>
             <h1>Headlines</h1>
             <div class="subtitle">{{ edition_label }}</div>
+            {% if hidden_read %}
+            <div class="read-hidden-note">{{ hidden_read }} {{ 'story' if hidden_read == 1 else 'stories' }} you've read {{ 'is' if hidden_read == 1 else 'are' }} hidden · <a href="{{ url_for('reading.recently_read') }}">Recently read</a></div>
+            {% endif %}
         </div>
         <div class="edition-links">
             {% if is_past_edition %}
@@ -77,7 +81,12 @@
     {% endif %}
 
     {% if stories %}
+        {#- Signed-in readers can mark a story read: the reading-glasses
+            button beside the card on hover (in the action row on touch
+            screens) slides it away, with Undo (static/js/reads.js). -#}
+        {% set can_mark_read = current_user.is_authenticated %}
         {% for story in stories %}
+        {% if can_mark_read %}<div class="hl-item" data-story-id="{{ story.id }}">{% endif %}
         {% call story_card(story) %}
             {{ bias_balance(story) }}
 
@@ -96,8 +105,15 @@
                 <a href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}" class="btn btn-dark">{{ icon('newspaper') }} Coverage &amp; Analysis</a>
                 {{ story_summary_action(story, false, 'tip-above-end') }}
                 {{ story_analysis_action(story, false, 'tip-above-end') }}
+                {% if can_mark_read %}
+                <button type="button" class="act act-read tip-above-end" data-mark-read aria-label="Mark as read">{{ icon('glasses') }}<span class="tip" role="tooltip"><strong>Mark as read</strong> Hides it from Headlines. Find it again under Recently read.</span></button>
+                {% endif %}
             </div>
         {% endcall %}
+        {% if can_mark_read %}
+        <button type="button" class="hl-read" data-mark-read aria-label="Mark as read"><span class="hl-read-icon">{{ icon('glasses') }}<span class="tip" role="tooltip"><strong>Mark as read</strong> Hides it from Headlines. Find it again under Recently read.</span></span></button>
+        </div>
+        {% endif %}
         {% endfor %}
 
         {{ pager(page, total_pages) }}
@@ -173,5 +189,6 @@
     {% endif %}
 </script>
 <script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
+{% if current_user.is_authenticated %}<script src="{{ url_for('static', filename='js/reads.js') }}" data-read-url="{{ url_for('reading.toggle_read', kind='KIND', item_id=0) }}"></script>{% endif %}
 </body>
 </html>

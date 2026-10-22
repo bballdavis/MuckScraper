@@ -5,6 +5,7 @@
 {% from 'breadcrumb.html' import float_back with context %}
 {% from 'ai_actions.html' import ai_action, story_summary_action, story_analysis_action with context %}
 {% from 'oped_columns.html' import oped_columns, oped_roundup with context %}
+{% from 'read_toggle.html' import read_toggle %}
 <!DOCTYPE html>
 <html data-theme="light">
 <head>
@@ -20,6 +21,7 @@
     <title>{{ story.display_headline }} — MuckScraper</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/feed_header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/reads.css') }}">
     <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/oped_columns.css') }}">
     <style>
@@ -239,7 +241,14 @@
 {{ float_back(feed_back_url('story-%d' % story.id), 'Back to Feed') }}
 <div class="story-card">
         <div id="ai-task-status" style="display:none; margin-bottom:20px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.03); color:var(--text-muted); font-size:13px;"></div>
-		    <h1>{{ story.display_headline }}</h1>
+        {% if current_user.is_authenticated %}
+        <div class="read-head">
+        <h1>{{ story.display_headline }}</h1>
+        {{ read_toggle('story', story.id, read_item) }}
+        </div>
+        {% else %}
+        <h1>{{ story.display_headline }}</h1>
+        {% endif %}
 
     {% call title_meta() %}
         {{ meta_item('Sources', story.articles|length) }}
@@ -497,5 +506,6 @@
 </script>
 
 <script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
+{% if current_user.is_authenticated %}<script src="{{ url_for('static', filename='js/reads.js') }}" data-read-url="{{ url_for('reading.toggle_read', kind='KIND', item_id=0) }}"></script>{% endif %}
 </body>
 </html>

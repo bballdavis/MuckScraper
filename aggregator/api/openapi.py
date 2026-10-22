@@ -49,7 +49,8 @@ SCHEMAS = {
         ["id", "section", "headline", "dek", "image_url", "logo_url", "coverage", "source_count", "updated_at",
          "is_summarized", "has_analysis", "has_ai_headline", "has_updates"],
         id=_I, section=_S, headline=_S, dek=_NS, image_url=_URL, logo_url=_LOGO, coverage=_ref("Coverage"),
-        source_count=_I, updated_at=_DT, is_summarized=_B, has_analysis=_B, has_ai_headline=_B, has_updates=_B),
+        source_count=_I, updated_at=_DT, is_summarized=_B, has_analysis=_B, has_ai_headline=_B, has_updates=_B,
+        is_read={"type": "boolean", "description": "Marked read by this user (editions, /stories, /stories/{id})"}),
     "ArticleCard": _obj(
         ["id", "story_id", "title", "outlet", "leaning", "url", "published_at", "image_url", "summary", "copy_of"],
         id=_I, story_id=_NI, title=_S, outlet=_ref("Outlet"), leaning=_LEANING, url=_URL,
@@ -131,7 +132,13 @@ SCHEMAS["StoryDetail"] = {"allOf": [_ref("StorySummary"), _obj(
     articles=_by_leaning(_ref("ArticleCard")), copies_hidden=_I, opinion=_by_leaning(_ref("OpinionPiece")))]}
 SCHEMAS["ArticleDetail"] = {"allOf": [_ref("ArticleCard"), _obj(
     ["topics", "analysis", "content_html"], topics=_PARAS, analysis=_PARAS,
-    content_html={"type": ["string", "null"], "description": "Sanitized scraped HTML; null unless the server allows full text."})]}
+    content_html={"type": ["string", "null"], "description": "Sanitized scraped HTML; null unless the server allows full text."},
+    is_read={"type": "boolean", "description": "Marked read by this user"})]}
+SCHEMAS["ReadItem"] = _obj(
+    ["kind", "id", "read_at", "story", "article"],
+    kind={"type": "string", "enum": ["story", "article"]}, id=_I, read_at=_DT,
+    story={"oneOf": [_ref("StorySummary"), {"type": "null"}], "description": "Set when kind is story"},
+    article={"oneOf": [_ref("ArticleCard"), {"type": "null"}], "description": "Set when kind is article"})
 
 
 def _json(schema, description="OK"):
@@ -157,6 +164,7 @@ def _path_id(name):
 
 _CURSOR = _q("cursor", _S, "next_cursor from the previous page")
 _LIMIT = _q("limit", {"type": "integer", "minimum": 1, "maximum": 50})
+_READ_KIND = {"name": "kind", "in": "path", "required": True, "schema": {"type": "string", "enum": ["stories", "articles"]}}
 _RANGE = _q("range", {"type": "string", "enum": ["24h", "7d", "30d", "all"]})
 
 
@@ -227,6 +235,15 @@ PATHS = {
     },
     "/me/newsbox/read": {"post": {"operationId": "markNewsBoxRead",
                                   "responses": {"200": _json(_obj(["updated"], updated=_I)), **_ERRORS}}},
+    "/me/read": _get("readItems", _json(_page(_ref("ReadItem"))),
+                     [_q("kind", {"type": "string", "enum": ["story", "article"]}), _CURSOR, _LIMIT]),
+    "/me/read/{kind}/{item_id}": {
+        "put": {"operationId": "markRead", "description": "Mark a story or article read; again moves it to the top.",
+                "parameters": [_READ_KIND, _path_id("item_id")],
+                "responses": {"200": _json(_ref("ReadItem")), **_ERRORS, **_NOT_FOUND}},
+        "delete": {"operationId": "markUnread", "parameters": [_READ_KIND, _path_id("item_id")],
+                   "responses": {"204": {"description": "Unread (whether or not it was read)"}, **_ERRORS, **_NOT_FOUND}},
+    },
     "/me/schedules": {
         **_get("getSchedule", _json(_ref("Schedule"))),
         "put": {"operationId": "putSchedule", "description": "Needs the summarize scope. Replaces the schedule.",
