@@ -629,18 +629,25 @@ class NewsBoxItem(db.Model):
 
     id         = db.Column(db.Integer, primary_key=True)
     user_id    = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    story_id   = db.Column(db.Integer, db.ForeignKey("stories.id", ondelete="CASCADE"), nullable=False)
-    origin     = db.Column(db.String(16), nullable=False)   # swiped / saved / auto
+    # Null while a Breaking headline sent from the app is still being
+    # scraped (feed_entry_id is set then); the scrape job fills it in.
+    story_id   = db.Column(db.Integer, db.ForeignKey("stories.id", ondelete="CASCADE"), nullable=True)
+    feed_entry_id = db.Column(db.Integer, db.ForeignKey("feed_entries.id", ondelete="SET NULL"), nullable=True)
+    origin     = db.Column(db.String(16), nullable=False)   # swiped / saved / auto / breaking
     depth      = db.Column(db.String(24), nullable=False, default="summary", server_default="summary")
     state      = db.Column(db.String(16), nullable=False, default="pending", server_default="pending")
     # Items from one scheduled run share this id.
     run_id     = db.Column(db.String(64), nullable=True)
     is_unread  = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    # What an unfinished item is waiting on: scrape -> group -> summary ->
+    # analysis (newsbox.STEPS), shown as a progress bar in the app.
+    step       = db.Column(db.String(16), nullable=True)
     error      = db.Column(db.String(300), nullable=True)
     added_at   = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     ready_at   = db.Column(db.DateTime, nullable=True)
 
     story = db.relationship("Story")
+    feed_entry = db.relationship("FeedEntry")
     user = db.relationship("User", backref=db.backref("newsbox_items", lazy="dynamic", cascade="all, delete-orphan"))
 
 
@@ -706,3 +713,41 @@ class BookmarkSnapshot(db.Model):
     finished_at = db.Column(db.DateTime, nullable=True)
 
     bookmark = db.relationship("Bookmark", back_populates="snapshots")
+
+
+class FeedEntry(db.Model):
+    """A headline seen in a general RSS feed, stored minutes after it is
+    published and before anything scrapes it (aggregator/breaking.py). The
+    Breaking banner on Headlines and /api/v1/breaking list the ones that have
+    no article yet; "scrape now" queues a job that runs the entry through the
+    normal ingestion. `url` is the normalized link, which for a Google News
+    feed is still the news.google.com one until the job resolves it.
+    `scrape_state` goes new -> queued -> done, or skipped / failed.
+    `is_breaking` and `outlet_count` are set by the poller
+    (news_fetcher/breaking_feed.py); `cluster_id` is the first entry that
+    reported the same event, so a cluster shows once."""
+    __tablename__ = "feed_entries"
+    __table_args__ = (
+        db.Index("ix_feed_entries_published_at", "published_at"),
+        db.Index("ix_feed_entries_breaking", "is_breaking", "published_at"),
+    )
+
+    id            = db.Column(db.Integer, primary_key=True)
+    url           = db.Column(db.String(2000), nullable=False, unique=True)
+    link          = db.Column(db.String(2000), nullable=False)
+    title         = db.Column(db.String(500), nullable=False)
+    source_name   = db.Column(db.String(200), nullable=False)
+    feed_url      = db.Column(db.String(2000), nullable=True)
+    image_url     = db.Column(db.String(2000), nullable=True)
+    content       = db.Column(db.Text, nullable=True)
+    published_at  = db.Column(db.DateTime, nullable=False)
+    first_seen_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    article_id    = db.Column(db.Integer, db.ForeignKey("articles.id", ondelete="SET NULL"), nullable=True)
+    scrape_state  = db.Column(db.String(16), nullable=False, default="new", server_default="new")
+    scrape_note   = db.Column(db.String(300), nullable=True)
+    requested_at  = db.Column(db.DateTime, nullable=True)
+    outlet_count  = db.Column(db.Integer, nullable=False, default=1, server_default="1")
+    is_breaking   = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    cluster_id    = db.Column(db.Integer, nullable=True)
+
+    article = db.relationship("Article")

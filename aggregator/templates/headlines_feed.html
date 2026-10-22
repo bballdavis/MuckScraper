@@ -14,10 +14,12 @@
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192.png') }}">
     <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512.png') }}">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Headlines — MuckScraper</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/story_card.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/feed_header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/breaking.css') }}">
     <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -53,6 +55,7 @@
 <div class="page-body">
 
 <div class="main">
+    {% if breaking_rows %}{% include '_breaking_bar.html' %}{% endif %}
     <div class="main-header">
         <div>
             <h1>Headlines</h1>
@@ -121,6 +124,52 @@
     applyTheme(savedTheme);
 
     {% include 'sidebar_script.html' %}
+
+    {% if not is_past_edition %}
+    // Breaking News bar (_breaking_bar.html): re-read every 2 minutes, every
+    // 4 seconds while a scrape or summary is running.
+    const breakingUrl = "{{ url_for('public.breaking_bar') }}";
+    const breakingSummarizeTemplate = "{{ url_for('public.summarize_breaking', entry_id=999999) }}";
+    let breakingTimer = null;
+
+    async function refreshBreaking() {
+        try {
+            const response = await fetch(breakingUrl, { headers: { 'Accept': 'text/html' } });
+            if (!response.ok) return;
+            const html = (await response.text()).trim();
+            const bar = document.getElementById('breaking-bar');
+            if (bar && !bar.contains(document.activeElement)) {
+                if (html) bar.outerHTML = html; else bar.remove();
+            } else if (!bar && html) {
+                document.querySelector('.main').insertAdjacentHTML('afterbegin', html);
+            }
+        } finally {
+            scheduleBreaking();
+        }
+    }
+
+    function scheduleBreaking() {
+        clearTimeout(breakingTimer);
+        const bar = document.getElementById('breaking-bar');
+        const working = bar && bar.dataset.working === 'true';
+        breakingTimer = setTimeout(refreshBreaking, working ? 4000 : 120000);
+    }
+
+    async function breakingSummarize(entryId, button) {
+        button.disabled = true;
+        button.blur();
+        try {
+            await fetch(breakingSummarizeTemplate.replace('999999', String(entryId)), {
+                method: 'POST',
+                headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content },
+            });
+        } finally {
+            refreshBreaking();
+        }
+    }
+
+    scheduleBreaking();
+    {% endif %}
 </script>
 <script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
 </body>

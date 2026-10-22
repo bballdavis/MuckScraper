@@ -1225,6 +1225,31 @@ if __name__ == "__main__":
         coalesce=True,
     )
 
+    # Breaking News (news_fetcher/breaking_feed.py): RSS headlines only,
+    # every few minutes, so the Headlines bar and the app see them before
+    # the next pipeline run scrapes anything.
+    def poll_breaking_feeds():
+        from news_fetcher.breaking_feed import poll_feeds
+        with app.app_context():
+            try:
+                poll_feeds()
+            except Exception:
+                db.session.rollback()
+                logging.exception("[Breaking] Polling the feeds failed")
+
+    from news_fetcher.breaking_feed import POLL_MINUTES as BREAKING_POLL_MINUTES
+    scheduler.add_job(
+        poll_breaking_feeds,
+        trigger="interval",
+        minutes=BREAKING_POLL_MINUTES,
+        next_run_time=datetime.now(timezone.utc),
+        id="breaking_feeds",
+        name=f"Breaking News feed check (every {BREAKING_POLL_MINUTES} min)",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     logging.info(
         "Scheduler running with %s scheduled run(s) in %s: %s",
         len(schedule_snapshot),

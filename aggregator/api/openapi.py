@@ -72,10 +72,23 @@ SCHEMAS = {
         "kind": {"type": "string", "enum": ["story", "article"]}, "id": _I, "story_id": _NI, "title": _S,
         "image_url": _URL, "logo_url": _LOGO, "source_count": _I, "updated_at": _NDT, "outlet": _ref("Outlet"),
         "leaning": _LEANING, "published_at": _NDT}},
+    "FeedHeadline": _obj(["title", "outlet", "url", "published_at"], title=_S, outlet=_S, url=_URL, published_at=_DT),
+    "BreakingItem": _obj(
+        ["id", "title", "outlet", "url", "published_at", "image_url", "outlet_count", "state", "story_id", "error"],
+        id=_I, title=_S, outlet=_S, url=_URL, published_at=_DT, image_url=_URL, outlet_count=_I,
+        state={"type": "string", "enum": ["new", "scraping", "scraped", "summarizing", "summarized", "failed"]},
+        story_id=_NI, error=_NS),
     "NewsBoxItem": _obj(
-        ["story", "origin", "state", "progress", "is_unread", "auto_run_id", "added_at", "ready_at", "error"],
-        story=_ref("StorySummary"), origin={"type": "string", "enum": ["swiped", "saved", "auto"]},
+        ["id", "story", "headline", "origin", "state", "step", "progress", "is_unread", "auto_run_id", "added_at",
+         "ready_at", "error"],
+        id=_I,
+        story={"oneOf": [_ref("StorySummary"), {"type": "null"}],
+               "description": "Null while a Breaking headline is still being scraped; headline stands in"},
+        headline={"oneOf": [_ref("FeedHeadline"), {"type": "null"}]},
+        origin={"type": "string", "enum": ["swiped", "saved", "auto", "breaking"]},
         state={"type": "string", "enum": ["pending", "in_progress", "ready", "failed"]},
+        step={"type": ["string", "null"], "enum": ["scrape", "group", "summary", "analysis", None],
+              "description": "What an unfinished item is waiting on"},
         progress={"type": ["number", "null"]}, is_unread=_B, auto_run_id=_NS, added_at=_DT, ready_at=_NDT,
         error=_NS),
     "Schedule": _obj(
@@ -199,7 +212,7 @@ PATHS = {
                       **_ERRORS, **_NOT_FOUND}}},
     "/me/newsbox": _get("newsbox", _json({"allOf": [_page(_ref("NewsBoxItem")), _obj(["unread_count"], unread_count=_I)]}),
                         [_q("state", {"type": "string", "enum": ["pending", "in_progress", "ready", "failed"]}),
-                         _q("origin", {"type": "string", "enum": ["swiped", "saved", "auto"]}),
+                         _q("origin", {"type": "string", "enum": ["swiped", "saved", "auto", "breaking"]}),
                          _q("unread", _B), _CURSOR, _LIMIT]),
     "/me/newsbox/{story_id}": {
         "patch": {"operationId": "updateNewsBoxItem", "parameters": [_path_id("story_id")],
@@ -241,6 +254,16 @@ PATHS = {
     "/me/bookmarks/{bookmark_id}/export": _get(
         "exportBookmark", {"description": "Every ready version as a zip", "content": {"application/zip": {}}},
         [_path_id("bookmark_id")], _NOT_FOUND),
+    "/breaking": _get("breaking", _json(_obj(["items"], items={"type": "array", "items": _ref("BreakingItem")}))),
+    "/breaking/{entry_id}/newsbox": {"post": {
+        "operationId": "sendBreakingToNewsBox", "parameters": [_path_id("entry_id")],
+        "description": "Needs the summarize scope. Scrapes the headline if needed and summarizes its story.",
+        "requestBody": {"required": True, "content": {"application/json": {"schema": {
+            "type": "object", "additionalProperties": False, "properties": {
+                "depth": {"type": "string", "enum": ["summary", "analysis", "summary_analysis"]}}}}}},
+        "responses": {"200": _json(_ref("NewsBoxItem"), "Already summarized: ready"),
+                      "202": _json(_ref("NewsBoxItem"), "Scraping or summarizing: pending"),
+                      **_ERRORS, **_NOT_FOUND}}},
     "/me/schedules/run": {"post": {
         "operationId": "runSchedule", "description": "Needs the summarize scope. Runs the schedule once, now.",
         "responses": {"202": _json(_obj(["run_id", "added"], run_id=_S, added=_I), "Run queued"), **_ERRORS}}},

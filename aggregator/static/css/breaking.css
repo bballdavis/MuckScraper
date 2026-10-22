@@ -1,0 +1,46 @@
+/* The Breaking News bar on Headlines (templates/_breaking_bar.html). A solid
+   accent block with a thin label band, then one compact row per headline.
+   No left accent border; corners 3px like the redesigned cards. */
+.breaking-bar {
+    background: var(--accent); color: #fff; border-radius: 3px; margin: 20px 0 0;
+    box-shadow: 0 6px 18px rgba(58, 58, 114, 0.22);
+}
+[data-theme="dark"] .breaking-bar { background: var(--accent-dark); box-shadow: none; outline: 1px solid #5a5aa0; }
+.bk-head {
+    display: flex; align-items: center; gap: 8px; padding: 5px 14px;
+    background: rgba(0, 0, 0, 0.24); border-radius: 3px 3px 0 0;
+    font-size: 11px; font-weight: 900; letter-spacing: 1.3px; text-transform: uppercase;
+}
+.bk-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: bk-pulse 1.4s ease-in-out infinite; }
+@keyframes bk-pulse { 50% { opacity: 0.25; } }
+.bk-rows { padding: 2px 8px 2px 14px; }
+.bk-row { display: flex; align-items: center; gap: 12px; min-height: 36px; }
+.bk-row + .bk-row { border-top: 1px solid rgba(255, 255, 255, 0.16); }
+.bk-title {
+    flex: 1; min-width: 0; color: #fff; text-decoration: none; font-size: 15px; font-weight: 700;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bk-title:hover, .bk-title:focus-visible { text-decoration: underline; outline: none; }
+.bk-meta { flex: 0 0 auto; color: #dcdcf4; font-size: 12px; white-space: nowrap; }
+.bk-meta strong { color: #fff; font-weight: 600; }
+/* The summary icon: no border; outline until the story is summarized, then
+   filled (Philip, 2026-10-22). */
+.bk-act {
+    position: relative; flex: 0 0 auto; width: 30px; height: 30px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none; border-radius: 3px; background: transparent; color: #fff; font: inherit;
+}
+button.bk-act { cursor: pointer; }
+button.bk-act:hover, button.bk-act:focus-visible { background: rgba(255, 255, 255, 0.18); outline: none; }
+.bk-act .bk-doc { fill: #fff; stroke: #fff; }
+.bk-act .bk-line { stroke: var(--accent); }
+[data-theme="dark"] .bk-act .bk-line { stroke: var(--accent-dark); }
+.bk-busy, .bk-act[disabled] { cursor: progress; }
+.bk-busy .icon, .bk-act[disabled] .icon { animation: bk-pulse 1s ease-in-out infinite; }
+.bk-act .tip { right: 0; top: calc(100% + 8px); transform: none; }
+@media (max-width: 640px) {
+    .bk-row { flex-wrap: wrap; gap: 2px 10px; padding: 6px 0; }
+    .bk-title { flex-basis: calc(100% - 42px); white-space: normal; }
+    .bk-meta { order: 3; }
+    .bk-act { order: 2; }
+}
