@@ -66,90 +66,9 @@
             list-style: disc;
         }
 
-        .btn-orange       { background: #fab387; color: #1e1e2e; }
-        .btn-orange:hover { background: #f9a070; }
-
-        .story ul.article-list { list-style: none; padding: 0; }
-
-        .story ul.article-list li {
-            padding: 12px 0;
-            font-size: 14px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .story ul.article-list li:last-child { border-bottom: none; }
-
-        .article-title {
-            color: var(--text);
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 15px;
-            line-height: 1.4;
-            flex-basis: 100%;
-            margin-bottom: 4px;
-        }
-        .article-title:hover { color: var(--accent-text); text-decoration: underline; }
-
-        .full-text-link       { font-size: 12px; font-weight: 600; color: var(--accent-text); text-decoration: none; }
-        .full-text-link:hover { text-decoration: underline; }
-
-        .outlet-name { color: var(--text-muted); font-size: 13px; font-weight: 500; }
-        .scrape-meta {
-            flex-basis: 100%;
-            margin-top: 8px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            font-size: var(--fs-label);
-            color: var(--text-muted);
-        }
-        .scrape-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 3px 8px;
-            border-radius: 999px;
-            border: 1px solid var(--border);
-            background: rgba(0,0,0,0.03);
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-        .scrape-chip.scrape-success { color: #1d6f42; border-color: rgba(29,111,66,0.25); background: rgba(29,111,66,0.08); }
-        .scrape-chip.scrape-fallback { color: #8a5a00; border-color: rgba(138,90,0,0.25); background: rgba(138,90,0,0.09); }
-        .scrape-chip.scrape-blocked,
-        .scrape-chip.scrape-failed { color: #a33636; border-color: rgba(163,54,54,0.25); background: rgba(163,54,54,0.08); }
-        .scrape-chip.scrape-skipped { color: #666; border-color: rgba(102,102,102,0.25); background: rgba(102,102,102,0.08); }
-        .scrape-detail {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-            font-size: var(--fs-label);
-            color: var(--text-faint);
-        }
-
-        .bias-tag {
-            display: inline-block;
-            font-size: var(--fs-label);
-            font-weight: 800;
-            padding: 2px 8px;
-            border-radius: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
         .bias-none { background-color: #ddd;    color: #666;  }
 
-        .article-actions { margin-left: auto; display: flex; gap: 8px; }
-
         .empty { text-align: center; padding: 80px 0; color: var(--text-faint); font-style: italic; }
-
-        /* Single-article cards: the headline already names the article, so
-           its row is the outlet, bias, actions and scrape details. */
-        .story.compact ul.article-list li { padding: 0; border-bottom: none; }
 
         @media (max-width: 900px) {
             .main { padding: 16px 16px 0; }
@@ -162,13 +81,9 @@
     so an explicit "All" survives a saved scrape default. -#}
 {%- set base = {'topic': active_label, 'scrape_status': scrape_param, 'show_single': show_single|string|lower, 'q': active_search_query, 'range': active_range} -%}
 {%- set range_short = {'24h': '24h', '7d': '7 days', '30d': '30 days', 'all': 'All'} -%}
-{%- set filter_count = (1 if active_range != 'all' else 0) + (1 if active_scrape_status else 0) + (1 if not is_multi_view and not show_single else 0) -%}
-<div class="layout">
-    {% include 'sidebar_nav.html' %}
-    <div class="page-body">
+{%- set sidebar_toggle_in_topbar = true -%}
     {% call feed_topbar(section_title, url_for(list_endpoint), active_search_query,
-                        {'topic': active_label, 'scrape_status': scrape_param, 'show_single': show_single|string|lower, 'range': active_range},
-                        filter_count) %}
+                        {'topic': active_label, 'scrape_status': scrape_param, 'show_single': show_single|string|lower, 'range': active_range}) %}
         <div>
             <span class="fp-label">Time range</span>
             <div class="fp-segment">
@@ -212,6 +127,9 @@
             {% endif %}
         </div>
     {% endcall %}
+<div class="layout feed-layout">
+    {% include 'sidebar_nav.html' %}
+    <div class="page-body">
     <div class="main">
         {% include '_flashes.html' %}
         <div class="active-filters">
@@ -234,99 +152,33 @@
         {% if stories %}
             {% for story in stories %}
             {% call story_card(story, compact=true) %}
-                        {% if story.articles|length > 1 %}
-                            {# Multi-article: the headline opens the full coverage; scrapers
-                               get the balance fetch when one side is short. #}
-                            {% if story.enrichment_direction and story.bias_gap >= 2 and can('scraper') %}
-                            <div class="card-actions">
-                                <form method="POST" action="{{ url_for('admin.enrich_story_balance', story_id=story.id) }}">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <input type="hidden" name="label" value="{{ active_label or '' }}">
-                                    <input type="hidden" name="scrape_status" value="{{ active_scrape_status or '' }}">
-                                    <input type="hidden" name="next" value="{{ url_for(list_endpoint, topic=active_label, scrape_status=scrape_param, show_single=show_single|string|lower, page=page, q=active_search_query or '', range=active_range) }}">
-                                    <button type="submit" class="btn btn-muted">Fetch more {{ story.enrichment_direction }}-leaning coverage</button>
-                                </form>
-                            </div>
-                            {% endif %}
-                        {% else %}
-                            {# Single article: the card headline is its title, so this row
-                               is the outlet, bias, actions and scrape details. #}
-                            <ul class="article-list">
-                                {% for article in story.display_articles %}
-                                <li>
-
-                                    <span class="outlet-name">{{ article.outlet.name }}</span>
-
-                                    <a class="full-text-link" href="{{ url_for('public.view_article', article_id=article.id, back=current_back()) }}">{{ 'Full Summary & Text →' if current_user.is_authenticated else 'Summary →' }}</a>
-
-                                    <div style="flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px;">
-                                        {{ bias_tag(article.outlet.bias_score if article.outlet else none) }}
-
-                                        {% if article.outlet.bias_source == "allsides" %}
-                                            <span class="source-badge as-badge" title="Rated by AllSides">AS</span>
-                                        {% elif article.outlet.bias_source == "ai" %}
-                                            <span class="source-badge ai-badge" title="Rated by AI">AI</span>
-                                        {% endif %}
-
-                                        {% if article.bias_score and article.bias_score != article.outlet.bias_score %}
-                                            <span style="color:var(--text-faint); font-size: var(--fs-label);">•</span>
-                                            {{ bias_tag(article.bias_score, prefix='Article: ', unrated=false) }}
-                                        {% endif %}
-
-                                        {% if can('scraper') %}
-                                        <span class="article-actions">
-                                            <button type="button" class="btn btn-muted"
-                                                title="AI Summary"
-                                                onclick="startAiTask('article_summary', {{ article.id }}, this)">
-                                                {{ '↻' if article.summary else '✦' }} Summary
-                                            </button>
-                                            <form method="POST" action="{{ url_for('admin.rate_article', article_id=article.id) }}">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="hidden" name="label" value="{{ active_label or '' }}">
-                                                <input type="hidden" name="scrape_status" value="{{ active_scrape_status or '' }}">
-                                                <input type="hidden" name="next" value="{{ url_for(list_endpoint, topic=active_label, scrape_status=scrape_param, show_single=show_single|string|lower, page=page, q=active_search_query or '', range=active_range) }}">
-                                                <button type="submit" class="btn btn-orange"
-                                                    title="Rate Bias">
-                                                    ✦ Bias
-                                                </button>
-                                            </form>
-                                        </span>
-                                        {% endif %}
-
-                                        {% if current_user.is_authenticated %}
-                                        <div class="scrape-meta">
-                                            {% set scrape_status = article.scrape_status or 'pending' %}
-                                            <span class="scrape-chip scrape-{{ scrape_status }}">
-                                                {% if scrape_status == 'success' %}
-                                                    Scrape OK
-                                                {% elif scrape_status == 'fallback' %}
-                                                    Fallback Used
-                                                {% elif scrape_status == 'blocked' %}
-                                                    Blocked
-                                                {% elif scrape_status == 'skipped' %}
-                                                    Skipped
-                                                {% elif scrape_status == 'failed' %}
-                                                    Failed
-                                                {% else %}
-                                                    Pending
-                                                {% endif %}
-                                            </span>
-                                            {% if article.scrape_method %}
-                                                <span class="scrape-detail">method={{ article.scrape_method }}</span>
-                                            {% endif %}
-                                            {% if article.scrape_http_status %}
-                                                <span class="scrape-detail">http={{ article.scrape_http_status }}</span>
-                                            {% endif %}
-                                            {% if article.scrape_failure_reason %}
-                                                <span class="scrape-detail" title="{{ article.scrape_failure_reason }}">{{ article.scrape_failure_reason[:90] }}{% if article.scrape_failure_reason|length > 90 %}...{% endif %}</span>
-                                            {% endif %}
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                </li>
-                                {% endfor %}
-                            </ul>
-                        {% endif %}
+                {#- The card's ⋯ menu actions (story_card_macros.html). #}
+                {%- set next_url = url_for(list_endpoint, topic=active_label, scrape_status=scrape_param, show_single=show_single|string|lower, page=page, q=active_search_query or '', range=active_range) %}
+                {%- if story.articles|length > 1 %}
+                    <a class="card-menu-item" role="menuitem" href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">Open full coverage</a>
+                    {% if story.enrichment_direction and story.bias_gap >= 2 and can('scraper') %}
+                    <form method="POST" action="{{ url_for('admin.enrich_story_balance', story_id=story.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="label" value="{{ active_label or '' }}">
+                        <input type="hidden" name="scrape_status" value="{{ active_scrape_status or '' }}">
+                        <input type="hidden" name="next" value="{{ next_url }}">
+                        <button type="submit" class="card-menu-item" role="menuitem">Fetch more {{ story.enrichment_direction }}-leaning coverage</button>
+                    </form>
+                    {% endif %}
+                {%- else %}
+                    {%- set article = story.display_articles|first %}
+                    <a class="card-menu-item" role="menuitem" href="{{ url_for('public.view_article', article_id=article.id, back=current_back()) }}">{{ 'Read full summary and text' if current_user.is_authenticated else 'Read summary' }}</a>
+                    {% if can('scraper') %}
+                    <button type="button" class="card-menu-item" role="menuitem" onclick="startAiTask('article_summary', {{ article.id }}, this)">{{ 'Regenerate AI summary' if article.summary else 'AI summary' }}</button>
+                    <form method="POST" action="{{ url_for('admin.rate_article', article_id=article.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="label" value="{{ active_label or '' }}">
+                        <input type="hidden" name="scrape_status" value="{{ active_scrape_status or '' }}">
+                        <input type="hidden" name="next" value="{{ next_url }}">
+                        <button type="submit" class="card-menu-item" role="menuitem">Rate bias</button>
+                    </form>
+                    {% endif %}
+                {%- endif %}
             {% endcall %}
             {% endfor %}
         {% else %}

@@ -14,7 +14,7 @@
 .sidebar {
     width: 240px;
     min-width: 240px;
-    background: linear-gradient(to right, var(--sidebar-bg), var(--sidebar-bg-end));
+    background: var(--sidebar-bg);
     color: var(--sidebar-text);
     display: flex;
     flex-direction: column;
@@ -59,16 +59,13 @@
 
 /* Groups: the story lists, Topics, More (sidebar_nav.html). A heading is a
    small muted label with room above it and never highlights, so it can't be
-   mistaken for a link; links are inset rounded rows (Philip, 2026-10-22). */
-.nav-group {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 0 12px;
-}
+   mistaken for a link (Philip, 2026-10-22). Links are plain text rows; the
+   current one is filled across the whole width of the menu, with no side
+   border or inset. */
+.nav-group { display: flex; flex-direction: column; }
 .nav-group + .nav-group {
-    margin-top: 14px;
-    padding-top: 14px;
+    margin-top: 12px;
+    padding-top: 12px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -78,8 +75,8 @@
     text-transform: uppercase;
     letter-spacing: 1.2px;
     color: var(--sidebar-muted);
-    opacity: 0.75;
-    padding: 0 12px 6px;
+    opacity: 0.7;
+    padding: 6px 24px 6px;
     white-space: nowrap;
 }
 
@@ -87,9 +84,8 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    min-height: 38px;
-    padding: 0 12px;
-    border-radius: 8px;
+    min-height: 40px;
+    padding: 0 24px;
     color: var(--sidebar-text);
     text-decoration: none;
     font-size: 14px;
@@ -98,30 +94,11 @@
     overflow: hidden;
     transition: background 0.15s, color 0.15s;
 }
-.nav-link .icon { width: 17px; height: 17px; flex-shrink: 0; opacity: 0.85; }
-.nav-link:hover { background: rgba(255, 255, 255, 0.07); color: var(--sidebar-hover); }
+.nav-link:hover { background: rgba(255, 255, 255, 0.06); color: var(--sidebar-hover); }
 .nav-link:focus-visible { outline: 2px solid var(--sidebar-accent-text); outline-offset: -2px; }
-.nav-link.active {
-    background: var(--sidebar-active-bg);
-    color: var(--sidebar-hover);
-    font-weight: 700;
-    box-shadow: inset 3px 0 0 var(--sidebar-accent-text);
-}
-.nav-link.active .icon { opacity: 1; }
-
-/* Topics are a flat list under their heading: a dot instead of an icon,
-   slightly shorter rows. */
-.nav-topic { min-height: 34px; }
-.topic-dot {
-    width: 6px;
-    height: 6px;
-    margin: 0 5px 0 6px;
-    border-radius: 50%;
-    background: var(--sidebar-muted);
-    opacity: 0.6;
-    flex-shrink: 0;
-}
-.nav-topic.active .topic-dot { background: var(--sidebar-accent-text); opacity: 1; }
+.nav-link.active { background: var(--sidebar-active-bg); color: var(--sidebar-hover); font-weight: 700; }
+.nav-link .icon { width: 17px; height: 17px; flex-shrink: 0; opacity: 0.85; }
+.nav-topic { min-height: 36px; }
 
 .sidebar-footer {
     margin-top: auto;
@@ -130,7 +107,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    background: linear-gradient(to right, var(--sidebar-bg), var(--sidebar-bg-end));
+    background: var(--sidebar-bg);
     flex-shrink: 0;
 }
 
