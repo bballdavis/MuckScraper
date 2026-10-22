@@ -70,6 +70,32 @@
 {%- endfor -%}
 {%- endmacro %}
 
+{# The card's image box, a chain of fallbacks (Philip, 2026-10-22): an
+   article image from the story (any of its articles, roundups aside), else
+   the newest outlet's logo on a tile with the outlet's name, else the name
+   alone, else a plain icon. A photo or logo that fails to load drops to the
+   next step. Logos come from news_fetcher/outlet_logos.py; /api/v1 serves
+   the same chain as image_url then logo_url. #}
+{% macro card_image(story) -%}
+{%- set photo = story.articles|selectattr('image_url')|rejectattr('is_roundup')|map(attribute='image_url')|first %}
+{%- set lead = (story.display_articles if story.display_articles is defined else story.articles)|map(attribute='outlet')|select|list %}
+{%- set logo_outlet = lead|selectattr('logo_url')|first %}
+{%- set source = logo_outlet or lead|first %}
+<div class="story-image{{ '' if photo else ' is-fallback' }}" aria-hidden="true">
+    {%- if photo %}
+    <img class="story-photo" src="{{ photo }}" alt="" loading="lazy" onerror="this.parentNode.classList.add('photo-failed')">
+    {%- endif %}
+    {%- if source %}
+    <span class="story-image-source{{ '' if logo_outlet else ' no-logo' }}">
+        {%- if logo_outlet %}<img class="story-logo" src="{{ logo_outlet.logo_url }}" alt="" loading="lazy" onerror="this.parentNode.classList.add('no-logo')">{% endif -%}
+        <span class="story-source-name">{{ source.name }}</span>
+    </span>
+    {%- else %}
+    <span class="story-image-placeholder">{{ icon('newspaper') }}</span>
+    {%- endif %}
+</div>
+{%- endmacro %}
+
 {# The card shell: image, headline, one metadata row. The page fills the
    rest through `{% call story_card(story) %} ... {% endcall %}`.
    compact=true (All / Grouped Stories): see the comment in that branch;
@@ -89,14 +115,7 @@
 {%- set has_menu = actions or current_user.is_authenticated %}
 <div class="story compact" id="story-{{ story.id }}">
     <div class="story-layout">
-        {% set featured_article = story.articles|selectattr('image_url')|first %}
-        <div class="story-image" aria-hidden="true">
-            {% if featured_article and featured_article.image_url %}
-                <img src="{{ featured_article.image_url }}" alt="" loading="lazy">
-            {% else %}
-                <span class="story-image-placeholder">{{ icon('newspaper') }}</span>
-            {% endif %}
-        </div>
+        {{ card_image(story) }}
         <div class="story-content">
             <h2><a class="story-link" href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ story.display_headline }}</a></h2>
             <div class="card-meta">
@@ -150,14 +169,7 @@
 {%- else %}
 <div class="story" id="story-{{ story.id }}">
     <div class="story-layout">
-        {% set featured_article = story.articles|selectattr('image_url')|first %}
-        <div class="story-image">
-            {% if featured_article and featured_article.image_url %}
-                <img src="{{ featured_article.image_url }}" alt="" loading="lazy">
-            {% else %}
-                <div class="story-image-placeholder">{{ icon('newspaper') }}</div>
-            {% endif %}
-        </div>
+        {{ card_image(story) }}
 
         <div class="story-content">
             <h2><a href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ story.display_headline }}</a></h2>

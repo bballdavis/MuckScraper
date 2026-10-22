@@ -43,13 +43,15 @@
         return node;
     }
 
-    function thumb(src) {
-        if (src) {
-            const img = el('img', 'ft-thumb');
-            img.src = src;
+    // The hit's image, else its outlet's logo (fitted, not cropped), else a
+    // blank tile; each one that fails to load gives way to the next.
+    function thumb(src, logo) {
+        if (src || logo) {
+            const img = el('img', src ? 'ft-thumb' : 'ft-thumb ft-thumb-logo');
+            img.src = src || logo;
             img.alt = '';
             img.loading = 'lazy';
-            img.addEventListener('error', function () { img.replaceWith(el('span', 'ft-thumb')); });
+            img.addEventListener('error', function () { img.replaceWith(thumb(null, src ? logo : null)); });
             return img;
         }
         const placeholder = el('span', 'ft-thumb');
@@ -86,7 +88,7 @@
         const meta = el('span', 'ft-hit-meta');
         metaNodes.forEach(function (node) { meta.append(node); });
         body.append(top, meta);
-        link.append(thumb(item.image), body);
+        link.append(thumb(item.image, item.logo), body);
         return link;
     }
 

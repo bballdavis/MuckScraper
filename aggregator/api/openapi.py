@@ -22,6 +22,11 @@ _B = {"type": "boolean"}
 _DT = {"type": "string", "format": "date-time"}
 _NDT = {"type": ["string", "null"], "format": "date-time"}
 _URL = {"type": ["string", "null"], "format": "uri"}
+# A card's image chain: `image_url` (the story's newest article image, or
+# this article's), then the outlet logo, then the app's own placeholder.
+# Logos are square icons: draw them fitted on a tile, not cropped.
+_LOGO = {"type": ["string", "null"], "format": "uri",
+         "description": "Outlet logo for when image_url is null; fit it, don't crop it"}
 _LEANING = {"type": "string", "enum": ["left", "center", "right", "unrated"]}
 _PARAS = {"type": "array", "items": _S}
 
@@ -39,11 +44,11 @@ SCHEMAS = {
     "Error": _obj(["error"], error=_obj(["code", "message"], code=_S, message=_S)),
     "Health": _obj(["ok", "version"], ok=_B, version=_S),
     "Coverage": _obj(["left", "center", "right"], left=_I, center=_I, right=_I),
-    "Outlet": _obj(["id", "name", "leaning"], id=_NI, name=_S, leaning=_LEANING),
+    "Outlet": _obj(["id", "name", "leaning", "logo_url"], id=_NI, name=_S, leaning=_LEANING, logo_url=_LOGO),
     "StorySummary": _obj(
-        ["id", "section", "headline", "dek", "image_url", "coverage", "source_count", "updated_at",
+        ["id", "section", "headline", "dek", "image_url", "logo_url", "coverage", "source_count", "updated_at",
          "is_summarized", "has_analysis", "has_ai_headline", "has_updates"],
-        id=_I, section=_S, headline=_S, dek=_NS, image_url=_URL, coverage=_ref("Coverage"),
+        id=_I, section=_S, headline=_S, dek=_NS, image_url=_URL, logo_url=_LOGO, coverage=_ref("Coverage"),
         source_count=_I, updated_at=_DT, is_summarized=_B, has_analysis=_B, has_ai_headline=_B, has_updates=_B),
     "ArticleCard": _obj(
         ["id", "story_id", "title", "outlet", "leaning", "url", "published_at", "image_url", "summary", "copy_of"],
@@ -65,7 +70,7 @@ SCHEMAS = {
                         hide_single=_B),
     "SearchHit": {"type": "object", "required": ["kind", "id", "title"], "properties": {
         "kind": {"type": "string", "enum": ["story", "article"]}, "id": _I, "story_id": _NI, "title": _S,
-        "image_url": _URL, "source_count": _I, "updated_at": _NDT, "outlet": _ref("Outlet"),
+        "image_url": _URL, "logo_url": _LOGO, "source_count": _I, "updated_at": _NDT, "outlet": _ref("Outlet"),
         "leaning": _LEANING, "published_at": _NDT}},
     "NewsBoxItem": _obj(
         ["story", "origin", "state", "progress", "is_unread", "auto_run_id", "added_at", "ready_at", "error"],
