@@ -574,6 +574,57 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertIn(story, [s.id for s in newsbox.pick_stories(self.ids["reader"], settings)])
         self._clear_newsbox()
 
+    def test_article_summary_and_lean_rating(self):
+        from unittest import mock
+        from aggregator import article_jobs, db
+        from aggregator.models import Article, Job, Story
+        Job.query.delete()
+        a2 = Article.query.filter_by(url="https://right.example/a2").first()
+        kept = (a2.content, a2.summary, a2.bias_score)
+        a2.content, a2.summary = "<p>The budget passed, critics said, with too much spending.</p>", None
+        db.session.commit()
+        reader = self._pair()
+        token = self._pair(scopes=("read", "summarize"))
+        path = f"/api/v1/articles/{a2.id}"
+
+        self.assertEqual(self._send("POST", path + "/summarize", reader).status_code, 403)
+        self.assertEqual(self._send("POST", path + "/rate-bias", reader).status_code, 403)
+        # One that already has a summary is answered at once.
+        r = self._send("POST", f"/api/v1/articles/{self.ids['a1']}/summarize", token)
+        self.assertEqual((r.status_code, r.get_json()["summary"]), (200, "Senate passed the budget."))
+        # One MuckScraper couldn't read has nothing to summarize.
+        lone = Article.query.filter_by(url="https://left.example/a3").first()
+        r = self._send("POST", f"/api/v1/articles/{lone.id}/summarize", token)
+        self.assertEqual((r.status_code, r.get_json()["error"]["code"]), (409, "no_text"))
+
+        r = self._send("POST", path + "/summarize", token)
+        self.assertEqual(r.status_code, 202)
+        self.assertTrue(r.get_json()["is_summarizing"])
+        self.assertEqual(self._send("POST", path + "/summarize", token).status_code, 202)
+        self.assertEqual(Job.query.filter_by(kind=article_jobs.SUMMARY_JOB).count(), 1)
+        r = self._send("POST", path + "/rate-bias", token)
+        self.assertEqual(r.status_code, 202)
+        body = self._get(path, token).get_json()
+        self.assertEqual((body["is_summarizing"], body["is_rating_bias"], body["leaning"]), (True, True, "right"))
+
+        with mock.patch("news_fetcher.summarizer.check_ollama_status", return_value=True), \
+                mock.patch("news_fetcher.summarizer.summarize_article", return_value="Critics called it costly."):
+            article_jobs.run_summary({"article_id": a2.id})
+        with mock.patch("news_fetcher.outlet_bias_llm.get_article_bias_from_llm", return_value=1):
+            article_jobs.run_bias({"article_id": a2.id})
+        Job.query.delete()
+        db.session.commit()
+        body = self._get(path, token).get_json()
+        self.assertEqual((body["summary"], body["leaning"], body["is_summarizing"]),
+                         ("Critics called it costly.", "left", False))
+        # The story's counts now take the article's own lean.
+        story = self._get(f"/api/v1/stories/{self.ids['story']}", token).get_json()
+        self.assertEqual((story["coverage"]["left"], story["coverage"]["right"]), (2, 0))
+
+        a2 = Article.query.get(a2.id)
+        a2.content, a2.summary, a2.bias_score = kept
+        db.session.commit()
+
     def _bookmark_env(self):
         import tempfile
         from aggregator import db

@@ -134,7 +134,9 @@ SCHEMAS["StoryDetail"] = {"allOf": [_ref("StorySummary"), _obj(
 SCHEMAS["ArticleDetail"] = {"allOf": [_ref("ArticleCard"), _obj(
     ["topics", "analysis", "content_html"], topics=_PARAS, analysis=_PARAS,
     content_html={"type": ["string", "null"], "description": "Sanitized scraped HTML; null unless the server allows full text."},
-    is_read={"type": "boolean", "description": "Marked read by this user"})]}
+    is_read={"type": "boolean", "description": "Marked read by this user"},
+    is_summarizing={"type": "boolean", "description": "Its summary is queued or being written"},
+    is_rating_bias={"type": "boolean", "description": "Its lean rating is queued or running"})]}
 SCHEMAS["ReadItem"] = _obj(
     ["kind", "id", "read_at", "story", "article"],
     kind={"type": "string", "enum": ["story", "article"]}, id=_I, read_at=_DT,
@@ -225,6 +227,19 @@ PATHS = {
                            "description": "Defaults to requested"}}}}}},
         "responses": {"200": _json(_ref("NewsBoxItem"), "Already summarized: ready"),
                       "202": _json(_ref("NewsBoxItem"), "Summary queued: pending"),
+                      **_ERRORS, **_NOT_FOUND}}},
+    "/articles/{article_id}/summarize": {"post": {
+        "operationId": "summarizeArticle", "parameters": [_path_id("article_id")],
+        "description": "Needs the summarize scope. Queues the article's own summary; poll /articles/{id}.",
+        "responses": {"200": _json(_ref("ArticleDetail"), "Already summarized"),
+                      "202": _json(_ref("ArticleDetail"), "Summary queued (is_summarizing)"),
+                      "409": _json(_ref("Error"), "No text to summarize"),
+                      **_ERRORS, **_NOT_FOUND}}},
+    "/articles/{article_id}/rate-bias": {"post": {
+        "operationId": "rateArticleBias", "parameters": [_path_id("article_id")],
+        "description": "Needs the summarize scope. Queues a rating of the article's own lean, which then "
+                       "replaces its outlet's in leaning and the story's coverage counts.",
+        "responses": {"202": _json(_ref("ArticleDetail"), "Rating queued (is_rating_bias)"),
                       **_ERRORS, **_NOT_FOUND}}},
     "/me/newsbox": _get("newsbox", _json({"allOf": [_page(_ref("NewsBoxItem")), _obj(["unread_count"], unread_count=_I)]}),
                         [_q("state", {"type": "string", "enum": ["pending", "in_progress", "ready", "failed"]}),
