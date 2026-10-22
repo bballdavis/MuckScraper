@@ -91,7 +91,7 @@
 
             {#- The story link, then the summary and analysis indicators
                 (ai_actions.html; status only here, they never run a task). -#}
-            <div class="card-actions">
+            <div class="card-actions card-actions-row">
                 <a href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}" class="btn btn-dark">{{ icon('newspaper') }} Coverage &amp; Analysis</a>
                 {{ story_summary_action(story, false, 'tip-above-end') }}
                 {{ story_analysis_action(story, false, 'tip-above-end') }}
