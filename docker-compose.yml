@@ -137,6 +137,7 @@ services:
       DISPLAY_TIMEZONE: ${DISPLAY_TIMEZONE:-UTC}
       # Reverse proxies or tunnels in front of the API; 0 when none.
       API_PROXY_HOPS: ${API_PROXY_HOPS:-1}
+      API_CLIENT_IP_HEADER: ${API_CLIENT_IP_HEADER:-}
     restart: unless-stopped
     volumes:
       - .:/app:ro
