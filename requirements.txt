@@ -24,3 +24,4 @@ email-validator
 gunicorn
 feedparser
 tzdata
+cryptography>=42
