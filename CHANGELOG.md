@@ -23,6 +23,8 @@ All notable changes to MuckScraper are documented here.
   section name sits beside the logo, search is centred, and the time range,
   scrape status and single-article filters moved into an icon-only Filters
   popover. Active filters show above the list as chips you can remove.
+  On wide screens the search is centred on the story column, not the
+  window, with the sidebar open or collapsed.
 - **Live search results.** Typing in the top bar shows the best matching
   stories (thumbnail, article and outlet counts, Left/Center/Right counts and
   bar) and articles (outlet and lean) as you type, from the new

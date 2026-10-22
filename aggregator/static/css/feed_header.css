@@ -46,10 +46,26 @@
 .ft-menu:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 .ft-menu:focus-visible { outline: 2px solid var(--sidebar-accent-text); outline-offset: 2px; }
 
-/* Left and right take equal shares so the search sits in the middle. */
+/* Left and right take equal shares of the spare width, so the search sits in
+   the middle. On wide screens the left side gets --ft-offset more, which
+   moves the search right by half of it: centred on the story column beside
+   the sidebar rather than on the window (Philip, 2026-10-22). The offset is
+   the sidebar's width (none when collapsed) plus the difference between the
+   bar's right and left padding (24px - 14px). */
+:root { --ft-offset: 0px; }
 .ft-left, .ft-right { flex: 1 1 180px; display: flex; align-items: center; min-width: 0; }
+.ft-left { flex-basis: calc(180px + var(--ft-offset)); transition: flex-basis 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .ft-left { gap: 10px; }
 .ft-right { justify-content: flex-end; gap: 10px; }
+@media (min-width: 901px) {
+    :root:has(.feed-layout .sidebar) { --ft-offset: calc(240px + 10px); }
+    :root:has(.feed-layout .sidebar.collapsed) { --ft-offset: 10px; }
+    /* One row; when space runs short only the search narrows, so the two
+       sides keep their difference and the search stays centred. */
+    .feed-topbar { flex-wrap: nowrap; }
+    .ft-left, .ft-right { flex-shrink: 0; }
+    .ft-center { min-width: 200px; }
+}
 
 .ft-logo {
     color: #fff;
