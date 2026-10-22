@@ -1191,6 +1191,28 @@ if __name__ == "__main__":
             replace_existing=True,
         )
 
+    # Each MuckScroller user's scheduled summaries (aggregator/newsbox.py):
+    # a cheap check that queues jobs for whatever schedule is due.
+    def run_due_newsbox_schedules():
+        from aggregator.newsbox import run_due_schedules
+        with app.app_context():
+            try:
+                run_due_schedules()
+            except Exception:
+                db.session.rollback()
+                logging.exception("[NewsBox] Checking due schedules failed")
+
+    scheduler.add_job(
+        run_due_newsbox_schedules,
+        trigger="interval",
+        minutes=1,
+        id="newsbox_schedules",
+        name="App scheduled summaries (every minute)",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     logging.info(
         "Scheduler running with %s scheduled run(s) in %s: %s",
         len(schedule_snapshot),

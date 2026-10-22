@@ -21,8 +21,14 @@ DEFAULTS = {
     "per_device_per_minute": 120,
     "per_ip_per_minute": 300,
     "pair_per_ip_per_hour": 10,
+    # Stories a user can send to NewsBox from the app (swipe or save) per day.
+    # Scheduled runs are capped by their own sections instead.
+    "summaries_per_user_per_day": 100,
+    # "Run now" on the app's Scheduled page, per user per day.
+    "schedule_runs_per_user_per_day": 10,
 }
-LIMIT_FIELDS = ("per_device_per_minute", "per_ip_per_minute", "pair_per_ip_per_hour")
+LIMIT_FIELDS = ("per_device_per_minute", "per_ip_per_minute", "pair_per_ip_per_hour",
+                "summaries_per_user_per_day", "schedule_runs_per_user_per_day")
 
 _cache = {"at": 0.0, "value": None}
 

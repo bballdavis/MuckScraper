@@ -22,6 +22,8 @@ LIMIT_LABELS = {
     "per_device_per_minute": "Requests per minute, per device",
     "per_ip_per_minute": "Requests per minute, per IP address",
     "pair_per_ip_per_hour": "Pairing attempts per hour, per IP address",
+    "summaries_per_user_per_day": "Stories sent to NewsBox per day, per user",
+    "schedule_runs_per_user_per_day": "Scheduled runs started by hand per day, per user",
 }
 
 

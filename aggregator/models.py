@@ -547,8 +547,9 @@ class ConfigSetting(db.Model):
 
 # Mobile API (aggregator/api/, served by aggregator/api_app.py). Scopes a
 # device token can carry; "read" covers every read endpoint and the user's own
-# preferences.
-API_SCOPES = ("read",)
+# preferences and NewsBox read state; "summarize" lets it queue summaries
+# (POST /stories/{id}/summarize) and edit or run the user's schedule.
+API_SCOPES = ("read", "summarize")
 
 
 class ApiDevice(db.Model):
@@ -605,3 +606,47 @@ class ApiRateCounter(db.Model):
     key          = db.Column(db.String(120), primary_key=True)
     window_start = db.Column(db.DateTime, primary_key=True)
     count        = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+
+
+class NewsBoxItem(db.Model):
+    """A story in one user's NewsBox (aggregator/newsbox.py): summarized for
+    them from the app (a swipe or a save) or by their schedule. `state` goes
+    pending -> in_progress -> ready, or failed; the summary itself lives on
+    the Story and is shared by everyone."""
+    __tablename__ = "newsbox_items"
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "story_id", name="uq_newsbox_user_story"),
+        db.Index("ix_newsbox_user_added", "user_id", "added_at"),
+        db.Index("ix_newsbox_story_state", "story_id", "state"),
+    )
+
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    story_id   = db.Column(db.Integer, db.ForeignKey("stories.id", ondelete="CASCADE"), nullable=False)
+    origin     = db.Column(db.String(16), nullable=False)   # swiped / saved / auto
+    depth      = db.Column(db.String(24), nullable=False, default="summary", server_default="summary")
+    state      = db.Column(db.String(16), nullable=False, default="pending", server_default="pending")
+    # Items from one scheduled run share this id.
+    run_id     = db.Column(db.String(64), nullable=True)
+    is_unread  = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    error      = db.Column(db.String(300), nullable=True)
+    added_at   = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    ready_at   = db.Column(db.DateTime, nullable=True)
+
+    story = db.relationship("Story")
+    user = db.relationship("User", backref=db.backref("newsbox_items", lazy="dynamic", cascade="all, delete-orphan"))
+
+
+class SummarySchedule(db.Model):
+    """One user's scheduled summaries: when to run and which sections, as JSON
+    checked by aggregator.newsbox.clean_schedule. The scheduler container
+    runs every schedule whose next_run_at has passed (run_due_schedules)."""
+    __tablename__ = "summary_schedules"
+
+    user_id     = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    settings    = db.Column(db.Text, nullable=False, default="{}", server_default="{}")
+    next_run_at = db.Column(db.DateTime, nullable=True, index=True)
+    last_run_at = db.Column(db.DateTime, nullable=True)
+    updated_at  = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = db.relationship("User", backref=db.backref("summary_schedule", uselist=False, cascade="all, delete-orphan"))

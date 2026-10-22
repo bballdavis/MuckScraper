@@ -26,15 +26,22 @@ in Settings › Users signs out all of their devices on their next request.
 ## Security
 
 - **Isolation:** the API process has only `/api/v1/*` routes, which a test
-  checks. Content endpoints are read-only. The only writes are a device's own
-  pairing, sign-out and last-used time, and the user's own feed preferences.
+  checks. Content endpoints are read-only. The writes are a device's own
+  pairing, sign-out and last-used time, and the user's own feed preferences,
+  NewsBox and schedule. No request runs a model: summaries are queued as jobs
+  for the scheduler container.
+- **Scopes:** a device has `read`, and `summarize` for sending stories to
+  NewsBox and editing or running its schedule. New pairings get both;
+  devices paired earlier were given `summarize` by migration `b7e2d4f9a1c3`.
 - **Tokens:** a token is `msk_` followed by 32 random bytes. Only its SHA-256
   is stored. Tokens expire after a year, and pairing again issues a new one.
   Pairing codes are also stored hashed.
 - **Rate limits** are counted in Postgres and shared by every worker. They
   apply per device and per IP, plus a tighter limit on pairing attempts per
-  IP. You can change all three in Settings › Mobile API. A request over a
-  limit gets `429` with `Retry-After`.
+  IP, stories sent to NewsBox per user per day and "Run now" per user per
+  day. You can change them in Settings › Mobile API. A request over a limit
+  gets `429` with `Retry-After`. Sending a story that is already in the
+  user's NewsBox doesn't count, and a scheduled run adds at most 120 stories.
 - **Input:** every parameter is validated, and an unknown parameter is a
   `400`. Bodies are capped at 16 KB, and queries time out after 5 seconds.
 - **Output:**
@@ -73,15 +80,29 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 | `GET /stories/{id}` | Summary, deep report, opinion roundup, articles and columns by leaning |
 | `GET /articles/{id}` | Title, outlet, leaning, summary, analysis, link, and scraped text when allowed |
 | `GET /search?q=&kind=stories\|articles&range=&limit=` | Compact hits for as-you-type search |
+| `POST /stories/{id}/summarize` `{depth, origin}` | Adds the story to the user's NewsBox: `200` ready when already summarized, `202` pending when a summary was queued. `depth` is `summary` or `summary_analysis`; `origin` is `swiped` or `saved`. Needs `summarize`. |
+| `GET /me/newsbox?state=&origin=&unread=&cursor=&limit=` | The user's NewsBox, newest first, with `unread_count` |
+| `PATCH /me/newsbox/{story_id}` `{is_unread}`, `DELETE` | Mark one item read or unread, or remove it |
+| `POST /me/newsbox/read` | Mark every item read |
+| `GET`/`PUT /me/schedules` | Scheduled summaries: run times in the user's `timezone`, sections (Headlines in pages of 20, a topic by its top N), depth and rules. `PUT` needs `summarize`. |
+| `POST /me/schedules/run` | Run the schedule once now. Needs `summarize`. |
 
 Lists are paginated with an opaque `cursor`: pass back the `next_cursor` from
 the previous page, which is `null` on the last page. `limit` is 1 to 50
 (default 20). Dates are ISO 8601 UTC to the second, for example
 `2026-10-22T14:05:00Z`.
 
+NewsBox items go `pending` → `in_progress` → `ready`, or `failed` with an
+`error`. A story already summarized is `ready` at once. One job writes a
+story's summary for everyone waiting on it, at lower priority than the
+pipeline and the admin's AI tasks. An item is unread from when it turns
+ready. Scheduled items have `origin: "auto"` and share an `auto_run_id`. The
+scheduler checks every minute for schedules that are due.
+
 ## Not yet
 
-These are in the plan but not built: swipe-to-summarize with job status,
-NewsBox, bookmarks with saved copies, auto-summarize schedules, a My devices
+These are in the plan but not built: bookmarks with saved copies (a saved
+story is summarized into NewsBox, but no backup is kept yet), push
+notifications when a run finishes (`notify_when_done` is stored only), a My devices
 list on the profile page for self-service pairing, a read-only Postgres role
 for the API, a request log with alerts, and App Attest.
