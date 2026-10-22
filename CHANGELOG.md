@@ -4,6 +4,31 @@ All notable changes to MuckScraper are documented here.
  
 ---
 
+## [Unreleased]
+
+### Changed
+- **New feed top bar** on Headlines, All Stories and Grouped Stories: the
+  section name sits beside the logo, search is centred, and the time range,
+  scrape status and single-article filters moved into an icon-only Filters
+  popover with a count badge. Active filters show above the list as chips
+  you can remove.
+- **Live search results.** Typing in the top bar shows the best matching
+  stories (thumbnail, article and outlet counts, Left/Center/Right counts and
+  bar) and articles (outlet and lean) as you type, from the new
+  `/admin/search/suggest` endpoint. Enter still runs the full search.
+- **Compact story cards** on All and Grouped Stories: a thumbnail, the
+  headline and counts, and the date over the Left/Center/Right line on the
+  right. Every card date uses one format ("Oct 19, 9:39 PM").
+- **Clearer sidebar.** Links are full-width rows with icons and a clear
+  active state, grouped under small muted headings (Topics, More) that no
+  longer look like links.
+
+### Added
+- **Feed defaults** on the profile page: start page, time range, scrape
+  status and hiding single-article stories. "Save as my default" in the
+  Filters popover stores the filters you are looking at. Stored per user in
+  `app_settings`, so no migration is needed.
+
 ## [1.0.1] - 2026-10-22
 
 ### Added
