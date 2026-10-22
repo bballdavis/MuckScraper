@@ -89,6 +89,8 @@ def story_summary(story, edition_story=None):
         "source_count": len({a.outlet.name if a.outlet else a.source for a in articles}),
         "updated_at": iso(story.last_updated),
         "is_summarized": bool((story.summary or "").strip()),
+        "has_analysis": bool((story.deep_report or "").strip()),
+        "has_ai_headline": bool(story.has_ai_headline),
         "has_updates": bool(getattr(edition_story, "has_updates", False)),
     }
 
@@ -220,4 +222,28 @@ def device(d):
         "scopes": d.scope_list,
         "created_at": iso(d.created_at),
         "expires_at": iso(d.expires_at),
+    }
+
+
+def newsbox_item(item):
+    """One NewsBox entry: the iOS NewsBoxItem."""
+    return {
+        "story": story_summary(item.story),
+        "origin": item.origin,
+        "state": item.state,
+        "progress": None,
+        "is_unread": bool(item.is_unread),
+        "auto_run_id": item.run_id,
+        "added_at": iso(item.added_at),
+        "ready_at": iso(item.ready_at),
+        "error": item.error if item.state == "failed" else None,
+    }
+
+
+def schedule(settings, row):
+    """The user's scheduled summaries: the iOS AutoSummarizeSettings."""
+    return {
+        **settings,
+        "next_run_at": iso(row.next_run_at) if row is not None else None,
+        "last_run_at": iso(row.last_run_at) if row is not None else None,
     }

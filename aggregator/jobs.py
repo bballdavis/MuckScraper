@@ -8,7 +8,8 @@ NOTIFY on commit wakes the worker at once; it also polls, so a lost
 notification only delays a job by POLL_SECONDS.
 
 Handlers are registered by kind (register()); aggregator/blueprints/admin/
-_tasks.py registers the admin bulk actions and AI tasks. One worker runs one
+_tasks.py registers the admin bulk actions and AI tasks, aggregator/
+newsbox.py the app's NewsBox summaries. One worker runs one
 job at a time, highest priority first, then oldest first.
 """
 import json
@@ -156,8 +157,10 @@ def worker_loop(app, stop_event=None):
     a NOTIFY or POLL_SECONDS. Survives database outages by retrying."""
     stop_event = stop_event or threading.Event()
     with app.app_context():
-        # Registers the admin handlers (bulk actions, AI tasks).
+        # Registers the admin handlers (bulk actions, AI tasks) and the
+        # app's NewsBox summaries.
         import aggregator.blueprints.admin._tasks  # noqa: F401
+        import aggregator.newsbox  # noqa: F401
         fail_interrupted_jobs()
         listen = None
         while not stop_event.is_set():

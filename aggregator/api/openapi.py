@@ -42,9 +42,9 @@ SCHEMAS = {
     "Outlet": _obj(["id", "name", "leaning"], id=_NI, name=_S, leaning=_LEANING),
     "StorySummary": _obj(
         ["id", "section", "headline", "dek", "image_url", "coverage", "source_count", "updated_at",
-         "is_summarized", "has_updates"],
+         "is_summarized", "has_analysis", "has_ai_headline", "has_updates"],
         id=_I, section=_S, headline=_S, dek=_NS, image_url=_URL, coverage=_ref("Coverage"),
-        source_count=_I, updated_at=_DT, is_summarized=_B, has_updates=_B),
+        source_count=_I, updated_at=_DT, is_summarized=_B, has_analysis=_B, has_ai_headline=_B, has_updates=_B),
     "ArticleCard": _obj(
         ["id", "story_id", "title", "outlet", "leaning", "url", "published_at", "image_url", "summary", "copy_of"],
         id=_I, story_id=_NI, title=_S, outlet=_ref("Outlet"), leaning=_LEANING, url=_URL,
@@ -67,6 +67,25 @@ SCHEMAS = {
         "kind": {"type": "string", "enum": ["story", "article"]}, "id": _I, "story_id": _NI, "title": _S,
         "image_url": _URL, "source_count": _I, "updated_at": _NDT, "outlet": _ref("Outlet"),
         "leaning": _LEANING, "published_at": _NDT}},
+    "NewsBoxItem": _obj(
+        ["story", "origin", "state", "progress", "is_unread", "auto_run_id", "added_at", "ready_at", "error"],
+        story=_ref("StorySummary"), origin={"type": "string", "enum": ["swiped", "saved", "auto"]},
+        state={"type": "string", "enum": ["pending", "in_progress", "ready", "failed"]},
+        progress={"type": ["number", "null"]}, is_unread=_B, auto_run_id=_NS, added_at=_DT, ready_at=_NDT,
+        error=_NS),
+    "Schedule": _obj(
+        ["is_enabled", "timezone", "run_times", "sections", "depth", "skip_already_summarized",
+         "minimum_sources", "notify_when_done", "next_run_at", "last_run_at"],
+        is_enabled=_B, timezone={"type": "string", "description": "IANA time zone for run times"},
+        run_times={"type": "array", "maxItems": 6, "items": _obj(
+            ["id", "time", "days", "is_enabled"], id=_S, time={"type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"},
+            days={"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 7}}, is_enabled=_B)},
+        sections={"type": "array", "maxItems": 30, "items": _obj(
+            ["section", "is_enabled", "amount"], section=_S, is_enabled=_B,
+            amount={"type": "integer", "minimum": 1, "maximum": 20,
+                    "description": "Pages of 20 for Headlines (1-5), top N for a topic"})},
+        depth={"type": "string", "enum": ["summary", "summary_analysis"]}, skip_already_summarized=_B,
+        minimum_sources=_NI, notify_when_done=_B, next_run_at=_NDT, last_run_at=_NDT),
 }
 SCHEMAS["Edition"] = {"allOf": [_ref("EditionBrief"), _obj(["stories"], stories={"type": "array", "items": _ref("StorySummary")})]}
 SCHEMAS["StoryDetail"] = {"allOf": [_ref("StorySummary"), _obj(
@@ -146,6 +165,39 @@ PATHS = {
     "/search": _get("search", _json(_obj(["items"], items={"type": "array", "items": _ref("SearchHit")})),
                     [_q("q", _S), _q("kind", {"type": "string", "enum": ["stories", "articles"]}), _RANGE, _LIMIT]),
     "/openapi.json": _get("openapiSpec", {"description": "This document"}, auth=False),
+    "/stories/{story_id}/summarize": {"post": {
+        "operationId": "summarizeStory", "parameters": [_path_id("story_id")],
+        "description": "Needs the summarize scope. Adds the story to the user's NewsBox.",
+        "requestBody": {"required": True, "content": {"application/json": {"schema": {
+            "type": "object", "additionalProperties": False, "properties": {
+                "depth": {"type": "string", "enum": ["summary", "summary_analysis"]},
+                "origin": {"type": "string", "enum": ["swiped", "saved"]}}}}}},
+        "responses": {"200": _json(_ref("NewsBoxItem"), "Already summarized: ready"),
+                      "202": _json(_ref("NewsBoxItem"), "Summary queued: pending"),
+                      **_ERRORS, **_NOT_FOUND}}},
+    "/me/newsbox": _get("newsbox", _json({"allOf": [_page(_ref("NewsBoxItem")), _obj(["unread_count"], unread_count=_I)]}),
+                        [_q("state", {"type": "string", "enum": ["pending", "in_progress", "ready", "failed"]}),
+                         _q("origin", {"type": "string", "enum": ["swiped", "saved", "auto"]}),
+                         _q("unread", _B), _CURSOR, _LIMIT]),
+    "/me/newsbox/{story_id}": {
+        "patch": {"operationId": "updateNewsBoxItem", "parameters": [_path_id("story_id")],
+                  "requestBody": {"required": True, "content": {"application/json": {"schema": {
+                      "type": "object", "additionalProperties": False, "properties": {"is_unread": _B}}}}},
+                  "responses": {"200": _json(_ref("NewsBoxItem")), **_ERRORS, **_NOT_FOUND}},
+        "delete": {"operationId": "removeNewsBoxItem", "parameters": [_path_id("story_id")],
+                   "responses": {"204": {"description": "Removed"}, **_ERRORS, **_NOT_FOUND}},
+    },
+    "/me/newsbox/read": {"post": {"operationId": "markNewsBoxRead",
+                                  "responses": {"200": _json(_obj(["updated"], updated=_I)), **_ERRORS}}},
+    "/me/schedules": {
+        **_get("getSchedule", _json(_ref("Schedule"))),
+        "put": {"operationId": "putSchedule", "description": "Needs the summarize scope. Replaces the schedule.",
+                "requestBody": {"required": True, "content": {"application/json": {"schema": _ref("Schedule")}}},
+                "responses": {"200": _json(_ref("Schedule")), **_ERRORS}},
+    },
+    "/me/schedules/run": {"post": {
+        "operationId": "runSchedule", "description": "Needs the summarize scope. Runs the schedule once, now.",
+        "responses": {"202": _json(_obj(["run_id", "added"], run_id=_S, added=_I), "Run queued"), **_ERRORS}}},
 }
 
 SPEC = {
