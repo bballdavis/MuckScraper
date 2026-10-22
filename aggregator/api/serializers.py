@@ -76,6 +76,16 @@ def _story_image(story, edition_story=None):
     return None
 
 
+def _story_logo(story):
+    """The newest outlet logo among the story's articles: what a card shows
+    when `image_url` is null. Clients draw it fitted on a plain tile, not
+    cropped like a photo (news_fetcher/outlet_logos.py)."""
+    for article in sorted(story.site_articles, key=lambda a: a.date or dt.min, reverse=True):
+        if article.outlet is not None and _http_url(article.outlet.logo_url):
+            return article.outlet.logo_url
+    return None
+
+
 def story_summary(story, edition_story=None):
     """A story card: the iOS StorySummary."""
     articles = story.site_articles
@@ -85,6 +95,7 @@ def story_summary(story, edition_story=None):
         "headline": story.display_headline,
         "dek": _dek(story.summary),
         "image_url": _story_image(story, edition_story),
+        "logo_url": _story_logo(story),
         "coverage": coverage(story),
         "source_count": len({a.outlet.name if a.outlet else a.source for a in articles}),
         "updated_at": iso(story.last_updated),
@@ -97,8 +108,8 @@ def story_summary(story, edition_story=None):
 
 def outlet(o, fallback_name=None):
     if o is None:
-        return {"id": None, "name": fallback_name or "Unknown", "leaning": "unrated"}
-    return {"id": o.id, "name": o.name, "leaning": leaning(o.bias_score)}
+        return {"id": None, "name": fallback_name or "Unknown", "leaning": "unrated", "logo_url": None}
+    return {"id": o.id, "name": o.name, "leaning": leaning(o.bias_score), "logo_url": _http_url(o.logo_url)}
 
 
 def article_card(article):
@@ -197,6 +208,7 @@ def search_story_hit(story):
         "id": story.id,
         "title": story.display_headline,
         "image_url": _story_image(story),
+        "logo_url": _story_logo(story),
         "source_count": len({a.outlet.name if a.outlet else a.source for a in story.site_articles}),
         "updated_at": iso(story.last_updated),
     }
