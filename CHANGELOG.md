@@ -31,9 +31,10 @@ All notable changes to MuckScraper are documented here.
 - **Compact story cards** on All and Grouped Stories: a thumbnail, the
   headline and counts, and the date over the Left/Center/Right line on the
   right. Every card date uses one format ("Oct 19, 9:39 PM").
-- **Clearer sidebar.** Links are full-width rows with icons and a clear
-  active state, grouped under small muted headings (Topics, More) that no
-  longer look like links.
+- **Clearer sidebar.** The current page is filled across the menu's full
+  width, and the small muted group headings (Topics, More) no longer look
+  like links. On the feed pages the top bar runs the full width above the
+  sidebar, with the menu button beside the MuckScraper name.
 
 ### Fixed
 - **`docker-compose.yml` now passes the OpenRouter settings and
