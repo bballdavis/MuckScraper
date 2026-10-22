@@ -55,7 +55,6 @@
 <div class="page-body">
 
 <div class="main">
-    {% if breaking_rows %}{% include '_breaking_bar.html' %}{% endif %}
     <div class="main-header">
         <div>
             <h1>Headlines</h1>
@@ -71,6 +70,8 @@
             <a href="{{ url_for('public.editions_archive') }}" class="btn btn-muted">{{ icon('calendar') }} Past editions</a>
         </div>
     </div>
+    {#- Breaking News sits under the edition line (Philip, 2026-10-22). -#}
+    {% if breaking_rows %}{% include '_breaking_bar.html' %}{% endif %}
     {% if is_past_edition %}
     <p class="past-note">An earlier edition, shown as its stories stand now: articles and opinion added since it was published are included.</p>
     {% endif %}
@@ -141,7 +142,7 @@
             if (bar && !bar.contains(document.activeElement)) {
                 if (html) bar.outerHTML = html; else bar.remove();
             } else if (!bar && html) {
-                document.querySelector('.main').insertAdjacentHTML('afterbegin', html);
+                document.querySelector('.main-header').insertAdjacentHTML('afterend', html);
             }
         } finally {
             scheduleBreaking();
