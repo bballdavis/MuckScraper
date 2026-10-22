@@ -4,7 +4,7 @@ All notable changes to MuckScraper are documented here.
  
 ---
 
-## [Unreleased]
+## [1.0.1] - 2026-10-22
 
 ### Added
 - **`APP_BIND` and `APP_PORT`** in `.env` choose where the admin app is
@@ -18,6 +18,10 @@ All notable changes to MuckScraper are documented here.
   usage data to Meilisearch by default. Spotted by u/geo38. Takes effect when
   the container is recreated (`./install.sh`, or
   `docker compose up -d meilisearch`).
+- **CNN Underscored pages are refused at ingestion** (`/cnn-underscored/`):
+  they are shopping reviews with affiliate links, not news. They also answer
+  403, and one of those was enough to put all of cnn.com on a six-hour
+  scrape hold.
 
 ### Removed
 - **The scraper no longer poses as Googlebot or opens paywalled sites in a
