@@ -131,14 +131,14 @@
 /* Summary / analysis indicators beside the Headlines button: square, as
    tall as the button. */
 /* Headlines: the story link and the summary/analysis indicators on one row,
-   all 40px tall, icons filling about 80% of that (Philip, 2026-10-22). */
+   all 40px tall, icons filling about 60% of that (Philip, 2026-10-22). */
 .card-actions-row { flex-wrap: nowrap; }
 .card-actions-row > .btn {
     flex: 1 1 auto; height: 40px; padding: 0 12px;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
 .card-actions-row > .act { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 10px; }
-.card-actions-row .icon { width: 32px; height: 32px; stroke-width: 1.5; }
+.card-actions-row .icon { width: 24px; height: 24px; }
 
 /* Compact cards (story_card(story, compact=true), All / Grouped Stories):
    image, headline, one meta row, then the bottom row with the bias bar (or
@@ -207,8 +207,8 @@
 .card-rail > * { flex: 1 1 0; min-height: 0; }
 .card-rail > * + * { border-top: 1px solid var(--border); }
 .card-rail .act { width: 100%; height: auto; border: 0; border-radius: 0; background: transparent; font-size: 18px; }
-/* Icons fill about 80% of the 39px rail's width (Philip, 2026-10-22). */
-.card-rail .icon { width: 31px; height: 31px; stroke-width: 1.5; }
+/* Icons fill about 60% of the 39px rail's width (Philip, 2026-10-22). */
+.card-rail .icon { width: 23px; height: 23px; }
 .card-rail .act-done { background: var(--accent); }
 .card-rail .act-ready:hover, .card-rail .act-ready:focus-visible { background: var(--accent); }
 .card-rail > :first-child { border-top-right-radius: 11px; }
