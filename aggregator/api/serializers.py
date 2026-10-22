@@ -237,13 +237,47 @@ def device(d):
     }
 
 
-def newsbox_item(item):
-    """One NewsBox entry: the iOS NewsBoxItem."""
+# How far along an unfinished NewsBox item is, by the step it waits on
+# (newsbox.STEPS); the app draws one bar segment per step.
+STEP_PROGRESS = {"scrape": 0.1, "group": 0.35, "summary": 0.55, "analysis": 0.8}
+
+
+def feed_headline(entry):
+    """A Breaking headline that isn't in a story yet."""
     return {
-        "story": story_summary(item.story),
+        "title": entry.title,
+        "outlet": entry.source_name,
+        "url": _http_url(entry.link),
+        "published_at": iso(entry.published_at),
+    }
+
+
+def breaking_item(entry, state):
+    """One headline in the Breaking News bar: the iOS BreakingItem."""
+    story = entry.article.story if entry.article is not None else None
+    return {
+        "id": entry.id,
+        **feed_headline(entry),
+        "image_url": _http_url(entry.image_url),
+        "outlet_count": entry.outlet_count,
+        "state": state,
+        "story_id": story.id if story is not None else None,
+        "error": entry.scrape_note if state == "failed" else None,
+    }
+
+
+def newsbox_item(item):
+    """One NewsBox entry: the iOS NewsBoxItem. `story` is null while a
+    Breaking headline is still being scraped; `headline` stands in then."""
+    unfinished = item.state in ("pending", "in_progress")
+    return {
+        "id": item.id,
+        "story": story_summary(item.story) if item.story is not None else None,
+        "headline": feed_headline(item.feed_entry) if item.story is None and item.feed_entry is not None else None,
         "origin": item.origin,
         "state": item.state,
-        "progress": None,
+        "step": item.step if unfinished else None,
+        "progress": STEP_PROGRESS.get(item.step) if unfinished else None,
         "is_unread": bool(item.is_unread),
         "auto_run_id": item.run_id,
         "added_at": iso(item.added_at),
