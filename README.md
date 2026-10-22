@@ -109,7 +109,6 @@ muckscraper/
 ├── docs/                           # Longer guides (MCP.md)
 ├── migrations/                     # Alembic migration files
 ├── news_fetcher/
-│   ├── Dockerfile                  # Scheduler image
 │   ├── fetch_and_store_articles/   # Ingestion, grouping, and edition publishing (package)
 │   ├── llm_client.py               # LLM provider dispatch (Ollama, Gemini, Groq, OpenAI-compatible)
 │   ├── prompt_registry.py          # DB-backed prompt templates
@@ -131,11 +130,11 @@ muckscraper/
 │   ├── cleanup_duplicates.py       # Utility: deduplicate articles and stories
 │   └── merge_outlets.py            # Legacy script; use Merge Outlets in Admin Tools instead
 ├── tests/                          # Automated tests
-├── boot.sh                         # Docker app entrypoint
+├── boot.sh                         # Starts gunicorn for the web app
 ├── install.sh                      # First-time setup and upgrades
 ├── bootstrap_admin.py              # Admin user creation script
 ├── docker-compose.yml              # Local stack definition
-├── Dockerfile                      # App image
+├── Dockerfile                      # The one image for app, scheduler and MCP server
 ├── requirements.txt                # Python dependencies
 └── .env.sample                     # Example environment configuration
 ```

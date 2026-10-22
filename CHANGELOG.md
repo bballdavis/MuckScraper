@@ -35,6 +35,17 @@ All notable changes to MuckScraper are documented here.
   active state, grouped under small muted headings (Topics, More) that no
   longer look like links.
 
+### Changed
+- **One slim image for the app, scheduler and MCP server.** The three
+  Dockerfiles are now one, without Playwright, Chromium and the ~25 X11/GTK
+  libraries it needed: nothing has driven a headless browser since 1.0.1.
+  Images are several hundred MB smaller and builds much faster. Pillow,
+  python-dotenv and pytest (never imported by the app) are gone from
+  `requirements.txt`.
+- **`docker-compose.yml`:** the app and scheduler share one environment block
+  (`x-app-env`), so a new setting is added once. The scheduler waits for a
+  Postgres health check instead of a fixed 15-second sleep.
+
 ### Fixed
 - **`docker-compose.yml` now passes the OpenRouter settings and
   `LLM_FAST_PROVIDER` into the containers.** They were documented in

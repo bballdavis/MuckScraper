@@ -82,8 +82,9 @@ info "Setting up the database (pgvector extension + tables) and admin user..."
 info "(retries automatically while Postgres finishes starting up)"
 docker compose exec app python bootstrap_admin.py
 
-# --build: the scheduler image carries its own copy of the code and packages,
-# so without it an upgrade leaves the scheduler running the old version.
+# --build: the image carries its own copy of the packages, so without it an
+# upgrade leaves the scheduler on old dependencies. (Same image as the app, so
+# this is a cache hit when the app was just rebuilt.)
 info "Building and starting the scheduler..."
 docker compose up -d --build scheduler
 
