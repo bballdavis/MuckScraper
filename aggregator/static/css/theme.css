@@ -192,7 +192,8 @@
 
 /* Rich tooltip: a hidden .tip child, shown on hover or keyboard focus. It
    opens to the left by default (the card rail sits at the right edge);
-   .tip-above opens it above, centred. */
+   .tip-above opens it above, centred; .tip-above-end above, right-aligned
+   (inside cards that clip their overflow). */
 .tip {
     position: absolute; z-index: 30; right: calc(100% + 8px); top: 50%; transform: translateY(-50%);
     width: max-content; max-width: 260px; padding: 8px 10px; border-radius: 8px;
@@ -203,6 +204,7 @@
 .tip strong { display: block; color: #fff; font-weight: 700; margin-bottom: 2px; }
 :hover > .tip, :focus-visible > .tip { opacity: 1; visibility: visible; }
 .tip-above > .tip, .tip-above .tip { right: auto; left: 50%; top: auto; bottom: calc(100% + 8px); transform: translateX(-50%); }
+.tip-above-end > .tip { right: 0; top: auto; bottom: calc(100% + 8px); transform: none; }
 
 /* Floating back button (breadcrumb.html float_back): sticks beside the
    card's top-left corner while the page scrolls; on narrow screens it sits

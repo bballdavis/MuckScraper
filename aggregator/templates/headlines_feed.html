@@ -1,6 +1,7 @@
 {% from 'story_card_macros.html' import story_card, bias_balance, bias_tag with context %}
 {% from '_feed_topbar.html' import feed_topbar with context %}
 {% from 'icons.html' import icon %}
+{% from 'ai_actions.html' import story_summary_action, story_analysis_action with context %}
 {% from 'pagination.html' import pager %}
 <!DOCTYPE html>
 <html data-theme="light">
@@ -85,8 +86,12 @@
                 <div class="summary pending">Analysis pending — this story hasn't been summarized yet.</div>
             {% endif %}
 
+            {#- The story link, then the summary and analysis indicators
+                (ai_actions.html; status only here, they never run a task). -#}
             <div class="card-actions">
-                <a href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}" class="btn btn-dark">View full coverage & analysis →</a>
+                <a href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}" class="btn btn-dark">{{ icon('newspaper') }} Coverage &amp; Analysis</a>
+                {{ story_summary_action(story, false, 'tip-above-end') }}
+                {{ story_analysis_action(story, false, 'tip-above-end') }}
             </div>
         {% endcall %}
         {% endfor %}
