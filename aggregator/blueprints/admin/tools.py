@@ -85,9 +85,8 @@ def tools_page():
 
     return render_template(
         "admin_tools.html",
-        containers=containers,
+        containers=_container_rows(containers),
         containers_running=sum(1 for c in containers if c.get("status") == "running"),
-        container_service_order=CONTAINER_SERVICE_NAMES,
         pipeline_schedule_restart_needed=pipeline_schedule_restart_needed(),
         fetch_running_ops=fetch_ops,
         other_running_ops=other_ops,
@@ -253,6 +252,62 @@ def _list_containers():
     except requests.RequestException as e:
         logger.warning("[ContainerRestart] Could not reach docker-restart-proxy: %s", e)
         return []
+
+
+def _parse_docker_time(value):
+    """Docker's RFC 3339 times carry nanoseconds; datetime takes micro."""
+    if not value or value.startswith("0001-"):
+        return None
+    try:
+        head, _, frac = value.rstrip("Z").partition(".")
+        stamp = datetime.strptime(head, "%Y-%m-%dT%H:%M:%S")
+        if frac:
+            stamp = stamp.replace(microsecond=int(frac[:6].ljust(6, "0")))
+        return stamp
+    except ValueError:
+        return None
+
+
+def _short_span(delta):
+    seconds = max(int(delta.total_seconds()), 0)
+    if seconds < 60:
+        return f"{seconds}s"
+    if seconds < 3600:
+        return f"{seconds // 60}m"
+    if seconds < 86400:
+        return f"{seconds // 3600}h {seconds % 3600 // 60}m"
+    return f"{seconds // 86400}d {seconds % 86400 // 3600}h"
+
+
+def _container_rows(containers):
+    """The proxy's containers in a fixed order (the known services first),
+    each with a health level (ok/warn/bad) and the facts the Overview shows."""
+    order = {name: i for i, name in enumerate(CONTAINER_SERVICE_NAMES)}
+    now = datetime.utcnow()
+    rows = []
+    for c in sorted(containers, key=lambda c: (order.get(c.get("service"), len(order)), c.get("service") or "")):
+        running = c.get("status") == "running"
+        health = c.get("health")
+        started = _parse_docker_time(c.get("started_at"))
+        finished = _parse_docker_time(c.get("finished_at"))
+        if not running:
+            level = "bad"
+            state = c.get("status") or "unknown"
+            if c.get("exit_code") not in (None, 0):
+                state += f" (exit {c['exit_code']})"
+            since = f"{_short_span(now - finished)} ago" if finished else None
+        else:
+            level = {"unhealthy": "bad", "starting": "warn"}.get(health, "ok")
+            state = health if health else "running"
+            since = f"up {_short_span(now - started)}" if started else None
+        rows.append({
+            **c,
+            "level": level,
+            "state": state,
+            "since": since,
+            "image_short": (c.get("image") or "").rsplit("/", 1)[-1] or None,
+        })
+    return rows
 
 
 def _describe_blocking(ops):

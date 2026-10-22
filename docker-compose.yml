@@ -32,6 +32,11 @@ x-app-env: &app-env
     EMBEDDING_MODEL: ${EMBEDDING_MODEL}
     LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
     EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
+    LMSTUDIO_HOST: ${LMSTUDIO_HOST:-}
+    LMSTUDIO_API_KEY: ${LMSTUDIO_API_KEY:-}
+    LMSTUDIO_MODEL: ${LMSTUDIO_MODEL:-}
+    LMSTUDIO_FAST_MODEL: ${LMSTUDIO_FAST_MODEL:-}
+    LMSTUDIO_EMBEDDING_MODEL: ${LMSTUDIO_EMBEDDING_MODEL:-}
     GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash-lite}
     GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
@@ -138,6 +143,7 @@ services:
       DISPLAY_TIMEZONE: ${DISPLAY_TIMEZONE:-UTC}
       # Reverse proxies or tunnels in front of the API; 0 when none.
       API_PROXY_HOPS: ${API_PROXY_HOPS:-1}
+      API_CLIENT_IP_HEADER: ${API_CLIENT_IP_HEADER:-}
       BOOKMARK_STORAGE_DIR: /data/bookmarks
     restart: unless-stopped
     volumes:

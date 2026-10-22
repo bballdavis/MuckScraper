@@ -18,8 +18,11 @@ DEFAULTS = {
     "full_text": False,
     # The address the phone uses, put into the pairing QR code.
     "public_url": "",
-    "per_device_per_minute": 120,
-    "per_ip_per_minute": 300,
+    # Sized for fast scrolling with prefetch: a feed page plus the story
+    # details the app loads ahead is a burst of 20-30 requests, a few times
+    # a minute. Abuse is still capped well below what the server can take.
+    "per_device_per_minute": 300,
+    "per_ip_per_minute": 600,
     "pair_per_ip_per_hour": 10,
     # Stories a user can send to NewsBox from the app (swipe or save) per day.
     # Scheduled runs are capped by their own sections instead.

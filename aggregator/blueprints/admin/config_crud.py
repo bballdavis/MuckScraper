@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from flask import render_template, request, redirect, url_for
+from flask import abort, jsonify, render_template, request, redirect, url_for
 from aggregator.permissions import ROLE_ADMIN, role_required
 from sqlalchemy import func
 from aggregator import db
@@ -51,7 +51,7 @@ def update_topic(topic_id):
         topic.sort_order = sort_order
     topic.is_active = request.form.get("is_active") == "on"
     db.session.commit()
-    return redirect(url_for("admin.topics_page"))
+    return redirect(url_for("admin.topics_page", _anchor=f"topic-{topic.id}"))
 
 
 RSS_FEED_BUCKETS = ["general", "right_enrichment", "left_enrichment", "op_ed"]
@@ -90,7 +90,7 @@ def update_rss_feed(feed_id):
     feed.fallback_url = request.form.get("fallback_url", "").strip() or None
     feed.enabled = request.form.get("enabled") == "on"
     db.session.commit()
-    return redirect(url_for("admin.rss_feeds_page"))
+    return redirect(url_for("admin.rss_feeds_page", _anchor=f"feed-{feed.id}"))
 
 
 @admin.route("/rss-feeds/<int:feed_id>/delete", methods=["POST"])
@@ -222,7 +222,7 @@ def update_pipeline_schedule(entry_id):
     entry.is_active = request.form.get("is_active") == "on"
     db.session.commit()
     _mark_pipeline_schedule_changed()
-    return redirect(url_for("admin.pipeline_schedule_page"))
+    return redirect(url_for("admin.pipeline_schedule_page", _anchor=f"run-{entry.id}"))
 
 
 @admin.route("/pipeline-schedule/<int:entry_id>/delete", methods=["POST"])
@@ -238,18 +238,30 @@ def delete_pipeline_schedule(entry_id):
 INGESTION_BLOCK_KINDS = ["source", "title_keyword"]
 
 
-@admin.route("/ingestion-blocks")
+# Each kind has its own page under Settings › Blocklists, keyed by a slug.
+INGESTION_BLOCK_SLUGS = {"sources": "source", "keywords": "title_keyword"}
+INGESTION_BLOCK_SLUG_FOR = {kind: slug for slug, kind in INGESTION_BLOCK_SLUGS.items()}
+
+
+@admin.route("/ingestion-blocks", defaults={"slug": "sources"})
+@admin.route("/ingestion-blocks/<slug>")
 @role_required(ROLE_ADMIN)
-def ingestion_blocks_page():
-    blocks_by_kind = {
-        kind: IngestionBlock.query.filter_by(kind=kind).order_by(
-            IngestionBlock.note.asc(), IngestionBlock.pattern.asc()
-        ).all()
-        for kind in INGESTION_BLOCK_KINDS
-    }
-    return render_template(
-        "ingestion_blocks.html", blocks_by_kind=blocks_by_kind, kinds=INGESTION_BLOCK_KINDS,
-    )
+def ingestion_blocks_page(slug):
+    kind = INGESTION_BLOCK_SLUGS.get(slug)
+    if kind is None:
+        abort(404)
+    blocks = IngestionBlock.query.filter_by(kind=kind).order_by(
+        IngestionBlock.note.asc(), IngestionBlock.pattern.asc()
+    ).all()
+    return render_template("ingestion_blocks.html", blocks=blocks, kind=kind)
+
+
+def _ingestion_blocks_redirect(kind, block_id=None):
+    return redirect(url_for(
+        "admin.ingestion_blocks_page",
+        slug=INGESTION_BLOCK_SLUG_FOR.get(kind, "sources"),
+        _anchor=f"block-{block_id}" if block_id else None,
+    ))
 
 
 @admin.route("/ingestion-blocks/add", methods=["POST"])
@@ -266,7 +278,7 @@ def add_ingestion_block():
         db.session.add(IngestionBlock(kind=kind, pattern=pattern, note=note, is_active=True))
         db.session.commit()
         logger.info(f"[IngestionBlocks] Added {kind} block: {pattern}")
-    return redirect(url_for("admin.ingestion_blocks_page"))
+    return _ingestion_blocks_redirect(kind)
 
 
 @admin.route("/ingestion-blocks/<int:block_id>/update", methods=["POST"])
@@ -285,16 +297,17 @@ def update_ingestion_block(block_id):
     block.note = request.form.get("note", "").strip() or None
     block.is_active = request.form.get("is_active") == "on"
     db.session.commit()
-    return redirect(url_for("admin.ingestion_blocks_page"))
+    return _ingestion_blocks_redirect(block.kind, block.id)
 
 
 @admin.route("/ingestion-blocks/<int:block_id>/delete", methods=["POST"])
 @role_required(ROLE_ADMIN)
 def delete_ingestion_block(block_id):
     block = IngestionBlock.query.get_or_404(block_id)
+    kind = block.kind
     db.session.delete(block)
     db.session.commit()
-    return redirect(url_for("admin.ingestion_blocks_page"))
+    return _ingestion_blocks_redirect(kind)
 
 
 SCHEDULED_FETCH_MODES = ["query", "top"]
@@ -374,9 +387,41 @@ def update_scheduled_fetch(fetch_id):
         setattr(fetch, key, value)
     if sort_order is not None:
         fetch.sort_order = sort_order
-    fetch.is_active = request.form.get("is_active") == "on"
+    # The card's switch saves on its own (set_scheduled_fetch_active), so the
+    # editor leaves the state alone unless a form sends it.
+    if "is_active" in request.form:
+        fetch.is_active = request.form.get("is_active") in ("on", "true", "1")
     db.session.commit()
-    return redirect(url_for("admin.scheduled_fetches_page"))
+    return redirect(url_for("admin.scheduled_fetches_page", _anchor=f"fetch-{fetch.id}"))
+
+
+@admin.route("/scheduled-fetches/<int:fetch_id>/active", methods=["POST"])
+@role_required(ROLE_ADMIN)
+def set_scheduled_fetch_active(fetch_id):
+    """The card's switch: turn one fetch on or off without touching the rest."""
+    fetch = ScheduledFetch.query.get_or_404(fetch_id)
+    payload = request.get_json(silent=True) or {}
+    fetch.is_active = bool(payload.get("active"))
+    db.session.commit()
+    return jsonify({"id": fetch.id, "active": fetch.is_active})
+
+
+@admin.route("/scheduled-fetches/reorder", methods=["POST"])
+@role_required(ROLE_ADMIN)
+def reorder_scheduled_fetches():
+    """Drag and drop: the page posts every fetch id in its new run order."""
+    payload = request.get_json(silent=True) or {}
+    try:
+        ids = [int(i) for i in payload.get("ids", [])]
+    except (TypeError, ValueError):
+        return jsonify({"error": "ids must be integers"}), 400
+    fetches = {f.id: f for f in ScheduledFetch.query.all()}
+    if sorted(ids) != sorted(fetches):
+        return jsonify({"error": "ids must list every scheduled fetch once"}), 400
+    for position, fetch_id in enumerate(ids, start=1):
+        fetches[fetch_id].sort_order = position
+    db.session.commit()
+    return jsonify({"ids": ids})
 
 
 @admin.route("/scheduled-fetches/<int:fetch_id>/delete", methods=["POST"])

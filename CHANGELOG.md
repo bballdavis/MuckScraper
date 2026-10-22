@@ -7,6 +7,16 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **LM Studio as a provider** (`lmstudio`) for chat and embeddings, through
+  its OpenAI-compatible local server (`LMSTUDIO_HOST`, optional
+  `LMSTUDIO_API_KEY`, `LMSTUDIO_MODEL`, `LMSTUDIO_FAST_MODEL`,
+  `LMSTUDIO_EMBEDDING_MODEL`). Embeddings can come from LM Studio while
+  Anthropic or another provider writes the text. Settings › LLM providers
+  now also saves the embedding provider and models, with a warning before a
+  switch; an embedding of the wrong size (not 768) is refused with one log
+  line instead of failing every insert.
+- `API_CLIENT_IP_HEADER` for the Mobile API, e.g. `CF-Connecting-IP` behind
+  Cloudflare, so each visitor gets their own per-address rate limit.
 - **Mobile API** for the MuckScroller iPhone app (docs/API.md): JSON under
   `/api/v1` served by its own app and container (`docker compose --profile
   api up -d api`), which has no web, admin or login routes. Devices pair with
@@ -47,6 +57,21 @@ All notable changes to MuckScraper are documented here.
   environment.
 
 ### Changed
+- **Settings polish.** Settings sits in the same centred column as the
+  feeds, with the section list as a card beside it, and panels use the story
+  cards' corner radius. Overview runs jobs from play buttons and lists one
+  container per row with its health, uptime, restarts, exit code and
+  out-of-memory kills (the restart proxy reports more state). Topics, RSS
+  feeds, blocklists and the run schedule have the add form on top, on/off
+  switches that save at once, and icon save and delete buttons. Scheduled
+  fetches are compact cards with a switch, an editor that opens in place and
+  drag-and-drop (or Alt + arrow keys) run order. The ingestion blocklist is
+  its own **Blocklists** group with a page each for sources and title
+  keywords. Source API keys take one row per source. The run schedule picks
+  times from a clock list and full or fetch-only from a switch.
+- Mobile API default rate limits raised to 300 requests a minute per device
+  and 600 per address, so fast scrolling with prefetch stays clear of them.
+  Limits already saved in Settings › Mobile API are kept.
 - **New feed top bar** on Headlines, All Stories and Grouped Stories: the
   section name sits beside the logo, search is centred, and the time range,
   scrape status and single-article filters moved into an icon-only Filters
