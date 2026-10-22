@@ -24,6 +24,7 @@ SETTINGS_SECTIONS = [
         ("fetches", "Scheduled fetches", "admin.scheduled_fetches_page", ScheduledFetch, False),
         ("ingest", "Ingestion blocklist", "admin.ingestion_blocks_page", None, False),
         ("scrapeblock", "Scrape blocklist", "admin.scrape_blocklist", None, False),
+        ("sourcekeys", "Source API keys", "admin.source_keys_page", None, True),
     ]),
     ("AI", [
         ("llm", "LLM providers", "admin.llm_providers_page", None, True),

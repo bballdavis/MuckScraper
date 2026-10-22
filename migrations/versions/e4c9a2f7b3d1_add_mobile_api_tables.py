@@ -2,7 +2,7 @@
 rate-limit counters.
 
 Revision ID: e4c9a2f7b3d1
-Revises: a8d3e6f1c2b7
+Revises: d3b8f6a1e2c9
 Create Date: 2026-10-22
 
 Device tokens and pairing codes are stored only as SHA-256 hashes
@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = 'e4c9a2f7b3d1'
-down_revision = 'a8d3e6f1c2b7'
+down_revision = 'd3b8f6a1e2c9'
 branch_labels = None
 depends_on = None
 
