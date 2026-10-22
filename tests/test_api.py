@@ -39,6 +39,29 @@ class RouteIsolationTests(unittest.TestCase):
             self.assertTrue(methods <= documented[path], f"{rule.rule} {methods}")
 
 
+class ScheduleTests(unittest.TestCase):
+    def test_next_run_follows_days_and_time_zone(self):
+        from aggregator.newsbox import clean_schedule, next_run
+        settings = clean_schedule({
+            "is_enabled": True, "timezone": "America/New_York",
+            "run_times": [{"id": "a", "time": "07:00", "days": [1, 2, 3, 4, 5], "is_enabled": True},
+                          {"id": "b", "time": "18:30", "days": [6], "is_enabled": False}]})
+        # Friday 2026-10-23 12:00 UTC is 08:00 in New York: next is Monday 07:00 EDT.
+        self.assertEqual(next_run(settings, datetime(2026, 10, 23, 12, 0)), datetime(2026, 10, 26, 11, 0))
+        # Thursday 10:00 UTC is 06:00 in New York: Thursday 07:00 EDT the same day.
+        self.assertEqual(next_run(settings, datetime(2026, 10, 22, 10, 0)), datetime(2026, 10, 22, 11, 0))
+        self.assertIsNone(next_run({**settings, "is_enabled": False}, datetime(2026, 10, 22)))
+
+    def test_clean_schedule_rejects_junk(self):
+        from aggregator.newsbox import ScheduleError, clean_schedule
+        for junk in ([], {"depth": "everything"}, {"minimum_sources": True},
+                     {"run_times": [{"id": "a", "time": "7:00", "days": [1], "is_enabled": True}]},
+                     {"run_times": [{"id": "a", "time": "07:00", "days": [8], "is_enabled": True}]},
+                     {"sections": [{"section": "World", "is_enabled": True, "amount": 21}]}):
+            with self.assertRaises(ScheduleError):
+                clean_schedule(junk)
+
+
 class ParamTests(unittest.TestCase):
     def test_cursor_round_trip_and_rejects_junk(self):
         from aggregator.api.errors import ApiError
@@ -105,18 +128,18 @@ class ApiEndToEndTests(unittest.TestCase):
         db.session.remove()
         self.ctx.pop()
 
-    def _code(self, user_id=None, expired=False):
+    def _code(self, user_id=None, expired=False, scopes=("read",)):
         from aggregator import db
         from aggregator.api.auth import create_pairing_code
         from aggregator.models import User
-        code, row = create_pairing_code(User.query.get(user_id or self.ids["reader"]), ["read"], "test")
+        code, row = create_pairing_code(User.query.get(user_id or self.ids["reader"]), list(scopes), "test")
         if expired:
             row.expires_at = datetime.utcnow() - timedelta(seconds=1)
         db.session.commit()
         return code
 
-    def _pair(self, name="Test phone"):
-        r = self.client.post("/api/v1/devices/pair", json={"code": self._code(), "device_name": name})
+    def _pair(self, name="Test phone", scopes=("read",)):
+        r = self.client.post("/api/v1/devices/pair", json={"code": self._code(scopes=scopes), "device_name": name})
         self.assertEqual(r.status_code, 201, r.get_json())
         return r.get_json()["token"]
 
@@ -278,6 +301,141 @@ class ApiEndToEndTests(unittest.TestCase):
         finally:
             settings.save({"enabled": True})
             db.session.commit()
+
+    def _clear_newsbox(self):
+        from aggregator import db
+        from aggregator.models import Job, NewsBoxItem, Story, SummarySchedule
+        NewsBoxItem.query.delete()
+        SummarySchedule.query.delete()
+        Job.query.delete()
+        Story.query.get(self.ids["story"]).deep_report = "The story: long report."
+        lone = Story.query.get(self.ids["lone"])
+        lone.summary = None
+        db.session.commit()
+
+    def _send(self, method, path, token, **kwargs):
+        return self.client.open(path, method=method, headers={"Authorization": f"Bearer {token}"}, **kwargs)
+
+    def test_summarize_needs_its_scope(self):
+        self._clear_newsbox()
+        token = self._pair()
+        r = self._send("POST", f"/api/v1/stories/{self.ids['story']}/summarize", token, json={})
+        self.assertEqual(r.status_code, 403)
+        r = self._send("PUT", "/api/v1/me/schedules", token, json={"is_enabled": True})
+        self.assertEqual(r.status_code, 403)
+
+    def test_summarized_story_is_ready_at_once(self):
+        self._clear_newsbox()
+        token = self._pair(scopes=("read", "summarize"))
+        r = self._send("POST", f"/api/v1/stories/{self.ids['story']}/summarize", token,
+                       json={"depth": "summary_analysis", "origin": "saved"})
+        self.assertEqual(r.status_code, 200, r.get_json())
+        item = r.get_json()
+        self.assertEqual((item["state"], item["origin"], item["is_unread"]), ("ready", "saved", True))
+        self.assertTrue(item["story"]["has_analysis"])
+        self.assertTrue(item["story"]["has_ai_headline"])
+        box = self._get("/api/v1/me/newsbox", token).get_json()
+        self.assertEqual(box["unread_count"], 1)
+        self.assertEqual(self._send("POST", "/api/v1/me/newsbox/read", token).get_json(), {"updated": 1})
+        self.assertEqual(self._get("/api/v1/me/newsbox", token).get_json()["unread_count"], 0)
+        r = self._send("PATCH", f"/api/v1/me/newsbox/{self.ids['story']}", token, json={"is_unread": True})
+        self.assertTrue(r.get_json()["is_unread"])
+        self.assertEqual(self._send("DELETE", f"/api/v1/me/newsbox/{self.ids['story']}", token).status_code, 204)
+        self.assertEqual(self._get("/api/v1/me/newsbox", token).get_json()["items"], [])
+
+    def test_unsummarized_story_queues_one_job_and_turns_ready(self):
+        from aggregator import db, jobs
+        from aggregator.models import Job, Story
+        self._clear_newsbox()
+        token = self._pair(scopes=("read", "summarize"))
+        path = f"/api/v1/stories/{self.ids['lone']}/summarize"
+        first = self._send("POST", path, token, json={})
+        self.assertEqual(first.status_code, 202, first.get_json())
+        self.assertEqual((first.get_json()["state"], first.get_json()["is_unread"]), ("pending", False))
+        self.assertEqual(self._send("POST", path, token, json={}).status_code, 202)
+        self.assertEqual(Job.query.filter_by(kind="newsbox_summary").count(), 1)
+
+        def write_summary(story):
+            return "The big picture: Written."
+        with mock.patch("news_fetcher.summarizer.check_ollama_status", return_value=True), \
+                mock.patch("news_fetcher.summarizer.summarize_story", side_effect=write_summary):
+            self.assertTrue(jobs.run_next_job())
+        item = self._get("/api/v1/me/newsbox?state=ready", token).get_json()["items"][0]
+        self.assertEqual(item["story"]["id"], self.ids["lone"])
+        self.assertTrue(item["is_unread"])
+        self.assertTrue(Story.query.get(self.ids["lone"]).summary)
+        db.session.commit()
+
+    def test_failed_job_marks_items_failed(self):
+        from aggregator import jobs
+        self._clear_newsbox()
+        token = self._pair(scopes=("read", "summarize"))
+        self._send("POST", f"/api/v1/stories/{self.ids['lone']}/summarize", token, json={})
+        with mock.patch("news_fetcher.summarizer.check_ollama_status", return_value=False):
+            jobs.run_next_job()
+        item = self._get("/api/v1/me/newsbox", token).get_json()["items"][0]
+        self.assertEqual(item["state"], "failed")
+        self.assertIn("offline", item["error"])
+
+    def test_summaries_per_day_are_limited(self):
+        from aggregator import db
+        from aggregator.api import settings
+        self._clear_newsbox()
+        token = self._pair(scopes=("read", "summarize"))
+        settings.save({"summaries_per_user_per_day": 1})
+        db.session.commit()
+        try:
+            ok = self._send("POST", f"/api/v1/stories/{self.ids['story']}/summarize", token, json={})
+            self.assertEqual(ok.status_code, 200)
+            # Asking again for a story already in NewsBox doesn't count.
+            again = self._send("POST", f"/api/v1/stories/{self.ids['story']}/summarize", token, json={})
+            self.assertEqual(again.status_code, 200)
+            over = self._send("POST", f"/api/v1/stories/{self.ids['lone']}/summarize", token, json={})
+            self.assertEqual(over.status_code, 429)
+        finally:
+            settings.save({"summaries_per_user_per_day": 100})
+            db.session.commit()
+
+    def test_schedule_round_trip_and_run(self):
+        self._clear_newsbox()
+        token = self._pair(scopes=("read", "summarize"))
+        self.assertFalse(self._get("/api/v1/me/schedules", token).get_json()["is_enabled"])
+        schedule = {
+            "is_enabled": True, "timezone": "America/New_York", "depth": "summary",
+            "run_times": [{"id": "morning", "time": "07:00", "days": [1, 2, 3, 4, 5, 6, 7], "is_enabled": True}],
+            "sections": [{"section": "Headlines", "is_enabled": True, "amount": 1},
+                         {"section": "US Politics", "is_enabled": True, "amount": 3}],
+            "skip_already_summarized": False, "minimum_sources": None, "notify_when_done": True,
+            "next_run_at": None,
+        }
+        r = self._send("PUT", "/api/v1/me/schedules", token, json=schedule)
+        self.assertEqual(r.status_code, 200, r.get_json())
+        self.assertIsNotNone(r.get_json()["next_run_at"])
+        for bad_value in ({"run_times": [{"id": "x", "time": "25:00", "days": [1], "is_enabled": True}]},
+                          {"sections": [{"section": "Headlines", "is_enabled": True, "amount": 9}]},
+                          {"timezone": "Mars/Base"}, {"surprise": 1}):
+            r = self._send("PUT", "/api/v1/me/schedules", token, json={**schedule, **bad_value})
+            self.assertEqual(r.status_code, 400, bad_value)
+        run = self._send("POST", "/api/v1/me/schedules/run", token)
+        self.assertEqual(run.status_code, 202, run.get_json())
+        self.assertEqual(run.get_json()["added"], 1)
+        item = self._get("/api/v1/me/newsbox?origin=auto", token).get_json()["items"][0]
+        self.assertEqual((item["state"], item["auto_run_id"]), ("ready", run.get_json()["run_id"]))
+
+    def test_due_schedules_run_and_move_on(self):
+        from aggregator import db, newsbox
+        from aggregator.models import NewsBoxItem, SummarySchedule
+        self._clear_newsbox()
+        settings, row = newsbox.save_schedule(self.ids["reader"], {
+            "is_enabled": True, "skip_already_summarized": False,
+            "run_times": [{"id": "a", "time": "07:00", "days": [1, 2, 3, 4, 5, 6, 7], "is_enabled": True}],
+            "sections": [{"section": "Headlines", "is_enabled": True, "amount": 1}]})
+        row.next_run_at = datetime.utcnow() - timedelta(minutes=1)
+        db.session.commit()
+        self.assertEqual(newsbox.run_due_schedules(), 1)
+        self.assertEqual(NewsBoxItem.query.filter_by(user_id=self.ids["reader"], origin="auto").count(), 1)
+        self.assertGreater(SummarySchedule.query.get(self.ids["reader"]).next_run_at, datetime.utcnow())
+        self.assertEqual(newsbox.run_due_schedules(), 0)
 
     def test_unknown_paths_are_json_404(self):
         r = self.client.get("/admin/tools")

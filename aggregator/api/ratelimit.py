@@ -47,3 +47,11 @@ def check_device(device):
 
 def check_pairing():
     _limit(f"pair:{request.remote_addr}", settings.load()["pair_per_ip_per_hour"], 3600)
+
+
+def check_summaries(user):
+    _limit(f"summarize:{user.id}", settings.load()["summaries_per_user_per_day"], 86400)
+
+
+def check_schedule_runs(user):
+    _limit(f"schedule_run:{user.id}", settings.load()["schedule_runs_per_user_per_day"], 86400)
