@@ -85,9 +85,6 @@
     text-overflow: ellipsis;
 }
 
-a.ft-back { text-decoration: none; }
-a.ft-back:hover { color: #fff; text-decoration: underline; }
-
 .ft-center {
     flex: 2 1 420px;
     max-width: 680px;
@@ -399,5 +396,4 @@ a.ft-back:hover { color: #fff; text-decoration: underline; }
     .feed-topbar .theme-toggle .theme-when-light,
     .feed-topbar .theme-toggle .theme-when-dark { font-size: 0; gap: 0; }
     .feed-topbar .theme-toggle .icon { font-size: 15px; }
-    .ft-back-lead { display: none; }
 }

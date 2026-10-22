@@ -3,6 +3,7 @@
 {% from 'icons.html' import icon %}
 {% from '_feed_topbar.html' import feed_topbar with context %}
 {% from 'title_meta.html' import title_meta, meta_item %}
+{% from 'breadcrumb.html' import float_back with context %}
 <!DOCTYPE html>
 <html data-theme="light">
 <head>
@@ -334,12 +335,13 @@
 
 {#- The feed's top bar, full width above the sidebar (_feed_topbar.html). -#}
 {%- set sidebar_toggle_in_topbar = true -%}
-{{ feed_topbar('', url_for('admin.list_articles'), back=(url_for('public.view_story', story_id=article.story_id, back=incoming_back()), 'Back to Story') if article.story_id else (feed_back_url(article_back_anchor(article)), 'Back to Feed')) }}
+{{ feed_topbar('Article', url_for('admin.list_articles')) }}
 <div class="layout feed-layout">
 {% include 'sidebar_nav.html' %}
 <div class="page-body">
 
 <div class="container">
+{{ float_back(url_for('public.view_story', story_id=article.story_id, back=incoming_back()) if article.story_id else feed_back_url(article_back_anchor(article)), 'Back to Story' if article.story_id else 'Back to Feed') }}
     <div class="article-card">
         <div id="ai-task-status" style="display:none; margin-bottom:20px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.03); color:var(--text-muted); font-size:13px;"></div>
 

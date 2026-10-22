@@ -25,8 +25,9 @@ All notable changes to MuckScraper are documented here.
   popover. Active filters show above the list as chips you can remove.
   On wide screens the search is centred on the story column, not the
   window, with the sidebar open or collapsed.
-  The story and article pages use the same bar and sidebar, with
-  "← Back to Feed" (or "← Back to Story") beside the logo.
+  The story and article pages use the same bar and sidebar. Their back
+  link is now a round button floating beside the card's top-left corner
+  (bottom left on smaller screens) that returns to the previous page.
 - **Story, article and opinion pages are tighter and consistent.** The line
   under every title reads the same way (SOURCES: 14 · PUBLISHED: … · LAST
   UPDATED: …). Section headings (Executive Summary, Multi-Source Analysis)
