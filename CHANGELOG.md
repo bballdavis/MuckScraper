@@ -22,18 +22,23 @@ All notable changes to MuckScraper are documented here.
 - **New feed top bar** on Headlines, All Stories and Grouped Stories: the
   section name sits beside the logo, search is centred, and the time range,
   scrape status and single-article filters moved into an icon-only Filters
-  popover with a count badge. Active filters show above the list as chips
-  you can remove.
+  popover. Active filters show above the list as chips you can remove.
 - **Live search results.** Typing in the top bar shows the best matching
   stories (thumbnail, article and outlet counts, Left/Center/Right counts and
   bar) and articles (outlet and lean) as you type, from the new
   `/admin/search/suggest` endpoint. Enter still runs the full search.
-- **Compact story cards** on All and Grouped Stories: a thumbnail, the
-  headline and counts, and the date over the Left/Center/Right line on the
-  right. Every card date uses one format ("Oct 19, 9:39 PM").
-- **Clearer sidebar.** Links are full-width rows with icons and a clear
-  active state, grouped under small muted headings (Topics, More) that no
-  longer look like links.
+- **Compact story cards** on All and Grouped Stories: the image, the
+  headline, one line with the date and counts, and a bottom row with a
+  rounded Left/Center/Right bar that carries its own counts (a single
+  article shows its lean chip instead). A click anywhere on the card opens
+  it. Fetch more, summary and bias actions and the scrape results moved into
+  a ⋯ menu; the method/http details are gone. Every card date uses one
+  format ("Oct 19, 9:39 PM").
+- **Clearer sidebar.** The current page is filled across the menu's full
+  width, and the small muted group headings (Topics, More) no longer look
+  like links. Topics are text only; the story lists and More keep their
+  icons. On the feed pages the top bar runs the full width above the
+  sidebar, with the menu button beside the MuckScraper name.
 - **One slim image for the app, scheduler and MCP server.** The three
   Dockerfiles are now one, without Playwright, Chromium and the ~25 X11/GTK
   libraries it needed: nothing has driven a headless browser since 1.0.1.

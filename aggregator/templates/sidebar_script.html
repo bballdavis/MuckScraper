@@ -5,19 +5,26 @@
     const sidebarPhoneQuery = window.matchMedia('(max-width: 768px), (max-height: 500px)');
     let sidebarIsPhone = sidebarPhoneQuery.matches;
 
+    // The button is either the fixed «/» tab beside the menu, or the menu
+    // icon in the feed top bar (.ft-menu), which keeps its icon and only
+    // reports its state.
+    function setSidebarButton(btn, open) {
+        btn.setAttribute('aria-expanded', String(open));
+        if (!btn.classList.contains('ft-menu')) btn.textContent = open ? '«' : '»';
+    }
+
     function toggleSidebar() {
         const sidebar = document.getElementById('sidebar');
         const btn = document.getElementById('sidebar-toggle');
         if (sidebarIsPhone) {
-            const open = sidebar.classList.toggle('mobile-open');
-            btn.textContent = open ? '«' : '»';
+            setSidebarButton(btn, sidebar.classList.toggle('mobile-open'));
             return;
         }
         sidebar.classList.toggle('collapsed');
 
         const isCollapsed = sidebar.classList.contains('collapsed');
         try { localStorage.setItem('muckscraper-sidebar', isCollapsed ? 'collapsed' : 'expanded'); } catch (e) {}
-        btn.textContent = isCollapsed ? '»' : '«';
+        setSidebarButton(btn, !isCollapsed);
     }
 
     let savedSidebar = null;
@@ -28,11 +35,11 @@
         sidebar.classList.remove('mobile-open');
         if (sidebarIsPhone) {
             sidebar.classList.remove('collapsed');
-            btn.textContent = '»';
+            setSidebarButton(btn, false);
         } else {
             const collapsed = savedSidebar === 'collapsed';
             sidebar.classList.toggle('collapsed', collapsed);
-            btn.textContent = collapsed ? '»' : '«';
+            setSidebarButton(btn, !collapsed);
         }
     }
     // On phones the button sits just below the page's top bar instead of on
@@ -40,8 +47,18 @@
     // per page and wrap on narrow screens, so measure rather than hard-code.
     function placeSidebarToggle() {
         const btn = document.getElementById('sidebar-toggle');
+        if (btn.classList.contains('ft-menu')) {
+            // Feed pages: the button is in the top bar, and the phone menu
+            // opens below the bar so the button stays reachable to close it.
+            const sidebar = document.getElementById('sidebar');
+            const bar = document.querySelector('.feed-topbar');
+            const bottom = sidebarIsPhone && bar ? Math.max(0, bar.getBoundingClientRect().bottom) : null;
+            sidebar.style.top = bottom === null ? '' : bottom + 'px';
+            sidebar.style.height = bottom === null ? '' : 'calc(100vh - ' + bottom + 'px)';
+            return;
+        }
         if (!sidebarIsPhone) { btn.style.top = ''; return; }
-        const bar = document.querySelector('.feed-topbar') || document.querySelector('.topbar') || document.querySelector('.main-header');
+        const bar = document.querySelector('.topbar') || document.querySelector('.main-header');
         // Bottom edge, not height: on All/Grouped/Search the bar starts a little
         // below the top until it sticks, so follow it while scrolling.
         const bottom = bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;

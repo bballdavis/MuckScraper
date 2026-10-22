@@ -197,3 +197,45 @@
         input.select();
     });
 })();
+
+// The ⋯ menu on compact story cards (story_card_macros.html): one open at a
+// time; a click outside or Escape closes it.
+(function () {
+    let openMenu = null;
+    function setMenu(menu, open) {
+        const btn = menu.querySelector('.card-menu-btn');
+        const pop = menu.querySelector('.card-menu-pop');
+        pop.hidden = !open;
+        btn.setAttribute('aria-expanded', String(open));
+        // Lift the card so the menu covers the cards below it.
+        menu.closest('.story').classList.toggle('menu-open', open);
+        // Open upward when there is no room below and there is room above.
+        pop.classList.remove('up');
+        if (open) {
+            const r = pop.getBoundingClientRect();
+            if (r.bottom > window.innerHeight && btn.getBoundingClientRect().top > r.height + 8) pop.classList.add('up');
+        }
+        openMenu = open ? menu : null;
+    }
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.card-menu-btn');
+        if (btn) {
+            const menu = btn.closest('.card-menu');
+            const wasOpen = menu === openMenu;
+            if (openMenu) setMenu(openMenu, false);
+            if (!wasOpen) {
+                setMenu(menu, true);
+                const first = menu.querySelector('.card-menu-item');
+                if (first) first.focus();
+            }
+            return;
+        }
+        if (openMenu && !openMenu.contains(e.target)) setMenu(openMenu, false);
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' || !openMenu) return;
+        const btn = openMenu.querySelector('.card-menu-btn');
+        setMenu(openMenu, false);
+        btn.focus();
+    });
+})();

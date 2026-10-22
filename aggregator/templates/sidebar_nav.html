@@ -4,23 +4,27 @@
     Three groups (Philip, 2026-10-22: headings and links were hard to tell
     apart): the story lists, Topics, and More. Headings are small muted
     labels that never highlight; every link is a full-width row with a hover
-    and active state, and the story lists carry an icon. -#}
-{%- from 'icons.html' import icon -%}
+    and a full-width active fill. The story lists and More keep their icons;
+    topics are text only. -#}
 {#- scrape_param keeps an explicit "all" when the reader's saved default is a
     scrape status (feed_prefs.py); other pages only have active_scrape_status. -#}
+{%- from 'icons.html' import icon -%}
 {%- set nav_scrape = scrape_param|default(active_scrape_status|default(none)) -%}
     <div class="sidebar" id="sidebar">
         <div class="sidebar-inner">
             <nav class="sidebar-content" aria-label="Sections">
                 <div class="nav-group">
                     <a class="nav-link {% if active_nav == 'headlines' %}active{% endif %}" href="{{ url_for('public.headlines_feed') }}"{% if active_nav == 'headlines' %} aria-current="page"{% endif %}>
-                        {{ icon('newspaper') }}<span class="full-text">Headlines</span>
+                        {{ icon('newspaper') }}
+                        <span class="full-text">Headlines</span>
                     </a>
                     <a class="nav-link {% if active_nav == 'grouped' %}active{% endif %}" href="{{ url_for('admin.multi_article_stories', topic=active_label|default(none), scrape_status=nav_scrape, q=active_search_query|default(none) or '', range=active_range|default(none)) }}"{% if active_nav == 'grouped' %} aria-current="page"{% endif %}>
-                        {{ icon('layers') }}<span class="full-text">Grouped Stories</span>
+                        {{ icon('layers') }}
+                        <span class="full-text">Grouped Stories</span>
                     </a>
                     <a class="nav-link {% if active_nav == 'all' %}active{% endif %}" href="{{ url_for('admin.list_articles', scrape_status=nav_scrape, show_single=show_single|default(none)|string|lower if show_single is defined else none, q=active_search_query|default(none) or '', range=active_range|default(none)) }}"{% if active_nav == 'all' %} aria-current="page"{% endif %}>
-                        {{ icon('list') }}<span class="full-text">All Stories</span>
+                        {{ icon('list') }}
+                        <span class="full-text">All Stories</span>
                     </a>
                 </div>
 
@@ -29,7 +33,7 @@
                     {% for topic in topics|default([]) %}
                     {%- set is_active = active_label|default(none) == topic.name %}
                     <a class="nav-link nav-topic {% if is_active %}active{% endif %}" href="{{ url_for('admin.list_articles', topic=topic.name, scrape_status=nav_scrape, show_single=show_single|default(none)|string|lower if show_single is defined else none, q=active_search_query|default(none) or '', range=active_range|default(none)) }}"{% if is_active %} aria-current="page"{% endif %}>
-                        <span class="topic-dot" aria-hidden="true"></span><span class="full-text">{{ topic.name }}</span>
+                        <span class="full-text">{{ topic.name }}</span>
                     </a>
                     {% endfor %}
                 </div>
@@ -38,16 +42,19 @@
                 <div class="nav-group">
                     <h2 class="nav-heading">More</h2>
                     <a class="nav-link {% if active_nav == 'oped' %}active{% endif %}" href="{{ url_for('admin.oped_list', range=active_range|default(none)) }}"{% if active_nav == 'oped' %} aria-current="page"{% endif %}>
-                        {{ icon('message-square') }}<span class="full-text">Op/Ed</span>
+                        {{ icon('message-square') }}
+                        <span class="full-text">Op/Ed</span>
                     </a>
                     {%- if current_user.is_authenticated %}
                     <a class="nav-link {% if active_nav == 'search' %}active{% endif %}" href="{{ url_for('admin.search_page') }}"{% if active_nav == 'search' %} aria-current="page"{% endif %}>
-                        {{ icon('table') }}<span class="full-text">Search</span>
+                        {{ icon('table') }}
+                        <span class="full-text">Search</span>
                     </a>
                     {%- endif %}
                     {%- if can('scraper') %}
                     <a class="nav-link {% if active_nav == 'fetch' %}active{% endif %}" href="{{ url_for('admin.fetch_page') }}"{% if active_nav == 'fetch' %} aria-current="page"{% endif %}>
-                        {{ icon('download') }}<span class="full-text">Fetch Articles</span>
+                        {{ icon('download') }}
+                        <span class="full-text">Fetch Articles</span>
                     </a>
                     {%- endif %}
                 </div>
@@ -70,4 +77,8 @@
             {% endif %}
         </div>
     </div>
+    {#- Pages with the feed top bar put this button in the bar instead
+        (_feed_topbar.html sets sidebar_toggle_in_topbar). #}
+    {%- if not sidebar_toggle_in_topbar|default(false) %}
     <button class="sidebar-toggle-btn" id="sidebar-toggle" onclick="toggleSidebar()" aria-label="Show or hide the menu">«</button>
+    {%- endif %}

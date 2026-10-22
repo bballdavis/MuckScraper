@@ -49,13 +49,12 @@
     --topbar-text:    #cdd6f4;
 
     /* Sidebar (sidebar_styles.html) */
-    --sidebar-bg:          #1e1e2e;
-    --sidebar-bg-end:      #50507b;
+    --sidebar-bg:          #25253a;
     --sidebar-text:        #cdd6f4;
     --sidebar-muted:       #c3c8dc;
     --sidebar-accent-text: #c9cbff;
     --sidebar-hover:       #ffffff;
-    --sidebar-active-bg:   #2a2a3e;
+    --sidebar-active-bg:   #3a3a5a;
 
     /* Bias, 1 = Left ... 5 = Right (blue / grey / red, see CLAUDE.md).
        Chips: same in both themes; -fg is the text colour on that chip. */
@@ -86,10 +85,9 @@
     --btn-muted-text: #cbd5e0;
     --shadow:         0 4px 12px rgba(0,0,0,0.25);
 
-    --sidebar-bg:          #030308;
-    --sidebar-bg-end:      #262665;
+    --sidebar-bg:          #12121c;
     --sidebar-muted:       #a6adc8;
-    --sidebar-active-bg:   #121220;
+    --sidebar-active-bg:   #2a2a44;
 
     --bias-unrated-bg: #4a5568;
     --bias-left-text:   #5b9be0;
