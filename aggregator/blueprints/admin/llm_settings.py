@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 PROVIDER_LABELS = {
     "ollama": "Ollama",
+    "lmstudio": "LM Studio",
     "anthropic": "Anthropic",
     "gemini": "Gemini",
     "groq": "Groq",
@@ -113,7 +114,19 @@ def _provider_rows(states):
         ],
         "env": "GEMINI_API_KEY, GEMINI_MODEL, GEMINI_FAST_MODEL",
     })
+    rows.append({
+        "key": "lmstudio",
+        "name": "LM Studio",
+        "is_new": True,
+        "roles": uses("lmstudio"),
+        "configured": bool(llm.LMSTUDIO_HOST and (llm.LMSTUDIO_MODEL or llm.LMSTUDIO_EMBEDDING_MODEL)),
+        "facts": [],
+        "env": "LMSTUDIO_HOST, LMSTUDIO_MODEL, LMSTUDIO_EMBEDDING_MODEL",
+        "about": "A local LM Studio server (Developer › Start server). It can take the embeddings while another provider writes the text. The embedding model must return 768 numbers, e.g. text-embedding-nomic-embed-text-v1.5.",
+    })
     for key in llm.OPENAI_COMPATIBLE_PROVIDERS:
+        if key == "lmstudio":
+            continue
         config = llm._openai_compatible_config(key)
         rows.append({
             "key": key,
@@ -173,8 +186,10 @@ def llm_providers_page():
     return render_template(
         "settings_llm.html",
         providers=_provider_rows(states),
-        routing_states={name: states[name] for name in config_store.ROUTING_FIELDS},
+        routing_states={name: states[name] for name in config_store.ROUTING_FIELDS + config_store.EMBEDDING_FIELDS},
         chat_providers=llm.CHAT_PROVIDERS,
+        embedding_providers=llm.EMBEDDING_PROVIDERS,
+        embedding_model=llm.embedding_model_name(),
         key_source=secret_box.key_source(),
         provider_labels=PROVIDER_LABELS,
         tiers=tiers,
@@ -232,6 +247,8 @@ def save_llm_routing():
         name: (request.form.get(name, "").strip().lower(), "provider")
         for name in config_store.ROUTING_FIELDS
     }
+    for name in config_store.EMBEDDING_FIELDS:
+        values[name] = (request.form.get(name, "").strip().lower(), "embedding_provider")
     if _save_all(values):
         flash("Routing saved. The scheduler picks it up within a minute.", "success")
     return redirect(url_for("admin.llm_providers_page"))
