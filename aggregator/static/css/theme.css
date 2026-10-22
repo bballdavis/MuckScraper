@@ -236,6 +236,25 @@
     .float-back::after { display: none; }
 }
 
+/* Round buttons under the back button (float_back's `below`): the read
+   toggle, and on the article page the summary and lean buttons. Same shape
+   and size as the back button; tooltips open to the right. On narrow
+   screens they stack up from just above the back button, bottom left. */
+.rail-stack { position: absolute; left: -64px; top: 56px; display: flex; flex-direction: column; gap: 12px; }
+.rail-stack form { display: contents; }
+.rail-btn.act {
+    width: 44px; height: 44px; border-radius: 50%; font-size: 20px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+.rail-btn.act .icon { width: 20px; height: 20px; }
+.rail-btn.act-ready:hover, .rail-btn.act-ready:focus-visible { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14); }
+.rail-btn.act-off { opacity: 1; color: var(--text-faint); }
+.rail-stack .tip { left: calc(100% + 10px); right: auto; top: 50%; transform: translateY(-50%); }
+@media (max-width: 1280px) {
+    .rail-stack { position: fixed; left: 16px; top: auto; bottom: 72px; z-index: 20; flex-direction: column-reverse; }
+    .rail-stack .tip { display: none; }
+}
+
 /* Back link in the top bar (templates/breadcrumb.html). The bar is dark in
    both themes, so one link colour serves both. */
 .crumb-bar { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
