@@ -21,8 +21,15 @@ All notable changes to MuckScraper are documented here.
   model serve the main and fast tiers and embeddings, what each provider has
   configured (keys shown as their last four characters), which pipeline task
   runs on which tier, and a Test button that makes one short call per tier.
-  Provider settings stay in the environment. The auto article deep analysis
-  switch moved here.
+  The auto article deep analysis switch moved here.
+- **Provider keys and models editable in Settings.** Routing, API keys,
+  models and Ollama hosts saved on Settings › LLM providers override the
+  environment variable of the same name; clearing one falls back to the
+  environment. Keys are Fernet-encrypted before they reach the new
+  `config_settings` table (migration `d3b8f6a1e2c9`) and the page only shows
+  their last four characters. The encryption key is `CONFIG_ENCRYPTION_KEY`
+  when set, otherwise derived from `SECRET_KEY`. The app applies a save at
+  once and the scheduler within 15 seconds of its next LLM call, no restart.
 
 ### Changed
 - **New feed top bar** on Headlines, All Stories and Grouped Stories: the

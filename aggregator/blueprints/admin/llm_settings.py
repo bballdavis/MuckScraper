@@ -1,16 +1,20 @@
-"""Settings › LLM providers: which backend serves each tier, what each
-provider has configured, and which pipeline tasks run on which tier.
+"""Settings › LLM providers: which backend serves each tier, each
+provider's keys and models, and which pipeline tasks run on which tier.
 
-Provider settings are environment variables (news_fetcher/llm_client.py
-reads them at import, in both the app and scheduler containers), so this
-page shows them rather than editing them. The two things it does change
-are the auto deep-analysis switch and a one-line test call per tier.
+Routing, keys, models and Ollama hosts can be saved here
+(aggregator/llm_config.py); a saved value overrides the environment
+variable of the same name and a cleared one falls back to it. Keys are
+encrypted before they reach the database and never come back to the
+browser. The page also has the auto deep-analysis switch and a one-line
+test call per tier.
 """
 import logging
 import time
 
-from flask import jsonify, render_template, request
+from flask import flash, jsonify, redirect, render_template, request, url_for
+from flask_login import current_user
 
+from aggregator import db, llm_config, secret_box
 from aggregator.permissions import ROLE_ADMIN, role_required
 
 from . import admin
@@ -48,7 +52,7 @@ def _mask(value):
     return f"…{value[-4:]}" if len(value) > 8 else "set"
 
 
-def _provider_rows():
+def _provider_rows(states):
     from news_fetcher import llm_client as llm
 
     quality, fast = llm.LLM_PROVIDER, llm.LLM_FAST_PROVIDER
@@ -125,6 +129,16 @@ def _provider_rows():
             "env": f"{key.upper()}_API_KEY, {key.upper()}_MODEL, {key.upper()}_FAST_MODEL",
         })
 
+    for row in rows:
+        row["fields"] = [
+            {"name": name, "label": label, "kind": kind, **states[name]}
+            for name, label, kind in llm_config.PROVIDER_FIELDS[row["key"]]
+        ]
+        row["saved_count"] = sum(1 for f in row["fields"] if f["source"] == "saved")
+        # The facts the form doesn't edit (embedding model, endpoint, ...).
+        edited = {f["label"] for f in row["fields"]}
+        row["facts"] = [(label, value) for label, value in row["facts"] if label not in edited]
+
     # Providers in use first (main, then fast, then embeddings), the rest after.
     def order(row):
         r = row["roles"]
@@ -155,9 +169,13 @@ def llm_providers_page():
         {"task": task, "tier": tier, **tiers[tier]}
         for task, tier in TASK_ROUTES
     ]
+    states = llm_config.field_states()
     return render_template(
         "settings_llm.html",
-        providers=_provider_rows(),
+        providers=_provider_rows(states),
+        routing_states={name: states[name] for name in llm_config.ROUTING_FIELDS},
+        chat_providers=llm.CHAT_PROVIDERS,
+        key_source=secret_box.key_source(),
         provider_labels=PROVIDER_LABELS,
         tiers=tiers,
         routes=routes,
@@ -190,3 +208,54 @@ def llm_test():
         "ok": True, "provider": provider, "model": llm.model_for_tier(tier),
         "message": f"Replied in {elapsed_ms} ms.",
     })
+
+
+def _save_all(values):
+    """Validate then save {name: value}; flash and return False on the first
+    error, so a bad field never half-applies a form."""
+    for name, (value, kind) in values.items():
+        error = llm_config.validate(name, value, kind)
+        if error:
+            flash(f"{name}: {error}", "error")
+            return False
+    for name, (value, _) in values.items():
+        llm_config.save(name, value, current_user.username)
+    db.session.commit()
+    llm_config.reload_now()
+    return True
+
+
+@admin.route("/settings/llm/routing", methods=["POST"])
+@role_required(ROLE_ADMIN)
+def save_llm_routing():
+    values = {
+        name: (request.form.get(name, "").strip().lower(), "provider")
+        for name in llm_config.ROUTING_FIELDS
+    }
+    if _save_all(values):
+        flash("Routing saved. The scheduler picks it up within a minute.", "success")
+    return redirect(url_for("admin.llm_providers_page"))
+
+
+@admin.route("/settings/llm/provider/<key>", methods=["POST"])
+@role_required(ROLE_ADMIN)
+def save_llm_provider(key):
+    """Save one provider's form. Model and host fields are saved as typed
+    (blank goes back to the environment). A key field left blank keeps the
+    saved key; the Remove checkbox deletes it."""
+    fields = llm_config.PROVIDER_FIELDS.get(key)
+    if fields is None:
+        flash("Unknown provider.", "error")
+        return redirect(url_for("admin.llm_providers_page"))
+    values = {}
+    for name, _, kind in fields:
+        value = request.form.get(name, "").strip()
+        if kind == "secret":
+            if request.form.get(f"clear_{name}"):
+                value = ""
+            elif not value:
+                continue
+        values[name] = (value, kind)
+    if _save_all(values):
+        flash(f"{PROVIDER_LABELS.get(key, key)} settings saved.", "success")
+    return redirect(url_for("admin.llm_providers_page") + f"#provider-{key}")
