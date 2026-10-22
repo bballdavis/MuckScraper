@@ -80,6 +80,13 @@ def scrape_blocklist():
                 "defer_until": payload.get("defer_until"),
             })
 
+    # A short "Oct 22 18:04 UTC" for the table; the full ISO time is its tooltip.
+    for row in retry_cache_domains + retry_cache_urls:
+        try:
+            row["defer_label"] = datetime.fromisoformat(str(row["defer_until"])).strftime("%b %-d %H:%M UTC")
+        except (TypeError, ValueError):
+            row["defer_label"] = row["defer_until"] or "—"
+
     retry_cache_domains.sort(key=lambda row: (row["defer_until"] or "", row["failure_count"]), reverse=True)
     retry_cache_urls.sort(key=lambda row: (row["defer_until"] or "", row["failure_count"]), reverse=True)
 
