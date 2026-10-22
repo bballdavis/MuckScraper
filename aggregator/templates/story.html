@@ -163,16 +163,29 @@
         [data-theme="dark"] .read-fallback { color: #f2c46d; }
         [data-theme="dark"] .read-blocked { color: #f08a8a; }
 
-        /* Each source row: the content, then a rail of summary and analysis
-           icons down the right side, as on the story cards. */
-        .article-item { flex-direction: row; gap: 0; padding: 0; }
-        .article-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 16px 16px 16px 0; }
+        /* Each source row is a card like the story cards on the list pages
+           (story_card.css .story): rounded, bordered, a light shadow and a
+           small lift on hover (Philip, 2026-10-22). The content, then a rail
+           of summary and analysis icons down the right side. */
+        .article-item {
+            flex-direction: row; gap: 0; padding: 0; margin-bottom: 14px;
+            background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .article-item:last-child { margin-bottom: 0; }
+        .article-item:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(0,0,0,0.1); }
+        [data-theme="dark"] .article-item { box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+        [data-theme="dark"] .article-item:hover { box-shadow: 0 12px 24px rgba(0,0,0,0.35); }
+        .article-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; }
         .row-rail { flex: 0 0 39px; display: flex; flex-direction: column; border-left: 1px solid var(--border); }
         .row-rail > * { flex: 1 1 0; }
         .row-rail > * + * { border-top: 1px solid var(--border); }
         .row-rail .act { width: 100%; height: auto; border: 0; border-radius: 0; background: transparent; font-size: 18px; }
         .row-rail .act-done { background: var(--accent); }
         .row-rail .act-ready:hover, .row-rail .act-ready:focus-visible { background: var(--accent); }
+        .row-rail > :first-child { border-top-right-radius: 15px; }
+        .row-rail > :last-child { border-bottom-right-radius: 15px; }
 
         .status-msg {
             padding: 12px 14px;
