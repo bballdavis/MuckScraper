@@ -349,12 +349,17 @@ starting point. Change them on these pages to suit your own beat.
 ### LLM behavior
 
 **Choosing a provider (`LLM_PROVIDER`).** Ollama is the default and the point of
-the project, but `LLM_PROVIDER` also accepts `gemini`, `groq`, and `openrouter`.
+the project, but `LLM_PROVIDER` also accepts `gemini`, `anthropic`, `groq`, and
+`openrouter`.
 The OpenRouter path is a generic OpenAI-compatible client — set `OPENROUTER_HOST`
 to any endpoint speaking `chat/completions` (DeepSeek, OpenAI, Together, a local
 vLLM) and it works with no code change. Embeddings are a separate axis
-(`EMBEDDING_PROVIDER`) and only Ollama and Gemini can serve them; Groq has no
-embedding models and OpenRouter routes chat completions only.
+(`EMBEDDING_PROVIDER`) and only Ollama and Gemini can serve them; Anthropic and
+Groq have no embedding models and OpenRouter routes chat completions only.
+
+`anthropic` calls the Messages API directly with `ANTHROPIC_API_KEY`. Set
+`ANTHROPIC_MODEL` (summaries) and optionally `ANTHROPIC_FAST_MODEL` (the
+mechanical calls), e.g. a Sonnet model and a Haiku model.
 
 **Splitting the two workloads (`LLM_FAST_PROVIDER`).** A run makes ~1,140
 mechanical calls against ~65 summary/deep-report calls (see below). Those two

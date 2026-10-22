@@ -4,6 +4,22 @@ All notable changes to MuckScraper are documented here.
  
 ---
 
+## [Unreleased]
+
+### Added
+- **Anthropic as an LLM provider.** `LLM_PROVIDER=anthropic` (or
+  `LLM_FAST_PROVIDER=anthropic`) sends generation to Anthropic's Messages API,
+  configured with `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, optional
+  `ANTHROPIC_FAST_MODEL`, and `ANTHROPIC_MAX_TOKENS`. Rate-limit (429) and
+  overload (529) answers are retried like the other cloud providers.
+  Embeddings stay on Ollama or Gemini.
+
+### Fixed
+- **`docker-compose.yml` now passes the OpenRouter settings and
+  `LLM_FAST_PROVIDER` into the containers.** They were documented in
+  `.env.sample` but never reached the app or scheduler, so setting them in
+  `.env` had no effect.
+
 ## [1.0.1] - 2026-10-22
 
 ### Added
