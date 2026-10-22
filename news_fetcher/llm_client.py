@@ -14,6 +14,7 @@ import os
 import time
 import logging
 import requests
+from news_fetcher import saved_settings
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ ANTHROPIC_MAX_TOKENS = int(os.environ.get("ANTHROPIC_MAX_TOKENS", "4096"))
 
 # ── Settings saved in the admin UI ──
 # Everything above comes from the environment. Settings › LLM providers can
-# also save these in the database (aggregator/llm_config.py, keys encrypted);
+# also save these in the database (aggregator/config_store.py, keys encrypted);
 # a saved value wins over the environment and a cleared one falls back to it.
 # configure() rebinds the module globals, so callers keep reading
 # llm_client.OLLAMA_HOST etc. exactly as before. EMBEDDING_PROVIDER and the
@@ -136,26 +137,16 @@ OVERRIDABLE_SETTINGS = (
 CHAT_PROVIDERS = ("ollama", "anthropic", "gemini", "groq", "openrouter")
 _ENV_DEFAULTS = {"LLM_PROVIDER": "ollama", "GEMINI_MODEL": "gemini-2.5-flash-lite"}
 
-# Set by the app (aggregator/llm_config.py): returns the saved overrides when
-# they changed since the last call, else None. Unset in tests and scripts that
-# never create the app, so they see the environment only.
-_config_source = None
-
-
-def set_config_source(source):
-    global _config_source
-    _config_source = source
+# Saved settings (news_fetcher/saved_settings.py) last applied by configure().
+_applied_settings_version = 0
 
 
 def _sync_config():
-    if _config_source is None:
-        return
-    try:
-        overrides = _config_source()
-    except Exception as e:  # a settings read must never break a pipeline call
-        logger.warning(f"[llm_client] Could not read saved LLM settings: {e}")
-        return
-    if overrides is not None:
+    """Re-apply the provider settings when the saved ones changed."""
+    global _applied_settings_version
+    version, overrides = saved_settings.snapshot()
+    if version != _applied_settings_version:
+        _applied_settings_version = version
         configure(overrides)
 
 

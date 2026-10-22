@@ -531,7 +531,7 @@ class EditionStory(db.Model):
 
 class ConfigSetting(db.Model):
     """A setting saved from the admin UI that overrides an environment
-    variable (aggregator/llm_config.py). Secrets are stored only as
+    variable (aggregator/config_store.py). Secrets are stored only as
     `secret_value`, Fernet-encrypted (aggregator/secret_box.py), with their
     last four characters in `hint` so the page can tell keys apart without
     decrypting them."""

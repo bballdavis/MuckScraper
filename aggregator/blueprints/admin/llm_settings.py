@@ -2,7 +2,7 @@
 provider's keys and models, and which pipeline tasks run on which tier.
 
 Routing, keys, models and Ollama hosts can be saved here
-(aggregator/llm_config.py); a saved value overrides the environment
+(aggregator/config_store.py); a saved value overrides the environment
 variable of the same name and a cleared one falls back to it. Keys are
 encrypted before they reach the database and never come back to the
 browser. The page also has the auto deep-analysis switch and a one-line
@@ -14,7 +14,7 @@ import time
 from flask import flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user
 
-from aggregator import db, llm_config, secret_box
+from aggregator import db, config_store, secret_box
 from aggregator.permissions import ROLE_ADMIN, role_required
 
 from . import admin
@@ -132,7 +132,7 @@ def _provider_rows(states):
     for row in rows:
         row["fields"] = [
             {"name": name, "label": label, "kind": kind, **states[name]}
-            for name, label, kind in llm_config.PROVIDER_FIELDS[row["key"]]
+            for name, label, kind in config_store.PROVIDER_FIELDS[row["key"]]
         ]
         row["saved_count"] = sum(1 for f in row["fields"] if f["source"] == "saved")
         # The facts the form doesn't edit (embedding model, endpoint, ...).
@@ -169,11 +169,11 @@ def llm_providers_page():
         {"task": task, "tier": tier, **tiers[tier]}
         for task, tier in TASK_ROUTES
     ]
-    states = llm_config.field_states()
+    states = config_store.field_states()
     return render_template(
         "settings_llm.html",
         providers=_provider_rows(states),
-        routing_states={name: states[name] for name in llm_config.ROUTING_FIELDS},
+        routing_states={name: states[name] for name in config_store.ROUTING_FIELDS},
         chat_providers=llm.CHAT_PROVIDERS,
         key_source=secret_box.key_source(),
         provider_labels=PROVIDER_LABELS,
@@ -214,14 +214,14 @@ def _save_all(values):
     """Validate then save {name: value}; flash and return False on the first
     error, so a bad field never half-applies a form."""
     for name, (value, kind) in values.items():
-        error = llm_config.validate(name, value, kind)
+        error = config_store.validate(name, value, kind)
         if error:
             flash(f"{name}: {error}", "error")
             return False
     for name, (value, _) in values.items():
-        llm_config.save(name, value, current_user.username)
+        config_store.save(name, value, current_user.username)
     db.session.commit()
-    llm_config.reload_now()
+    config_store.reload_now()
     return True
 
 
@@ -230,23 +230,18 @@ def _save_all(values):
 def save_llm_routing():
     values = {
         name: (request.form.get(name, "").strip().lower(), "provider")
-        for name in llm_config.ROUTING_FIELDS
+        for name in config_store.ROUTING_FIELDS
     }
     if _save_all(values):
         flash("Routing saved. The scheduler picks it up within a minute.", "success")
     return redirect(url_for("admin.llm_providers_page"))
 
 
-@admin.route("/settings/llm/provider/<key>", methods=["POST"])
-@role_required(ROLE_ADMIN)
-def save_llm_provider(key):
-    """Save one provider's form. Model and host fields are saved as typed
-    (blank goes back to the environment). A key field left blank keeps the
-    saved key; the Remove checkbox deletes it."""
-    fields = llm_config.PROVIDER_FIELDS.get(key)
-    if fields is None:
-        flash("Unknown provider.", "error")
-        return redirect(url_for("admin.llm_providers_page"))
+def save_fields_form(fields):
+    """Save a form of config_field()s (templates/_config_fields.html).
+    Non-key fields are saved as typed (blank goes back to the environment).
+    A key field left blank keeps the saved key; its Remove checkbox deletes
+    it. Returns True when everything saved."""
     values = {}
     for name, _, kind in fields:
         value = request.form.get(name, "").strip()
@@ -256,6 +251,16 @@ def save_llm_provider(key):
             elif not value:
                 continue
         values[name] = (value, kind)
-    if _save_all(values):
+    return _save_all(values)
+
+
+@admin.route("/settings/llm/provider/<key>", methods=["POST"])
+@role_required(ROLE_ADMIN)
+def save_llm_provider(key):
+    fields = config_store.PROVIDER_FIELDS.get(key)
+    if fields is None:
+        flash("Unknown provider.", "error")
+        return redirect(url_for("admin.llm_providers_page"))
+    if save_fields_form(fields):
         flash(f"{PROVIDER_LABELS.get(key, key)} settings saved.", "success")
     return redirect(url_for("admin.llm_providers_page") + f"#provider-{key}")
