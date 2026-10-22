@@ -5,6 +5,7 @@
 {% from 'title_meta.html' import title_meta, meta_item %}
 {% from 'breadcrumb.html' import float_back with context %}
 {% from 'read_toggle.html' import read_toggle %}
+{% from 'ai_actions.html' import ai_action with context %}
 <!DOCTYPE html>
 <html data-theme="light">
 <head>
@@ -128,106 +129,64 @@
             margin: 16px 0;
         }
 
-        .summary {
-            background: var(--summary-bg);
-            border-left: 4px solid var(--accent);
-            padding: 16px 20px;
-            margin-bottom: 20px;
-            font-size: 16px;
-            line-height: 1.6;
-            color: var(--text);
-            border-radius: 0 16px 16px 0;
-        }
-
-        .summary-label {
+        /* Section headings above their callouts, as on the story page. */
+        .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 10px; }
+        .section-label {
             font-size: var(--fs-label);
             font-weight: 800;
             text-transform: uppercase;
             color: var(--accent-text);
             letter-spacing: 2px;
-            margin: 24px 0 10px;
         }
 
-        .summary p { margin-bottom: 1em; }
-        .summary p:last-child { margin-bottom: 0; }
-
-        .summary-section-label {
-            color: var(--accent-text);
-            font-size: 15px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .scrape-panel {
-            margin: 16px 0 0;
-            padding: 16px 18px;
-            border-radius: 14px;
-            border: 1px solid var(--border);
+        .analysis-box {
             background: var(--summary-bg);
+            border-left: 4px solid var(--accent);
+            padding: 16px 20px;
+            border-radius: 0 12px 12px 0;
+            font-size: 16px;
+            line-height: 1.6;
         }
+        .analysis-box p { margin-bottom: 0.8em; }
+        .analysis-box p:last-child { margin-bottom: 0; }
 
-        .scrape-panel-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 10px;
-        }
-
-        .scrape-label {
-            font-size: var(--fs-label);
-            font-weight: 800;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--text-faint);
-        }
-
-        .scrape-chip {
-            display: inline-flex;
-            align-items: center;
-            padding: 4px 10px;
-            border-radius: 999px;
-            border: 1px solid var(--border);
+        .status-msg {
+            padding: 12px 14px;
             background: rgba(0,0,0,0.03);
-            font-size: var(--fs-label);
-            font-weight: 800;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-        }
-
-        .scrape-chip.scrape-success { color: #1d6f42; border-color: rgba(29,111,66,0.25); background: rgba(29,111,66,0.08); }
-        .scrape-chip.scrape-fallback { color: #8a5a00; border-color: rgba(138,90,0,0.25); background: rgba(138,90,0,0.09); }
-        .scrape-chip.scrape-blocked,
-        .scrape-chip.scrape-failed { color: #a33636; border-color: rgba(163,54,54,0.25); background: rgba(163,54,54,0.08); }
-        .scrape-chip.scrape-skipped { color: #666; border-color: rgba(102,102,102,0.25); background: rgba(102,102,102,0.08); }
-
-        .scrape-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 10px 16px;
-        }
-
-        .scrape-item {
-            min-width: 0;
-        }
-
-        .scrape-key {
-            display: block;
-            margin-bottom: 4px;
-            font-size: var(--fs-label);
-            font-weight: 800;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--text-faint);
-        }
-
-        .scrape-value {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-            font-size: 12px;
+            border-radius: 10px;
+            font-style: italic;
             color: var(--text-muted);
-            word-break: break-word;
+            font-size: 14px;
         }
+
+        /* Under the title: a Source button (the publisher's page) and, at its
+           right, the read status as an icon-only chip whose tooltip gives the
+           detail, as on the story page's source rows (Philip, 2026-10-22). */
+        .source-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; }
+        .pill {
+            height: 30px; min-width: 104px; padding: 0 12px;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            border: 1px solid var(--accent); border-radius: 8px; background: transparent;
+            color: var(--accent-text); font-size: 12px; font-weight: 700;
+            text-decoration: none; white-space: nowrap;
+            transition: background 0.15s, color 0.15s;
+        }
+        .pill .icon { font-size: 14px; }
+        .pill:hover, .pill:focus-visible { background: var(--accent); color: #fff; outline: none; }
+        .read-chip {
+            position: relative; width: 30px; height: 30px; border-radius: 8px;
+            display: inline-flex; align-items: center; justify-content: center; font-size: 16px; cursor: help;
+        }
+        .read-chip .tip { left: 0; right: auto; top: calc(100% + 8px); transform: none; max-width: 320px; }
+        .read-chip:focus > .tip { opacity: 1; visibility: visible; }  /* a tap on a phone */
+        .tip-facts { display: block; margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; color: #c8c8d4; word-break: break-word; }
+        .read-success { background: rgba(29,111,66,0.12); color: #1d6f42; }
+        .read-fallback { background: rgba(196,128,0,0.15); color: #a86a00; }
+        .read-blocked { background: rgba(163,54,54,0.12); color: #a33636; }
+        .read-pending { background: rgba(102,102,102,0.12); color: var(--text-muted); }
+        [data-theme="dark"] .read-success { color: #6fcf97; }
+        [data-theme="dark"] .read-fallback { color: #f2c46d; }
+        [data-theme="dark"] .read-blocked { color: #f08a8a; }
 
         .summary-bullets {
             margin: 8px 0 1em 1.5em;
@@ -308,25 +267,14 @@
             box-shadow: var(--shadow);
         }
 
-        .source-link {
-            margin-top: 48px;
-            padding-top: 32px;
-            border-top: 1px solid var(--border);
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--text-muted);
-        }
-
-        .source-link a {
-            color: var(--accent-text);
-            text-decoration: none;
-            font-weight: 700;
-        }
-
-        .source-link a:hover { text-decoration: underline; }
+        .flash { padding: 12px 16px; border-radius: 10px; font-size: 14px; font-weight: 600; margin-bottom: 20px; border: 1px solid; }
+        .flash-success { color: #1d6f42; background: rgba(29, 111, 66, 0.08); border-color: rgba(29, 111, 66, 0.3); }
+        .flash-error { color: #a33636; background: rgba(163, 54, 54, 0.08); border-color: rgba(163, 54, 54, 0.3); }
+        [data-theme="dark"] .flash-success { color: #7fd6a2; }
+        [data-theme="dark"] .flash-error { color: #f2a0a0; }
 
         @media (max-width: 600px) {
-            .article-card { padding: 24px; border-radius: 0; }
+            .article-card { padding: 20px; border-radius: 0; }
             .container { margin: 0; padding: 0; }
             h1 { font-size: 28px; }
         }
@@ -343,27 +291,53 @@
 <div class="page-body">
 
 <div class="container">
-{{ float_back(url_for('public.view_story', story_id=article.story_id, back=incoming_back()) if article.story_id else feed_back_url(article_back_anchor(article)), 'Back to Story' if article.story_id else 'Back to Feed', read_toggle('article', article.id, read_item) if current_user.is_authenticated else '') }}
+{#- Round buttons under the back button: read, then (scrapers) the article
+    summary while there is none, and the lean rating (Philip, 2026-10-22). -#}
+{%- set rail -%}
+{%- if current_user.is_authenticated -%}
+{{ read_toggle('article', article.id, read_item) }}
+{%- if can('scraper') and not article.summary -%}
+{%- if ollama_online -%}
+{{ ai_action('summary', 'ready', 'Generate article summary', 'Writes a short summary from the text MuckScraper could read. Runs in the background; the page reloads when it is done.', "startAiTask('article_summary', %d, this)" % article.id, 'rail-btn') }}
+{%- else -%}
+{{ ai_action('summary', 'off', 'Article summary not generated yet', 'The AI provider is offline; the article is queued for a summary.', extra_class='rail-btn') }}
+{%- endif -%}
+{%- endif -%}
+{%- if can('scraper') -%}
+<form method="POST" action="{{ url_for('admin.rate_article', article_id=article.id) }}" onsubmit="var b = this.querySelector('button'); b.disabled = true; b.classList.add('busy');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ request.full_path }}">
+    <input type="hidden" name="report" value="1">
+    <button type="submit" class="act act-ready rail-btn" aria-label="Rate this article's lean">{{ icon('gauge') }}<span class="tip" role="tooltip"><strong>Rate this article's lean</strong> Asks the AI to rate this article's own Left/Right lean from its text, in place of the outlet's rating. Updates the lean chip and the story's Left, Center and Right counts.</span></button>
+</form>
+{%- endif -%}
+{%- endif -%}
+{%- endset -%}
+{{ float_back(url_for('public.view_story', story_id=article.story_id, back=incoming_back()) if article.story_id else feed_back_url(article_back_anchor(article)), 'Back to Story' if article.story_id else 'Back to Feed', rail, collapse=can('scraper')) }}
     <div class="article-card">
+        {% include '_flashes.html' %}
         <div id="ai-task-status" style="display:none; margin-bottom:20px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.03); color:var(--text-muted); font-size:13px;"></div>
 
-        <h1><a href="{{ article.url }}" target="_blank" style="color: inherit; text-decoration: none;">{{ article.title }}</a></h1>
+        <h1>{{ article.title }}</h1>
+        {#- The lean chip is the article's own rating when it has one (Rate
+            lean, or a per-article AllSides rating), else the outlet's; the
+            same score the story's Left/Center/Right counts use. -#}
+        {% set lean = article.bias_score if article.bias_score is not none else (article.outlet.bias_score if article.outlet else none) %}
         {% call title_meta() %}
             {{ meta_item('Source', article.outlet.name if article.outlet else 'Unknown') }}
             {{ meta_item('Published', when=article.date) }}
             {% if article.last_updated and article.last_updated != article.date %}{{ meta_item('Last updated', when=article.last_updated) }}{% endif %}
-            {{ bias_tag(article.outlet.bias_score if article.outlet else none) }}
+            {{ bias_tag(lean) }}
         {% endcall %}
 
         {% if article.has_usable_image %}
             <img src="{{ article.image_url }}" alt="Article Image" style="width: 100%; border-radius: 16px; margin-bottom: 16px; box-shadow: var(--shadow);">
         {% endif %}
 
-        <hr class="divider">
-
         {#- Plain-language read status. Signed-out visitors see this instead of
-            the telemetry panel (Regis, 2026-10-08: the technical fields and the
+            the telemetry (Regis, 2026-10-08: the technical fields and the
             scraped text stay signed-in only). -#}
+        {% set scrape_status = article.scrape_status or 'pending' %}
         {% set read_status = {
             'success':  ('Fully read', 'MuckScraper read the full article.'),
             'fallback': ('Partly read', "Only the publisher's excerpt was available, so the summary is based on that."),
@@ -371,69 +345,41 @@
             'failed':   ("Couldn't read the full article", 'The article was behind a paywall or could not be read when it was fetched.'),
             'skipped':  ('Full text not available', 'MuckScraper does not read articles from this source in full.'),
             'pending':  ('Not read yet', 'This article has not been read yet.'),
-        }[article.scrape_status or 'pending'] %}
+        }[scrape_status] %}
         {% set summary_blocked_reason = {
             'blocked': 'No summary: the publisher blocked full-text access, so there was not enough of the article to summarize.',
             'failed':  'No summary: the article was behind a paywall or could not be read, so there was not enough of it to summarize.',
             'skipped': 'No summary: MuckScraper does not read articles from this source in full.',
         }.get(article.scrape_status) %}
 
-        {#- Signed-in readers see the scrape telemetry first, under the title
-            (Regis, 2026-10-10). -#}
-        {% if current_user.is_authenticated %}
-        <div class="scrape-panel">
-            {% set scrape_status = article.scrape_status or 'pending' %}
-            <div class="scrape-panel-header">
-                <span class="scrape-label">Scrape Telemetry</span>
-                <span class="scrape-chip scrape-{{ scrape_status }}">
-                    {% if scrape_status == 'success' %}
-                        Scrape OK
-                    {% elif scrape_status == 'fallback' %}
-                        Fallback Used
-                    {% elif scrape_status == 'blocked' %}
-                        Blocked
-                    {% elif scrape_status == 'skipped' %}
-                        Skipped
-                    {% elif scrape_status == 'failed' %}
-                        Failed
-                    {% else %}
-                        Pending
-                    {% endif %}
-                </span>
-            </div>
-            <div class="scrape-grid">
-                <div class="scrape-item">
-                    <span class="scrape-key">Method</span>
-                    <span class="scrape-value">{{ article.scrape_method or 'n/a' }}</span>
-                </div>
-                <div class="scrape-item">
-                    <span class="scrape-key">HTTP Status</span>
-                    <span class="scrape-value">{{ article.scrape_http_status or 'n/a' }}</span>
-                </div>
-                <div class="scrape-item" style="grid-column: 1 / -1;">
-                    <span class="scrape-key">Failure Reason</span>
-                    <span class="scrape-value">{{ article.scrape_failure_reason or 'n/a' }}</span>
-                </div>
-            </div>
+        {#- The Source button, then the read status as an icon chip; its
+            tooltip explains it, and signed-in readers also get the scrape
+            telemetry there (Regis, 2026-10-10: technical fields signed-in only). -#}
+        {% set chip = {'success': ('success', 'circle-check'), 'fallback': ('fallback', 'circle-alert'),
+                       'blocked': ('blocked', 'ban'), 'failed': ('blocked', 'ban'),
+                       'skipped': ('pending', 'ban'), 'pending': ('pending', 'circle-alert')}[scrape_status] %}
+        <div class="source-row">
+            <a href="{{ article.url }}" target="_blank" rel="noopener" class="pill">{{ icon('link') }} Source</a>
+            <span class="read-chip read-{{ chip[0] }}" tabindex="0" aria-label="{{ read_status[0] }}: {{ read_status[1] }}">{{ icon(chip[1]) }}<span class="tip" role="tooltip"><strong>{{ read_status[0] }}</strong> {{ read_status[1] }}
+                {%- if current_user.is_authenticated %}<span class="tip-facts">Method: {{ article.scrape_method or 'n/a' }} · HTTP {{ article.scrape_http_status or 'n/a' }}{% if article.scrape_failure_reason %}<br>{{ article.scrape_failure_reason }}{% endif %}</span>{% endif %}</span></span>
         </div>
-        {% endif %}
 
-        <h2 class="summary-label">Executive Summary</h2>
-        <div class="summary">
+        <div class="section-head"><h2 class="section-label">Executive Summary</h2></div>
+        <div class="analysis-box">
             {% if article.summary %}
                 <p>{{ article.summary | summary_paragraph }}</p>
             {% elif summary_blocked_reason and not (article.content and article.content|length > 100) %}
-                <p style="font-style: italic; color: var(--text-muted);">{{ summary_blocked_reason }} Read it at the source below.</p>
+                <div class="status-msg">{{ summary_blocked_reason }} Read it at the source with the Source button above.</div>
             {% elif not ollama_online %}
-                <p style="font-style: italic; color: var(--text-muted);">Summary will be generated when Ollama is back online. This article has been added to the queue.</p>
+                <div class="status-msg">Summary will be generated when the AI provider is back online. This article has been added to the queue.</div>
             {% else %}
-                <p style="font-style: italic; color: var(--text-muted);">No summary has been generated yet.{% if can('scraper') %} Use the summarize action to process this article.{% endif %}</p>
+                <div class="status-msg">No summary has been generated yet.{% if can('scraper') %} Use the summary button beside the article to write one.{% endif %}</div>
             {% endif %}
         </div>
 
         {% if article.deep_analysis %}
-        <h2 class="summary-label">Deep Analysis</h2>
-        <div class="summary">
+        <div class="section-head"><h2 class="section-label">Deep Analysis</h2></div>
+        <div class="analysis-box">
             {% for line in article.deep_analysis.split('\n') %}
                 {% set l = line.strip() %}
                 {% if l %}
@@ -444,13 +390,14 @@
         {% endif %}
 
         {% if current_user.is_authenticated %}
+        <div class="section-head"><h2 class="section-label">Article</h2></div>
         <div class="article-body">
             {% if article.content and article.content|length > 100 %}
                 {{ article.content | clean_html }}
             {% else %}
                 <div style="padding: 40px; background: var(--bg); border-radius: 16px; text-align: center; border: 1px dashed var(--border);">
                     <p style="color: var(--text-muted); margin-bottom: 16px;">Full scrape unavailable for this article.</p>
-                    <a href="{{ article.url }}" target="_blank" class="btn">View Article at Source</a>
+                    <a href="{{ article.url }}" target="_blank" rel="noopener" class="btn">View Article at Source</a>
                 </div>
             {% endif %}
         </div>
@@ -458,31 +405,10 @@
         {% else %}
         {#- Signed-out visitors get the summary, a plain read status and a link,
             never the scraped text or the technical fields. -#}
-        <div class="scrape-panel">
-            <div class="scrape-panel-header" style="margin-bottom: 6px;">
-                <span class="scrape-label">How we read this article</span>
-                <span class="scrape-chip scrape-{{ article.scrape_status or 'pending' }}">{{ read_status[0] }}</span>
-            </div>
-            <p style="color: var(--text-muted); font-size: var(--fs-meta); margin: 0;">{{ read_status[1] }}</p>
-        </div>
         <div class="public-source">
             <a href="{{ article.url }}" target="_blank" rel="noopener" class="btn">Read the full article at {{ article.outlet.name if article.outlet else 'the source' }} →</a>
         </div>
         {% endif %}
-
-        {% if can('scraper') %}
-        <div class="article-actions" style="margin-top: 32px; display: flex; gap: 16px;">
-            <button type="button" class="btn" onclick="startAiTask('article_summary', {{ article.id }}, this)">Summarize</button>
-            <form method="POST" action="{{ url_for('admin.rate_article', article_id=article.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn" style="background: var(--bg); color: var(--accent-text); border: 1px solid var(--accent);">Rate Bias</button>
-            </form>
-        </div>
-        {% endif %}
-
-        <div class="source-link">
-            Original source: <a href="{{ article.url }}" target="_blank">{{ article.url }}</a>
-        </div>
 
     </div>
 </div>
@@ -551,7 +477,8 @@
                 activeAiTaskPoll = null;
                 if (button) {
                     button.disabled = false;
-                    button.textContent = button.dataset.originalText;
+                    button.classList.remove('busy');
+                    if (button.dataset.originalText) button.textContent = button.dataset.originalText;
                 }
             }
         }, 2000);
@@ -559,9 +486,10 @@
 
     async function startAiTask(taskType, resourceId, button) {
         if (button) {
-            button.dataset.originalText = button.textContent;
             button.disabled = true;
-            button.textContent = 'Working...';
+            // Icon buttons (ai_actions.html) pulse; text buttons say so.
+            if (button.classList.contains('act')) button.classList.add('busy');
+            else { button.dataset.originalText = button.textContent; button.textContent = 'Working...'; }
         }
 
         const response = await fetch(aiTaskStartUrl, {
@@ -582,7 +510,8 @@
         if (!response.ok && response.status !== 409) {
             if (button) {
                 button.disabled = false;
-                button.textContent = button.dataset.originalText;
+                button.classList.remove('busy');
+                if (button.dataset.originalText) button.textContent = button.dataset.originalText;
             }
             return;
         }
