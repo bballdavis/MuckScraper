@@ -22,6 +22,7 @@ HEADERS_DEFAULT = {
 # The allowlist lives in aggregator/html_safety.py so the templates filter
 # with exactly the same rules at render time.
 from aggregator.html_safety import ALLOWED_ATTRIBUTES, ALLOWED_TAGS, sanitize_html  # noqa: E402,F401
+from news_fetcher import nyt_api  # noqa: E402
 
 # No crawler user agent and no headless browser for paywalled sites (Regis,
 # 2026-10-21). Posing as Googlebot is how 12ft.io got past paywalls before
@@ -728,7 +729,37 @@ def extract_article_html_bs4(url, headers=None):
 
 def scrape_article(url, fallback_content=None, force=False):
     """
-    Main scraping entry point.
+    Main scraping entry point: the publisher's own pages (see
+    _scrape_publisher), then, for a NYT article that didn't yield full text,
+    the abstract and opening paragraph from NYT's free Article Search API when
+    NYT_API_KEY is set. The API text is used only when it is longer than what
+    the publisher pass found.
+    """
+    result = _scrape_publisher(url, fallback_content=fallback_content, force=force)
+    if result.status in (SCRAPE_STATUS_SUCCESS, SCRAPE_STATUS_SKIPPED) or not nyt_api.is_nyt_url(url):
+        return result
+
+    paragraphs = nyt_api.lookup_article(url)
+    if not paragraphs:
+        return result
+    api_text = " ".join(paragraphs)
+    if len(api_text) <= len(_clean_text(re.sub(r"<[^>]+>", " ", result.content or ""))):
+        return result
+    logger.info(f"  [Scraper] Using NYT API abstract for {url[:60]}")
+    content = sanitize_html(
+        "<div>" + "".join(f"<p>{bleach.clean(p, strip=True)}</p>" for p in paragraphs) + "</div>"
+    )
+    return ScrapeResult(
+        content=content,
+        status=SCRAPE_STATUS_FALLBACK,
+        method="nyt_api",
+        http_status=result.http_status,
+    )
+
+
+def _scrape_publisher(url, fallback_content=None, force=False):
+    """
+    Scrape from the publisher's own pages.
     The fallback order stays within the publisher's own surface area:
     direct HTML extraction, content variants, structured metadata, then
     caller-provided RSS/API descriptions.
