@@ -96,12 +96,11 @@
 @keyframes read-toast-count { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
 /* ── Story and article pages: read toggle ──
-   A round button under the floating back button, left of the card
-   (breadcrumb.html float_back's `below`), the same shape and size: empty
-   while unread, filled in the theme colour once read. On narrow screens it
-   sits above the back button at the bottom left. */
+   A round button under the floating back button, left of the card, the
+   same shape and size (it sits in theme.css .rail-stack): empty while
+   unread, filled in the theme colour once read. */
 .read-toggle {
-    position: absolute; left: -64px; top: 56px;
+    position: relative;
     width: 44px; height: 44px; border-radius: 50%; padding: 0;
     display: flex; align-items: center; justify-content: center;
     background: var(--surface); color: var(--text-muted); border: 1px solid var(--border);
@@ -113,10 +112,6 @@
 .read-toggle.is-read:hover, .read-toggle.is-read:focus-visible { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
 .read-toggle:disabled { cursor: progress; }
 .read-toggle .tip { left: calc(100% + 10px); right: auto; top: 50%; transform: translateY(-50%); }
-@media (max-width: 1280px) {
-    .read-toggle { position: fixed; left: 16px; top: auto; bottom: 72px; z-index: 20; }
-    .read-toggle .tip { display: none; }
-}
 
 /* ── Recently Read ── */
 .rr-list { list-style: none; }

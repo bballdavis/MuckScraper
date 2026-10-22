@@ -236,6 +236,38 @@
     .float-back::after { display: none; }
 }
 
+/* Round buttons under the back button (float_back's `below`): the read
+   toggle, and on the article page the summary and lean buttons. Same shape
+   and size as the back button; tooltips open to the right. On narrow
+   screens they stack up from just above the back button, bottom left. */
+.rail-stack { position: absolute; left: -64px; top: 56px; display: flex; flex-direction: column; gap: 12px; }
+.rail-stack form { display: contents; }
+.rail-btn.act {
+    width: 44px; height: 44px; border-radius: 50%; font-size: 20px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+.rail-btn.act .icon { width: 20px; height: 20px; }
+.rail-btn.act-ready:hover, .rail-btn.act-ready:focus-visible { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14); }
+.rail-btn.act-off { opacity: 1; color: var(--text-faint); }
+.rail-stack .tip { left: calc(100% + 10px); right: auto; top: 50%; transform: translateY(-50%); }
+/* The ⋯ button that folds the stack on narrow screens (float_back collapse). */
+.rail-more {
+    display: none; width: 44px; height: 44px; border-radius: 50%; padding: 0;
+    align-items: center; justify-content: center;
+    background: var(--surface); color: var(--text-muted); border: 1px solid var(--border);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1); font: inherit; font-size: 20px; cursor: pointer;
+}
+.rail-more .icon { width: 20px; height: 20px; }
+.back-rail.open .rail-more { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (max-width: 1280px) {
+    .rail-stack { position: fixed; left: 16px; top: auto; bottom: 72px; z-index: 20; flex-direction: column-reverse; }
+    .rail-stack .tip { display: none; }
+    .rail-collapsible .rail-more { display: flex; position: fixed; left: 16px; bottom: 72px; z-index: 21; }
+    .rail-collapsible .rail-stack { bottom: 128px; opacity: 0; visibility: hidden; transform: translateY(8px);
+        transition: opacity 0.15s, transform 0.15s, visibility 0s linear 0.15s; }
+    .rail-collapsible.open .rail-stack { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+}
+
 /* Back link in the top bar (templates/breadcrumb.html). The bar is dark in
    both themes, so one link colour serves both. */
 .crumb-bar { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
