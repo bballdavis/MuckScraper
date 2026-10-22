@@ -61,7 +61,7 @@
             <h1>Headlines</h1>
             <div class="subtitle">{{ edition_label }}</div>
             {% if hidden_read %}
-            <div class="read-hidden-note">{{ hidden_read }} {{ 'story' if hidden_read == 1 else 'stories' }} you've read {{ 'is' if hidden_read == 1 else 'are' }} hidden · <a href="{{ url_for('reading.recently_read') }}">Recently read</a></div>
+            <div class="read-hidden-note">{{ hidden_read }} {{ 'story' if hidden_read == 1 else 'stories' }} you've read {{ 'is' if hidden_read == 1 else 'are' }} hidden · <a href="{{ url_for('reading.recently_read') }}">Recently Read</a></div>
             {% endif %}
         </div>
         <div class="edition-links">
@@ -106,12 +106,12 @@
                 {{ story_summary_action(story, false, 'tip-above-end') }}
                 {{ story_analysis_action(story, false, 'tip-above-end') }}
                 {% if can_mark_read %}
-                <button type="button" class="act act-read tip-above-end" data-mark-read aria-label="Mark as read">{{ icon('glasses') }}<span class="tip" role="tooltip"><strong>Mark as read</strong> Hides it from Headlines. Find it again under Recently read.</span></button>
+                <button type="button" class="act act-read tip-above-end" data-mark-read aria-label="Mark as read">{{ icon('glasses') }}<span class="tip" role="tooltip"><strong>Mark as read</strong> Hides it from Headlines. Find it again under Recently Read.</span></button>
                 {% endif %}
             </div>
         {% endcall %}
         {% if can_mark_read %}
-        <button type="button" class="hl-read" data-mark-read aria-label="Mark as read"><span class="hl-read-icon">{{ icon('glasses') }}<span class="tip" role="tooltip"><strong>Mark as read</strong> Hides it from Headlines. Find it again under Recently read.</span></span></button>
+        <button type="button" class="hl-read" data-mark-read aria-label="Mark as read"><span class="hl-read-icon">{{ icon('glasses') }}<span class="tip" role="tooltip"><strong>Mark as read</strong> Hides it from Headlines. Find it again under Recently Read.</span></span></button>
         </div>
         {% endif %}
         {% endfor %}

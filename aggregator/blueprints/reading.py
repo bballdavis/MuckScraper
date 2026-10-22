@@ -1,5 +1,5 @@
 """Read state for signed-in readers (aggregator/reads.py): mark a story or
-article read or unread, and the Recently read page. Its own blueprint
+article read or unread, and the Recently Read page. Its own blueprint
 because these routes write; public.py's pages only read. Headlines, the
 story page and the article page look the state up themselves.
 """
@@ -22,7 +22,7 @@ def _read_payload(kind, item_id):
 def toggle_read(kind, item_id):
     """Mark a story or article read (POST) or unread (DELETE) for the
     signed-in reader: the reading-glasses buttons on Headlines, the story
-    and article pages, and Recently read."""
+    and article pages, and Recently Read."""
     if kind not in reads.KINDS:
         abort(404)
     if request.method == "POST":
