@@ -52,6 +52,11 @@
 <button type="button" id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">{{ theme_toggle_label() }}</button>
 {%- endmacro -%}
 
+{#- The same switch as an item in the account menu (account_menu.html). -#}
+{%- macro theme_menu_label() -%}
+<span class="theme-when-light">{{ icon('moon') }} Dark mode</span><span class="theme-when-dark">{{ icon('sun') }} Light mode</span>
+{%- endmacro -%}
+
 {%- macro theme_toggle_label() -%}
 <span class="theme-when-light">{{ icon('moon') }} Dark</span><span class="theme-when-dark">{{ icon('sun') }} Light</span>
 {%- endmacro -%}

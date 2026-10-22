@@ -221,6 +221,24 @@
 .lcr-bar .seg-c { background: #8c8c8c; }
 .lcr-bar .seg-r { background: var(--bias-5-bg); }
 
+/* ── Phone search button (hidden on wide screens) ── */
+.ft-search-toggle {
+    display: none;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 10px;
+    border: 1px solid #3a3a55;
+    background: #2a2a3e;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+}
+.ft-search-toggle:hover, .ft-search-toggle[aria-expanded="true"] { background: var(--accent); border-color: var(--accent-light); }
+.ft-search-toggle:focus-visible { outline: 2px solid var(--sidebar-accent-text); outline-offset: 2px; }
+
 /* ── Filters ── */
 .ft-filters { position: relative; flex: 0 0 auto; }
 .ft-filter-btn {
@@ -385,9 +403,23 @@
     .ft-section { font-size: 14px; }
     .ft-right { gap: 8px; }
     .feed-topbar .theme-toggle { padding: 6px 10px; }
-    /* Phones: logo and account on one row, search and Filters full width below. */
+    /* Phones: logo, search button and account on one row; the search button
+       slides the search and Filters out full width below. */
     .ft-center { order: 3; flex-basis: 100%; max-width: none; }
     .ft-left, .ft-right { flex-basis: auto; }
+    /* The section name shortens before the buttons drop to a second row. */
+    .ft-left { flex: 1 1 0; min-width: 0; }
+    .ft-right { flex: 0 0 auto; }
+    .ft-search-toggle { display: inline-flex; }
+    .feed-topbar:not(.search-open) .ft-center { display: none; }
+    .feed-topbar.search-open .ft-center { animation: ft-slide-down 0.18s ease-out; }
+}
+@keyframes ft-slide-down {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .feed-topbar.search-open .ft-center { animation: none; }
 }
 
 /* Narrow phones: the Light/Dark button shows its icon only, so the logo,

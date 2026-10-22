@@ -27,6 +27,19 @@
         });
     }
 
+    // ── Phone search button: slides the search and Filters out below ──
+    const bar = document.querySelector('.feed-topbar');
+    const searchToggle = document.getElementById('ft-search-toggle');
+    if (bar && searchToggle) {
+        searchToggle.addEventListener('click', function () {
+            const open = !bar.classList.contains('search-open');
+            bar.classList.toggle('search-open', open);
+            searchToggle.setAttribute('aria-expanded', String(open));
+            if (open && input) input.focus();
+            else { setPopover(false); if (typeof closeSuggest === 'function') closeSuggest(); }
+        });
+    }
+
     if (!form || !input || !panel) return;
 
     // ── Live results ──

@@ -1,6 +1,6 @@
 {% from 'story_card_macros.html' import bias_tag with context %}
 {% from 'account_menu.html' import account_menu with context %}
-{% from 'icons.html' import icon, theme_toggle_label %}
+{% from 'icons.html' import icon %}
 {% from 'breadcrumb.html' import back_link %}
 {% from 'title_meta.html' import title_meta, meta_item %}
 {#- One Op/Ed piece (admin.oped_piece, blueprints/admin/oped.py), laid out like
@@ -201,7 +201,6 @@
         {{ back_link(back_href, back_label) }}
     </div>
     <div style="display:flex; align-items:center; gap:12px;">
-        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">{{ theme_toggle_label() }}</button>
         {{ account_menu() }}
     </div>
 </div>
