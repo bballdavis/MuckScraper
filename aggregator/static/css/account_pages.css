@@ -21,6 +21,8 @@ input[type="text"], input[type="email"], input[type="password"], select {
     font: inherit; font-size: 14px; color: var(--text); background: var(--bg);
     border: 1px solid var(--input-border); border-radius: 8px; padding: 8px 10px;
 }
+.check-field { display: flex; align-items: center; gap: 10px; margin: 4px 0 18px; font-size: 14px; color: var(--text); cursor: pointer; }
+.check-field input { width: 16px; height: 16px; accent-color: var(--accent); }
 input:focus, select:focus { outline: 2px solid var(--accent-text); outline-offset: 1px; border-color: transparent; }
 .btn { display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: 10px; padding: 9px 16px; font: inherit; font-size: var(--fs-meta); font-weight: 700; cursor: pointer; text-decoration: none; }
 .btn-primary { background: var(--accent); color: #fff; }

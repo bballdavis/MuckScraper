@@ -1,0 +1,365 @@
+/*
+ * The feed's top bar (templates/_feed_topbar.html): section name beside the
+ * logo, search centred with live results, an icon-only Filters button and its
+ * popover. Linked after theme.css by headlines_feed.html and articles.html.
+ * The bar is dark in both themes; the dropdown and popover follow the theme.
+ */
+
+.visually-hidden {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.feed-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--topbar-bg);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 20px;
+    /* Room on the left for the sidebar's fixed show/hide button. */
+    padding: 10px 24px 10px 48px;
+}
+
+/* Left and right take equal shares so the search sits in the middle. */
+.ft-left, .ft-right { flex: 1 1 180px; display: flex; align-items: center; min-width: 0; }
+.ft-left { gap: 10px; }
+.ft-right { justify-content: flex-end; gap: 10px; }
+
+.ft-logo {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.ft-sep { color: #6c6f93; font-size: 18px; }
+.ft-section {
+    color: var(--sidebar-accent-text);
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ft-center {
+    flex: 2 1 420px;
+    max-width: 680px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+}
+
+/* ── Search ── */
+.ft-search { flex: 1 1 auto; position: relative; min-width: 0; }
+.ft-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #9aa0c0; font-size: 17px; display: flex; pointer-events: none; }
+.ft-search input[type="search"] {
+    width: 100%;
+    height: 40px;
+    padding: 0 40px 0 40px;
+    border-radius: 10px;
+    border: 1px solid #3a3a55;
+    background: #2a2a3e;
+    color: #fff;
+    font: inherit;
+    font-size: 15px;
+    -webkit-appearance: none;
+    appearance: none;
+}
+.ft-search input[type="search"]::placeholder { color: #9aa0c0; }
+.ft-search input[type="search"]:focus { outline: none; border-color: var(--accent-light); box-shadow: 0 0 0 3px rgba(116, 116, 184, 0.35); }
+.ft-search input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
+.ft-kbd {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font: 600 12px/1 system-ui, sans-serif; color: #b9bdd8;
+    border: 1px solid #4a4a68; border-radius: 5px; padding: 3px 6px;
+    pointer-events: none;
+}
+.ft-search input:focus ~ .ft-kbd { display: none; }
+
+/* ── Live results ── */
+.ft-suggest {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: max(100%, min(620px, calc(100vw - 32px)));
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 18px 40px rgba(20, 20, 40, 0.22);
+    overflow: hidden;
+    z-index: 310;
+}
+.ft-suggest[hidden] { display: none; }
+.ft-group-label {
+    padding: 10px 14px 4px;
+    font-size: var(--fs-label);
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.ft-group-label + .ft-hit { margin-top: 0; }
+.ft-hits + .ft-group-label { border-top: 1px solid var(--border); }
+
+.ft-hit {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    color: var(--text);
+    text-decoration: none;
+}
+.ft-hit:hover, .ft-hit.is-active { background: var(--btn-muted-bg); }
+.ft-thumb {
+    flex: 0 0 auto;
+    width: 56px;
+    height: 40px;
+    border-radius: 6px;
+    background: var(--btn-muted-bg);
+    object-fit: cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-faint);
+    font-size: 16px;
+}
+.ft-hit-body { flex: 1 1 auto; min-width: 0; }
+.ft-hit-top { display: flex; align-items: baseline; gap: 10px; }
+.ft-hit-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ft-hit-date, .ft-hit-meta { font-size: var(--fs-label); color: var(--text-muted); }
+.ft-hit-date { flex: 0 0 auto; white-space: nowrap; }
+.ft-hit-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.ft-hit-meta .ft-right-group { margin-left: auto; }
+.ft-lean {
+    margin-left: auto;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.ft-lean.bias-unrated { background: var(--bias-unrated-bg); color: #fff; }
+.ft-empty { padding: 16px 14px; font-size: 14px; color: var(--text-muted); }
+.ft-suggest-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    font-size: var(--fs-label);
+    color: var(--text-muted);
+}
+.ft-suggest-foot a { color: var(--accent-text); font-weight: 700; text-decoration: none; }
+.ft-suggest-foot a:hover { text-decoration: underline; }
+
+/* Left / Center / Right: counts, then the bar at the far right. Shared with
+   the compact story cards (story_card.css uses the same classes). */
+.lcr { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: var(--fs-label); font-weight: 700; white-space: nowrap; }
+.lcr-l { color: var(--bias-left-text); }
+.lcr-c { color: var(--bias-center-text); }
+.lcr-r { color: var(--bias-right-text); }
+.lcr-bar { display: flex; width: 64px; height: 6px; border-radius: 3px; overflow: hidden; background: var(--border); }
+.lcr-bar span { display: block; height: 100%; }
+.lcr-bar .seg-l { background: var(--bias-1-bg); }
+.lcr-bar .seg-c { background: #8c8c8c; }
+.lcr-bar .seg-r { background: var(--bias-5-bg); }
+
+/* ── Filters ── */
+.ft-filters { position: relative; flex: 0 0 auto; }
+.ft-filter-btn {
+    height: 40px;
+    min-width: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 10px;
+    border-radius: 10px;
+    border: 1px solid #3a3a55;
+    background: #2a2a3e;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+}
+.ft-filter-btn:hover, .ft-filter-btn[aria-expanded="true"] { background: var(--accent); border-color: var(--accent-light); }
+.ft-filter-btn:focus-visible { outline: 2px solid var(--sidebar-accent-text); outline-offset: 2px; }
+.ft-badge {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: var(--sidebar-accent-text);
+    color: var(--topbar-bg);
+    font-size: 12px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ft-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 380px;
+    max-width: calc(100vw - 32px);
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 18px 40px rgba(20, 20, 40, 0.22);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    z-index: 310;
+}
+.ft-popover[hidden] { display: none; }
+.fp-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: var(--fs-label);
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.fp-segment {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    padding: 4px;
+    background: var(--btn-muted-bg);
+    border-radius: 10px;
+}
+.fp-segment a {
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--btn-muted-text);
+    text-decoration: none;
+}
+.fp-segment a:hover { color: var(--accent-text); }
+.fp-segment a.active { background: var(--surface); color: var(--accent-text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.fp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fp-chips a {
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--input-border);
+    background: var(--surface);
+    color: var(--btn-muted-text);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    text-transform: capitalize;
+}
+.fp-chips a:hover { border-color: var(--accent); color: var(--accent-text); }
+.fp-chips a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fp-note { font-size: var(--fs-label); color: var(--text-muted); line-height: 1.45; }
+.fp-switch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 14px;
+}
+.fp-switch .switch-track { position: relative; width: 40px; height: 22px; border-radius: 11px; background: var(--input-border); flex-shrink: 0; transition: background 0.15s; }
+.fp-switch .switch-thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+.fp-switch[aria-checked="true"] .switch-track { background: var(--accent); }
+.fp-switch[aria-checked="true"] .switch-thumb { transform: translateX(18px); }
+.fp-switch:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 4px; border-radius: 4px; }
+.fp-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+.fp-foot a { font-size: 13px; font-weight: 600; color: var(--accent-text); text-decoration: none; }
+.fp-foot a:hover { text-decoration: underline; }
+.fp-foot form { display: flex; }
+.fp-save {
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    background: var(--surface);
+    color: var(--accent-text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.fp-save:hover { background: var(--accent); color: #fff; }
+
+/* Flash messages (templates/_flashes.html), e.g. after "Save as my default".
+   Same look as account_pages.css. */
+.flash { padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; margin-bottom: 12px; border: 1px solid; }
+.flash-success { color: #1d6f42; background: rgba(29, 111, 66, 0.08); border-color: rgba(29, 111, 66, 0.3); }
+.flash-error { color: #a33636; background: rgba(163, 54, 54, 0.08); border-color: rgba(163, 54, 54, 0.3); }
+[data-theme="dark"] .flash-success { color: #7fd6a2; }
+[data-theme="dark"] .flash-error { color: #f2a0a0; }
+
+/* Active filters shown above the list, each removable. */
+.active-filters { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 16px; }
+.active-filters p { font-size: 14px; color: var(--text-muted); }
+.filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 6px 0 10px;
+    border-radius: 999px;
+    background: var(--btn-muted-bg);
+    color: var(--accent-text);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+}
+.filter-chip .icon { font-size: 12px; }
+.filter-chip:hover { background: var(--input-border); }
+
+/* Wide screens: the section name never truncates; the search gives way. */
+@media (min-width: 901px) {
+    .ft-left { min-width: max-content; }
+}
+
+@media (max-width: 900px) {
+    .feed-topbar { padding: 10px 16px 10px 28px; column-gap: 12px; }
+    .ft-logo { font-size: 16px; }
+    .ft-section { font-size: 14px; }
+    .ft-right { gap: 8px; }
+    .feed-topbar .theme-toggle { padding: 6px 10px; }
+    /* Phones: logo and account on one row, search and Filters full width below. */
+    .ft-center { order: 3; flex-basis: 100%; max-width: none; }
+    .ft-left, .ft-right { flex-basis: auto; }
+}

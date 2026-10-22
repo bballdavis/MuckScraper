@@ -41,7 +41,7 @@
     function placeSidebarToggle() {
         const btn = document.getElementById('sidebar-toggle');
         if (!sidebarIsPhone) { btn.style.top = ''; return; }
-        const bar = document.querySelector('.topbar') || document.querySelector('.main-header');
+        const bar = document.querySelector('.feed-topbar') || document.querySelector('.topbar') || document.querySelector('.main-header');
         // Bottom edge, not height: on All/Grouped/Search the bar starts a little
         // below the top until it sticks, so follow it while scrolling.
         const bottom = bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
