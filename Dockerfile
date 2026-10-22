@@ -18,6 +18,10 @@ COPY aggregator ./aggregator
 COPY news_fetcher ./news_fetcher
 COPY mcp_server ./mcp_server
 COPY boot.sh ./boot.sh
+# Schema setup and the first admin account, so a deploy without the
+# bind-mounted checkout (e.g. Komodo) can still run migrations.
+COPY bootstrap_admin.py ./bootstrap_admin.py
+COPY migrations ./migrations
 
 RUN git config --global --add safe.directory /app
 
