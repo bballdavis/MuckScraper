@@ -1,4 +1,59 @@
 # muckscraperHeadlinesGoogleNEW/docker-compose.yml
+
+# app, scheduler and mcp all run the one image built from ./Dockerfile; each
+# picks its own command.
+x-app-image: &app-image
+  build: .
+  image: muckscraper-app
+
+# Environment shared by app and scheduler. Add a new provider key here once.
+x-app-env: &app-env
+    FLASK_APP: aggregator.app
+    SECRET_KEY: ${SECRET_KEY}
+    DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    POSTGRES_HOST: postgres
+    POSTGRES_DB: ${POSTGRES_DB}
+    ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+    ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    NEWS_API_KEY: ${NEWS_API_KEY:-}
+    GNEWS_API_KEY: ${GNEWS_API_KEY:-}
+    OLLAMA_HOST: ${OLLAMA_HOST}
+    OLLAMA_FALLBACK_HOST: ${OLLAMA_FALLBACK_HOST:-}
+    OLLAMA_PRIMARY_RECHECK_SECONDS: ${OLLAMA_PRIMARY_RECHECK_SECONDS:-60}
+    OLLAMA_MODEL: ${OLLAMA_MODEL}
+    OLLAMA_FAST_MODEL: ${OLLAMA_FAST_MODEL:-}
+    OLLAMA_THINK: ${OLLAMA_THINK:-}
+    EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+    LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+    EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
+    GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash-lite}
+    GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
+    LLM_FAST_PROVIDER: ${LLM_FAST_PROVIDER:-}
+    GROQ_API_KEY: ${GROQ_API_KEY:-}
+    GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+    OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+    OPENROUTER_FAST_MODEL: ${OPENROUTER_FAST_MODEL:-}
+    OPENROUTER_HOST: ${OPENROUTER_HOST:-https://openrouter.ai/api/v1}
+    OPENROUTER_SITE_URL: ${OPENROUTER_SITE_URL:-}
+    OPENROUTER_APP_NAME: ${OPENROUTER_APP_NAME:-}
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+    ANTHROPIC_FAST_MODEL: ${ANTHROPIC_FAST_MODEL:-}
+    ANTHROPIC_MAX_TOKENS: ${ANTHROPIC_MAX_TOKENS:-4096}
+    OLLAMA_MAC: ${OLLAMA_MAC:-}
+    N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+    N8N_FETCH_REPORT_WEBHOOK_URL: ${N8N_FETCH_REPORT_WEBHOOK_URL:-}
+    LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+    LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+    LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+    MEILI_URL: ${MEILI_URL:-http://meilisearch:7700}
+    MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-muckscraper-dev-key}
+
 services:
   postgres:
     image: pgvector/pgvector:pg14
@@ -8,6 +63,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
     restart: unless-stopped
 
   meilisearch:
@@ -31,120 +91,35 @@ services:
     restart: unless-stopped
 
   scheduler:
-    build:
-      context: .
-      dockerfile: news_fetcher/Dockerfile
+    <<: *app-image
     depends_on:
-      - postgres
-      - meilisearch
-    command: sh -c "sleep 15 && python -m news_fetcher.scheduler"
+      postgres:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+    command: python -m news_fetcher.scheduler
     environment:
-      FLASK_APP: aggregator.app
-      SECRET_KEY: ${SECRET_KEY}
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_HOST: postgres
-      POSTGRES_DB: ${POSTGRES_DB}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      NEWS_API_KEY: ${NEWS_API_KEY:-}
-      GNEWS_API_KEY: ${GNEWS_API_KEY:-}
-      OLLAMA_HOST: ${OLLAMA_HOST}
-      OLLAMA_FALLBACK_HOST: ${OLLAMA_FALLBACK_HOST:-}
-      OLLAMA_PRIMARY_RECHECK_SECONDS: ${OLLAMA_PRIMARY_RECHECK_SECONDS:-60}
-      OLLAMA_MODEL: ${OLLAMA_MODEL}
-      OLLAMA_FAST_MODEL: ${OLLAMA_FAST_MODEL:-}
-      OLLAMA_THINK: ${OLLAMA_THINK:-}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
-      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
-      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash-lite}
-      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
-      LLM_FAST_PROVIDER: ${LLM_FAST_PROVIDER:-}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
-      OPENROUTER_FAST_MODEL: ${OPENROUTER_FAST_MODEL:-}
-      OPENROUTER_HOST: ${OPENROUTER_HOST:-https://openrouter.ai/api/v1}
-      OPENROUTER_SITE_URL: ${OPENROUTER_SITE_URL:-}
-      OPENROUTER_APP_NAME: ${OPENROUTER_APP_NAME:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
-      ANTHROPIC_FAST_MODEL: ${ANTHROPIC_FAST_MODEL:-}
-      ANTHROPIC_MAX_TOKENS: ${ANTHROPIC_MAX_TOKENS:-4096}
-      OLLAMA_MAC: ${OLLAMA_MAC:-}
-      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
-      N8N_FETCH_REPORT_WEBHOOK_URL: ${N8N_FETCH_REPORT_WEBHOOK_URL:-}
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
-      MEILI_URL: ${MEILI_URL:-http://meilisearch:7700}
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-muckscraper-dev-key}
+      <<: *app-env
     restart: unless-stopped
     volumes:
       - .:/app
 
   app:
-    build: .
+    <<: *app-image
     ports:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-5000}:5000"
     depends_on:
-      - postgres
-      - meilisearch
-      - docker-restart-proxy
+      postgres:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+      docker-restart-proxy:
+        condition: service_started
     environment:
-      FLASK_APP: aggregator.app
+      <<: *app-env
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
-      SECRET_KEY: ${SECRET_KEY}
       DISPLAY_TIMEZONE: ${DISPLAY_TIMEZONE:-UTC}
       PUBLIC_READ_ACCESS: ${PUBLIC_READ_ACCESS:-false}
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_HOST: postgres
-      POSTGRES_DB: ${POSTGRES_DB}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      NEWS_API_KEY: ${NEWS_API_KEY:-}
-      GNEWS_API_KEY: ${GNEWS_API_KEY:-}
-      OLLAMA_HOST: ${OLLAMA_HOST}
-      OLLAMA_FALLBACK_HOST: ${OLLAMA_FALLBACK_HOST:-}
-      OLLAMA_PRIMARY_RECHECK_SECONDS: ${OLLAMA_PRIMARY_RECHECK_SECONDS:-60}
-      OLLAMA_MODEL: ${OLLAMA_MODEL}
-      OLLAMA_FAST_MODEL: ${OLLAMA_FAST_MODEL:-}
-      OLLAMA_THINK: ${OLLAMA_THINK:-}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
-      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
-      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash-lite}
-      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
-      LLM_FAST_PROVIDER: ${LLM_FAST_PROVIDER:-}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
-      OPENROUTER_FAST_MODEL: ${OPENROUTER_FAST_MODEL:-}
-      OPENROUTER_HOST: ${OPENROUTER_HOST:-https://openrouter.ai/api/v1}
-      OPENROUTER_SITE_URL: ${OPENROUTER_SITE_URL:-}
-      OPENROUTER_APP_NAME: ${OPENROUTER_APP_NAME:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
-      ANTHROPIC_FAST_MODEL: ${ANTHROPIC_FAST_MODEL:-}
-      ANTHROPIC_MAX_TOKENS: ${ANTHROPIC_MAX_TOKENS:-4096}
-      OLLAMA_MAC: ${OLLAMA_MAC:-}
-      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
-      N8N_FETCH_REPORT_WEBHOOK_URL: ${N8N_FETCH_REPORT_WEBHOOK_URL:-}
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
-      MEILI_URL: ${MEILI_URL:-http://meilisearch:7700}
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-muckscraper-dev-key}
       DOCKER_RESTART_PROXY_URL: http://docker-restart-proxy:5001
     restart: unless-stopped
     volumes:
@@ -156,13 +131,15 @@ services:
   # writes; container logs come from docker-restart-proxy, not the socket.
   mcp:
     profiles: ["mcp"]
-    build:
-      context: .
-      dockerfile: mcp_server/Dockerfile
+    <<: *app-image
+    command: python -m mcp_server
     depends_on:
-      - postgres
-      - meilisearch
-      - docker-restart-proxy
+      postgres:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+      docker-restart-proxy:
+        condition: service_started
     ports:
       - "${MCP_BIND:-127.0.0.1}:${MCP_PORT:-8765}:8765"
     environment:
