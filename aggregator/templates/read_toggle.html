@@ -1,0 +1,23 @@
+{#- The read toggle for the story and article pages: the reading glasses and
+    a circle, empty while unread and filled once read (Philip, 2026-10-22).
+    Signed-in readers only; static/js/reads.js flips it and the tooltip.
+    Styles: static/css/reads.css .read-toggle.
+
+        {% from 'read_toggle.html' import read_toggle %}
+        {{ read_toggle('story', story.id, read_item) }}
+-#}
+{% from 'icons.html' import icon %}
+{%- macro read_toggle(kind, item_id, read_item) -%}
+{%- set noun = 'story' if kind == 'story' else 'article' -%}
+{%- set read_title = 'Read' -%}
+{%- set read_body = 'Click to mark it unread' ~ (' and bring it back to Headlines.' if kind == 'story' else '.') -%}
+{%- set unread_title = 'Mark as read' -%}
+{%- set unread_body = ('Hides this story from Headlines. ' if kind == 'story' else '') ~ 'It is listed under Recently read.' -%}
+<button type="button" class="read-toggle{{ ' is-read' if read_item }}" data-kind="{{ kind }}" data-id="{{ item_id }}"
+        aria-pressed="{{ 'true' if read_item else 'false' }}" aria-label="{{ read_title if read_item else unread_title }}"
+        data-read-title="{{ read_title }}" data-read-body="{{ read_body }}"
+        data-unread-title="{{ unread_title }}" data-unread-body="{{ unread_body }}">
+    {{- icon('glasses') }}<span class="read-dot" aria-hidden="true"></span>
+    <span class="tip" role="tooltip"><strong>{{ read_title if read_item else unread_title }}</strong> <span class="tip-body">{{ read_body if read_item else unread_body }}</span></span>
+</button>
+{%- endmacro -%}

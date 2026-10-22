@@ -754,3 +754,28 @@ class FeedEntry(db.Model):
     cluster_id    = db.Column(db.Integer, nullable=True)
 
     article = db.relationship("Article")
+
+
+class ReadItem(db.Model):
+    """A story or an article one user marked read (aggregator/reads.py):
+    from the reading-glasses button on Headlines, the story and article
+    pages, or a swipe in the app (/api/v1/me/read). Read stories drop out of
+    that user's Headlines; Recently read lists both kinds, newest first.
+    Exactly one of story_id and article_id is set."""
+    __tablename__ = "read_items"
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "story_id", name="uq_read_user_story"),
+        db.UniqueConstraint("user_id", "article_id", name="uq_read_user_article"),
+        db.CheckConstraint("(story_id IS NULL) <> (article_id IS NULL)", name="ck_read_one_target"),
+        db.Index("ix_read_user_read_at", "user_id", "read_at"),
+    )
+
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    story_id   = db.Column(db.Integer, db.ForeignKey("stories.id", ondelete="CASCADE"), nullable=True)
+    article_id = db.Column(db.Integer, db.ForeignKey("articles.id", ondelete="CASCADE"), nullable=True)
+    read_at    = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    story = db.relationship("Story")
+    article = db.relationship("Article")
+    user = db.relationship("User", backref=db.backref("read_items", lazy="dynamic", cascade="all, delete-orphan"))
