@@ -89,7 +89,7 @@ SCHEMAS = {
             ["section", "is_enabled", "amount"], section=_S, is_enabled=_B,
             amount={"type": "integer", "minimum": 1, "maximum": 20,
                     "description": "Pages of 20 for Headlines (1-5), top N for a topic"})},
-        depth={"type": "string", "enum": ["summary", "summary_analysis"]}, skip_already_summarized=_B,
+        depth={"type": "string", "enum": ["summary", "analysis", "summary_analysis"]}, skip_already_summarized=_B,
         minimum_sources=_NI, notify_when_done=_B, next_run_at=_NDT, last_run_at=_NDT),
     "BookmarkVersion": _obj(
         ["version", "status", "captures", "size_bytes", "asset_count", "created_at", "finished_at", "error"],
@@ -192,7 +192,7 @@ PATHS = {
         "description": "Needs the summarize scope. Adds the story to the user's NewsBox.",
         "requestBody": {"required": True, "content": {"application/json": {"schema": {
             "type": "object", "additionalProperties": False, "properties": {
-                "depth": {"type": "string", "enum": ["summary", "summary_analysis"]},
+                "depth": {"type": "string", "enum": ["summary", "analysis", "summary_analysis"]},
                 "origin": {"type": "string", "enum": ["swiped", "saved"]}}}}}},
         "responses": {"200": _json(_ref("NewsBoxItem"), "Already summarized: ready"),
                       "202": _json(_ref("NewsBoxItem"), "Summary queued: pending"),
