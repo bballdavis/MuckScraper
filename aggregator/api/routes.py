@@ -10,7 +10,7 @@ from flask import g, jsonify, request
 from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload, selectinload
 
-from aggregator import db, feed_prefs, reads
+from aggregator import db, feed_prefs, reads, skips
 from aggregator.models import Article, Edition, EditionStory, OpinionPiece, Story, Topic
 from aggregator.opinion import published_edition_opinion_cards
 from aggregator.search import SearchUnavailableError, search_article_ids, search_story_ids
@@ -238,7 +238,9 @@ def story(story_id):
     if row is None:
         raise ApiError(404, "not_found", "Not found.")
     pieces = OpinionPiece.query.options(joinedload(OpinionPiece.outlet)).filter_by(story_id=story_id).all()
-    return jsonify(_annotate_read([ser.story_detail(row, pieces)])[0])
+    out = _annotate_read([ser.story_detail(row, pieces)])[0]
+    out["is_skipped"] = bool(skips.skipped_ids(g.user.id, [story_id]))
+    return jsonify(out)
 
 
 @api.route("/articles/<int:article_id>")
