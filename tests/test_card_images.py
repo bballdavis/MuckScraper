@@ -81,6 +81,15 @@ class LogoCandidateTests(unittest.TestCase):
         self.assertEqual(outlet_logos.resolve_logo("https://example.com/news/x?y=1", session=session),
                          "https://example.com/apple-touch-icon.png")
 
+    def test_blocked_site_falls_back_to_the_favicon_service(self):
+        def get(url, **kwargs):
+            if "google.com/s2/favicons" in url:
+                return SimpleNamespace(status_code=200, headers={"Content-Type": "image/png"}, close=lambda: None)
+            return SimpleNamespace(status_code=403, url=url, text="Access denied", headers={}, close=lambda: None)
+        self.assertEqual(
+            outlet_logos.resolve_logo("https://www.washingtonpost.com/world/x/", session=SimpleNamespace(get=get)),
+            "https://www.google.com/s2/favicons?domain=washingtonpost.com&sz=128")
+
     def test_site_root(self):
         self.assertEqual(outlet_logos.site_root("https://www.cbsnews.com/news/a?b=1"), "https://www.cbsnews.com/")
         self.assertIsNone(outlet_logos.site_root("mailto:x@y.z"))

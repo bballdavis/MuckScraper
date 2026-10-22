@@ -2,8 +2,8 @@
 """Images for cards that have none (Philip, 2026-10-22).
 
 A card shows, in order: its article's image, another article's image in the
-same story, the outlet's logo, then a plain placeholder. Two passes here fill
-the gaps behind that chain, and both run once per full pipeline run:
+same story, the outlet's logo, then the outlet's name set as a masthead. Two
+passes here fill the gaps behind that chain, and both run on every fetch run:
 
 - `retry_missing_images` fetches each recent article that has no image once
   more and reads the page's og:image (scraper.extract_page_image). New
@@ -11,9 +11,9 @@ the gaps behind that chain, and both run once per full pipeline run:
   this covers the ones whose scrape was deferred, blocked or failed early.
 - `refresh_outlet_logos` resolves each outlet's icon from its home page
   (apple-touch-icon, a large rel=icon, the JSON-LD publisher logo, then
-  /apple-touch-icon.png and /favicon.ico) and stores the URL on the outlet,
-  so the web cards and /api/v1 serve the same one. SVG is skipped: the iOS
-  app's image views can't draw it.
+  /apple-touch-icon.png and /favicon.ico, then Google's favicon service) and
+  stores the URL on the outlet, so the web cards and /api/v1 serve the same
+  one. SVG is skipped: the iOS app's image views can't draw it.
 """
 
 import json
@@ -159,10 +159,19 @@ def resolve_logo(site_url, session=None):
             html, page_url = response.text, response.url or root
     except requests.RequestException as exc:
         logger.info("  [Logos] Home page failed for %s: %s", root, exc)
-    for candidate in logo_candidates(html, page_url):
+    for candidate in logo_candidates(html, page_url) + [favicon_service_url(root)]:
         if _is_image(candidate, session):
             return candidate
     return None
+
+
+def favicon_service_url(site_url):
+    """Google's favicon service for the site: the last resort when the
+    publisher's own server turns the lookup away, as bot walls do (the
+    Washington Post's cards had no logo on 2026-10-22). It serves a PNG up to
+    128px, and 404s for a site it has no icon for."""
+    host = urlparse(site_url).netloc.lower().removeprefix("www.")
+    return f"https://www.google.com/s2/favicons?domain={host}&sz=128"
 
 
 def _outlet_site(outlet):
