@@ -32,4 +32,4 @@ def _api_error(e):
     return error_response(e.status, e.code, e.message, e.headers)
 
 
-from . import routes, me_routes, read_routes, skip_routes, bookmark_routes, breaking_routes, openapi  # noqa: E402,F401
+from . import routes, me_routes, read_routes, skip_routes, article_routes, bookmark_routes, breaking_routes, openapi  # noqa: E402,F401
