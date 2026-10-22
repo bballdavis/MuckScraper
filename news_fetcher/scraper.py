@@ -97,6 +97,9 @@ class ScrapeResult:
     method: str | None = None
     failure_reason: str | None = None
     http_status: int | None = None
+    # The page's share image (og:image and the like), read from the first
+    # page fetched; ingestion and rescrapes use it when the feed gave none.
+    image_url: str | None = None
 
     @property
     def succeeded(self):
@@ -597,6 +600,56 @@ def extract_structured_metadata(html, url):
     return best_html
 
 
+def _absolute_image_url(value, base_url):
+    if isinstance(value, dict):
+        value = value.get("url") or value.get("contentUrl")
+    if isinstance(value, list):
+        value = next((v for v in (_absolute_image_url(item, base_url) for item in value) if v), None)
+    if not isinstance(value, str) or not value.strip():
+        return None
+    absolute = urljoin(base_url, value.strip())
+    return absolute if urlparse(absolute).scheme in ("http", "https") else None
+
+
+def extract_page_image(html, url):
+    """The article's share image from its HTML: og:image, twitter:image,
+    link rel=image_src, then a JSON-LD `image`. None when there is none."""
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        return None
+    for attrs in (
+        {"property": "og:image:secure_url"},
+        {"property": "og:image"},
+        {"name": "og:image"},
+        {"name": "twitter:image"},
+        {"name": "twitter:image:src"},
+        {"property": "twitter:image"},
+        {"itemprop": "image"},
+    ):
+        tag = soup.find("meta", attrs=attrs)
+        found = _absolute_image_url(tag.get("content") if tag else None, url)
+        if found:
+            return found
+    link = soup.find("link", rel=lambda value: value and "image_src" in value)
+    found = _absolute_image_url(link.get("href") if link else None, url)
+    if found:
+        return found
+    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        try:
+            payload = json.loads(script.string or script.get_text() or "")
+        except Exception:
+            continue
+        items = payload if isinstance(payload, list) else [payload]
+        items += [g for item in items if isinstance(item, dict) for g in item.get("@graph", []) or []]
+        for item in items:
+            if isinstance(item, dict) and item.get("image"):
+                found = _absolute_image_url(item["image"], url)
+                if found:
+                    return found
+    return None
+
+
 def build_variant_urls(url, html=None):
     """
     Generate likely article variants without crossing origin boundaries.
@@ -754,10 +807,21 @@ def scrape_article(url, fallback_content=None, force=False):
         status=SCRAPE_STATUS_FALLBACK,
         method="nyt_api",
         http_status=result.http_status,
+        image_url=result.image_url,
     )
 
 
 def _scrape_publisher(url, fallback_content=None, force=False):
+    """_scrape_publisher_pages, plus the first share image found on the pages
+    it fetched, whatever the text extraction made of them."""
+    page_images = []
+    result = _scrape_publisher_pages(url, fallback_content, force, page_images)
+    if result.image_url is None and page_images:
+        result.image_url = page_images[0]
+    return result
+
+
+def _scrape_publisher_pages(url, fallback_content, force, page_images):
     """
     Scrape from the publisher's own pages.
     The fallback order stays within the publisher's own surface area:
@@ -845,6 +909,10 @@ def _scrape_publisher(url, fallback_content=None, force=False):
         try:
             response = _fetch_html(candidate_url, headers=headers)
             http_status = response.status_code
+            if not page_images:
+                page_images.append(extract_page_image(response.text, candidate_url))
+                if page_images[0] is None:
+                    page_images.clear()
             if candidate_url == url and headers == HEADERS_DEFAULT:
                 initial_html = response.text
             content = extract_with_readability(response.text, candidate_url)

@@ -51,6 +51,10 @@ class Outlet(db.Model):
     bias_retry_count = db.Column(db.Integer, default=0, nullable=False, server_default='0')
     allsides_bias_score = db.Column(db.Float, nullable=True)
     bias_source = db.Column(db.String(16), nullable=True)
+    # The outlet's icon for cards with no article image, resolved per domain
+    # by news_fetcher/outlet_logos.py (2026-10-22).
+    logo_url = db.Column(db.String, nullable=True)
+    logo_checked_at = db.Column(db.DateTime, nullable=True)
 
     articles = db.relationship("Article", backref="outlet", lazy=True)
 
@@ -169,6 +173,9 @@ class Article(db.Model):
     copy_of_id = db.Column(db.Integer, db.ForeignKey("articles.id", ondelete="SET NULL"), nullable=True, index=True)
     copy_overlap = db.Column(db.Float, nullable=True)
     copy_checked_at = db.Column(db.DateTime, nullable=True)
+    # Set when outlet_logos.retry_missing_images fetched the page again for an
+    # og:image, found or not, so each article is retried once.
+    image_checked_at = db.Column(db.DateTime, nullable=True)
     search_vector = deferred(db.Column(TSVECTOR, db.Computed(ARTICLE_SEARCH_VECTOR_SQL, persisted=True)))
 
     topics = db.relationship("Topic", secondary=article_topics, back_populates="articles")
