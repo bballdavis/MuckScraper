@@ -128,6 +128,10 @@
 .card-actions > * { flex: 1 1 220px; }
 .card-actions form { display: flex; }
 .card-actions .btn { width: 100%; text-align: center; padding: 11px 12px; font-size: var(--fs-meta); font-weight: 700; }
+/* Summary / analysis indicators beside the Headlines button: square, as
+   tall as the button. */
+.card-actions > .act { flex: 0 0 42px; width: 42px; height: auto; align-self: stretch; font-size: 17px; border-radius: 10px; }
+.card-actions .btn .icon { margin-right: 6px; vertical-align: -0.15em; }
 
 /* Compact cards (story_card(story, compact=true), All / Grouped Stories):
    image, headline, one meta row, then the bottom row with the bias bar (or
