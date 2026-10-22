@@ -30,8 +30,9 @@ in Settings › Users signs out all of their devices on their next request.
   pairing, sign-out and last-used time, and the user's own feed preferences,
   NewsBox and schedule. No request runs a model: summaries are queued as jobs
   for the scheduler container.
-- **Scopes:** a device has `read`, and `summarize` for sending stories to
-  NewsBox and editing or running its schedule. New pairings get both;
+- **Scopes:** a device has `read`, and `summarize` for work that runs in the
+  background: sending stories to NewsBox, saving bookmarks, and editing or
+  running its schedule. New pairings get both;
   devices paired earlier were given `summarize` by migration `b7e2d4f9a1c3`.
 - **Tokens:** a token is `msk_` followed by 32 random bytes. Only its SHA-256
   is stored. Tokens expire after a year, and pairing again issues a new one.
@@ -86,6 +87,13 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 | `POST /me/newsbox/read` | Mark every item read |
 | `GET`/`PUT /me/schedules` | Scheduled summaries: run times in the user's `timezone`, sections (Headlines in pages of 20, a topic by its top N), depth and rules. `PUT` needs `summarize`. |
 | `POST /me/schedules/run` | Run the schedule once now. Needs `summarize`. |
+| `GET /me/bookmarks` | Saved stories with their latest version, plus `used_bytes` and `quota_bytes` (null when unlimited) |
+| `POST /me/bookmarks` `{story_id}` | Save a story: `202` while a new time-capsule version is written. It also goes to NewsBox as saved. Needs `summarize`. |
+| `GET`/`DELETE /me/bookmarks/{id}` | One bookmark with all its versions, or delete it and its files |
+| `POST /me/bookmarks/{id}/versions` | Save the story again as it stands now (a new version). Needs `summarize`. |
+| `GET /me/bookmarks/{id}/versions/{n}` | The time capsule itself (below) |
+| `GET /me/bookmarks/{id}/versions/{n}/assets/{name}` | A saved picture, page PDF or screenshot |
+| `GET /me/bookmarks/{id}/export` | Every ready version as a zip of `v<n>/snapshot.json` and `v<n>/assets/` |
 
 Lists are paginated with an opaque `cursor`: pass back the `next_cursor` from
 the previous page, which is `null` on the last page. `limit` is 1 to 50
@@ -99,10 +107,33 @@ pipeline and the admin's AI tasks. An item is unread from when it turns
 ready. Scheduled items have `origin: "auto"` and share an `auto_run_id`. The
 scheduler checks every minute for schedules that are due.
 
+### Bookmarks
+
+A saved story is a time capsule. Each version keeps:
+- the story: headline, original title, summary, multi-source analysis,
+  opinion roundup, topics, and coverage by leaning
+- every article: outlet and bias scores, link, date, summary, analysis, and
+  the full scraped text (whatever the full-text setting says, since this is
+  the user's own copy)
+- the linked columns, with their text
+- every picture: the story's, each article's and the ones inside the text
+- a PDF and a screenshot of each article's page, from the optional capture
+  container (`--profile capture`, `Dockerfile.capture`)
+
+Pictures and pages are referenced as `assets/<name>`. Versions never change
+after they are written, and a bookmark outlives its story: if the story is
+merged away, `story` is null and the versions stay.
+
+The scheduler writes the text and pictures. The capture container, which is
+the only one with a browser, adds the pages. Both fetch only public http(s)
+addresses (`aggregator/safe_fetch.py`), and every redirect and every request
+the page makes is checked. Files live in the `bookmark_data` volume, which
+the API mounts read-only. Each user has a storage limit (Settings › Mobile
+API › Bookmark storage: a default, per-user overrides, blank for unlimited).
+A version that would go over the limit stops with status `over_quota`.
+
 ## Not yet
 
-These are in the plan but not built: bookmarks with saved copies (a saved
-story is summarized into NewsBox, but no backup is kept yet), push
-notifications when a run finishes (`notify_when_done` is stored only), a My devices
+These are in the plan but not built: push notifications when a run finishes (`notify_when_done` is stored only), a My devices
 list on the profile page for self-service pairing, a read-only Postgres role
 for the API, a request log with alerts, and App Attest.

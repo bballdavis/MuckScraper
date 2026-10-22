@@ -28,6 +28,10 @@ INTERRUPTED_MESSAGE = "Interrupted by a scheduler restart; run it again."
 # kind -> (run(payload), fail(payload, message) or None)
 _HANDLERS = {}
 
+# Jobs only the capture container can run (it has the headless browser);
+# the scheduler's worker leaves them queued for it.
+BROWSER_KINDS = ("bookmark_capture",)
+
 
 def register(kind, run, fail=None):
     """Register `run(payload)` for jobs of `kind`. `fail(payload, message)`,
@@ -48,21 +52,32 @@ def enqueue(kind, payload=None, priority=0):
     return job.id
 
 
-def _claim_next():
+def _kind_filter(kinds, exclude):
+    """SQL and params limiting a claim to `kinds`, or to all but `exclude`."""
+    if kinds:
+        return "AND kind = ANY(:kinds)", {"kinds": list(kinds)}
+    if exclude:
+        return "AND kind <> ALL(:exclude)", {"exclude": list(exclude)}
+    return "", {}
+
+
+def _claim_next(kinds=None, exclude=None):
     """Mark the next queued job running and return (id, kind, payload), or
-    None when the queue is empty."""
+    None when the queue is empty. `kinds` limits it to those kinds;
+    `exclude` skips those."""
+    where, params = _kind_filter(kinds, exclude)
     row = db.session.execute(db.text(
-        """
+        f"""
         UPDATE jobs SET status = 'running', started_at = (now() at time zone 'utc')
         WHERE id = (
-            SELECT id FROM jobs WHERE status = 'queued'
+            SELECT id FROM jobs WHERE status = 'queued' {where}
             ORDER BY priority DESC, id
             FOR UPDATE SKIP LOCKED
             LIMIT 1
         )
         RETURNING id, kind, payload
         """
-    )).fetchone()
+    ), params).fetchone()
     db.session.commit()
     if row is None:
         return None
@@ -90,9 +105,9 @@ def _call_fail(fail, payload, message):
         logger.exception("[Jobs] fail handler raised")
 
 
-def run_next_job():
+def run_next_job(kinds=None, exclude=BROWSER_KINDS):
     """Run one queued job, if any. Returns True when a job was run."""
-    claimed = _claim_next()
+    claimed = _claim_next(kinds, exclude)
     if claimed is None:
         return False
     job_id, kind, payload = claimed
@@ -117,16 +132,18 @@ def run_next_job():
     return True
 
 
-def fail_interrupted_jobs():
-    """Mark jobs left 'running' by a previous worker process as errors. Only
-    one worker exists, so at its start any running job is an orphan."""
+def fail_interrupted_jobs(kinds=None, exclude=BROWSER_KINDS):
+    """Mark jobs left 'running' by a previous worker process as errors. One
+    worker runs each set of kinds, so at its start any of its running jobs
+    is an orphan."""
+    where, params = _kind_filter(kinds, exclude)
     rows = db.session.execute(db.text(
-        """
+        f"""
         UPDATE jobs SET status = 'error', finished_at = (now() at time zone 'utc'), error = :msg
-        WHERE status = 'running'
+        WHERE status = 'running' {where}
         RETURNING kind, payload
         """
-    ), {"msg": INTERRUPTED_MESSAGE}).fetchall()
+    ), {"msg": INTERRUPTED_MESSAGE, **params}).fetchall()
     db.session.commit()
     for row in rows:
         _, fail = _HANDLERS.get(row.kind, (None, None))
@@ -152,22 +169,27 @@ def _wait_for_notify(conn, timeout):
         conn.notifies.clear()
 
 
-def worker_loop(app, stop_event=None):
+def worker_loop(app, stop_event=None, kinds=None):
     """Run jobs until `stop_event` is set: drain the queue, then sleep until
-    a NOTIFY or POLL_SECONDS. Survives database outages by retrying."""
+    a NOTIFY or POLL_SECONDS. Survives database outages by retrying.
+    `kinds` makes it run only those (the capture container); otherwise it
+    runs everything but BROWSER_KINDS."""
     stop_event = stop_event or threading.Event()
+    exclude = None if kinds else BROWSER_KINDS
     with app.app_context():
-        # Registers the admin handlers (bulk actions, AI tasks) and the
-        # app's NewsBox summaries.
-        import aggregator.blueprints.admin._tasks  # noqa: F401
-        import aggregator.newsbox  # noqa: F401
-        fail_interrupted_jobs()
+        if not kinds:
+            # Registers the admin handlers (bulk actions, AI tasks), the
+            # app's NewsBox summaries and bookmark snapshots.
+            import aggregator.blueprints.admin._tasks  # noqa: F401
+            import aggregator.newsbox  # noqa: F401
+            import aggregator.bookmarks  # noqa: F401
+        fail_interrupted_jobs(kinds, exclude)
         listen = None
         while not stop_event.is_set():
             try:
                 if listen is None:
                     listen = _listen_connection()
-                while not stop_event.is_set() and run_next_job():
+                while not stop_event.is_set() and run_next_job(kinds, exclude):
                     pass
                 _wait_for_notify(listen[1], POLL_SECONDS)
             except Exception:

@@ -143,6 +143,39 @@
         <button type="submit" class="btn">Save settings</button>
     </div>
 </form>
+
+<form class="panel" id="bookmarks" method="POST" action="{{ url_for('admin.save_bookmark_storage') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="panel-head">
+        <div>
+            <h2>Bookmark storage</h2>
+            <p>Saved stories keep a full copy: text, summaries, analysis, coverage, pictures and page captures. A save that would go over a user's limit stops and says so; nothing already saved is removed.{% if not capture_live %} Page captures are off: the capture container isn't running (<code>docker compose --profile capture up -d</code>).{% endif %}</p>
+        </div>
+    </div>
+    <div class="row">
+        <span><label class="row-label" for="bookmark_quota_mb">Limit per user (MB)</label><span class="row-sub">Blank for unlimited</span></span>
+        <input type="number" id="bookmark_quota_mb" name="bookmark_quota_mb" value="{{ config.bookmark_quota_mb if config.bookmark_quota_mb is not none else '' }}" min="1" max="1000000" class="num-input">
+    </div>
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead><tr><th scope="col">User</th><th scope="col">Bookmarks</th><th scope="col">Using</th><th scope="col">Own limit (MB)</th></tr></thead>
+            <tbody>
+            {%- for row in storage %}
+                <tr>
+                    <td>{{ row.user.username }}</td>
+                    <td>{{ row.count }}</td>
+                    <td>{{ row.used }}</td>
+                    <td><input type="number" name="quota_{{ row.user.id }}" value="{{ row.override if row.override is not none else '' }}" min="0" max="1000000" class="num-input" aria-label="Own limit for {{ row.user.username }}" placeholder="Default"></td>
+                </tr>
+            {%- endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="row"><span class="muted">Own limit: blank uses the limit above, 0 is unlimited.</span></div>
+    <div class="panel-foot">
+        <button type="submit" class="btn">Save storage limits</button>
+    </div>
+</form>
 {% endblock %}
 
 {% block styles %}

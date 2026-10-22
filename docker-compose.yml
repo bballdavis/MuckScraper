@@ -89,9 +89,13 @@ services:
     command: python -m news_fetcher.scheduler
     environment:
       <<: *app-env
+      BOOKMARK_STORAGE_DIR: /data/bookmarks
     restart: unless-stopped
     volumes:
       - .:/app
+      # Bookmark time capsules (aggregator/bookmarks.py): written here,
+      # served read-only by the api container.
+      - bookmark_data:/data/bookmarks
 
   app:
     <<: *app-image
@@ -108,9 +112,11 @@ services:
       DISPLAY_TIMEZONE: ${DISPLAY_TIMEZONE:-UTC}
       PUBLIC_READ_ACCESS: ${PUBLIC_READ_ACCESS:-false}
       DOCKER_RESTART_PROXY_URL: http://docker-restart-proxy:5001
+      BOOKMARK_STORAGE_DIR: /data/bookmarks
     restart: unless-stopped
     volumes:
       - .:/app
+      - bookmark_data:/data/bookmarks:ro
 
   # Optional Mobile API for the MuckScroller app (docs/API.md). Off unless
   # started with `docker compose --profile api up -d`. Its own app
@@ -132,9 +138,35 @@ services:
       DISPLAY_TIMEZONE: ${DISPLAY_TIMEZONE:-UTC}
       # Reverse proxies or tunnels in front of the API; 0 when none.
       API_PROXY_HOPS: ${API_PROXY_HOPS:-1}
+      BOOKMARK_STORAGE_DIR: /data/bookmarks
     restart: unless-stopped
     volumes:
       - .:/app:ro
+      - bookmark_data:/data/bookmarks:ro
+
+  # Optional page captures for bookmark time capsules: a PDF and screenshot
+  # of each saved article's page. Off unless started with
+  # `docker compose --profile capture up -d`; without it, saved stories keep
+  # everything but the page captures. Its own image carries the headless
+  # browser (Dockerfile.capture) and its worker runs only capture jobs.
+  capture:
+    profiles: ["capture"]
+    build:
+      context: .
+      dockerfile: Dockerfile.capture
+    image: muckscraper-capture
+    command: python -m aggregator.capture
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      BOOKMARK_STORAGE_DIR: /data/bookmarks
+    # Chromium wants more shared memory than Docker's 64 MB default.
+    shm_size: "1gb"
+    restart: unless-stopped
+    volumes:
+      - bookmark_data:/data/bookmarks
 
   # Optional read-only MCP server for health checks and troubleshooting
   # (docs/MCP.md). Off unless started with `docker compose --profile mcp up -d`.
@@ -173,6 +205,9 @@ services:
     volumes:
       - .:/app:ro
     restart: unless-stopped
+
+volumes:
+  bookmark_data:
 
 networks:
   default:

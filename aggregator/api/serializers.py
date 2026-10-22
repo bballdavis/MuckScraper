@@ -247,3 +247,34 @@ def schedule(settings, row):
         "next_run_at": iso(row.next_run_at) if row is not None else None,
         "last_run_at": iso(row.last_run_at) if row is not None else None,
     }
+
+
+def bookmark_version(snapshot):
+    return {
+        "version": snapshot.version,
+        "status": snapshot.status,
+        "captures": snapshot.captures,
+        "size_bytes": int(snapshot.size_bytes or 0),
+        "asset_count": snapshot.asset_count,
+        "created_at": iso(snapshot.created_at),
+        "finished_at": iso(snapshot.finished_at),
+        "error": snapshot.error if snapshot.status in ("failed", "over_quota") or snapshot.captures in ("failed", "over_quota") else None,
+    }
+
+
+def bookmark(b, versions=False):
+    """A saved story: the iOS Bookmark. `story` is null once the story is gone."""
+    snaps = list(b.snapshots)
+    out = {
+        "id": b.id,
+        "story_id": b.story_id,
+        "title": b.title,
+        "story": story_summary(b.story) if b.story is not None else None,
+        "saved_at": iso(b.created_at),
+        "latest": bookmark_version(snaps[-1]) if snaps else None,
+        "version_count": len(snaps),
+        "size_bytes": sum(int(s.size_bytes or 0) for s in snaps),
+    }
+    if versions:
+        out["versions"] = [bookmark_version(s) for s in snaps]
+    return out
