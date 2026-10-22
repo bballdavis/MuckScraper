@@ -207,6 +207,8 @@
 .card-rail > * { flex: 1 1 0; min-height: 0; }
 .card-rail > * + * { border-top: 1px solid var(--border); }
 .card-rail .act { width: 100%; height: auto; border: 0; border-radius: 0; background: transparent; font-size: 18px; }
+/* Icons fill about 85% of the 39px rail's width (Philip, 2026-10-22). */
+.card-rail .icon { width: 33px; height: 33px; stroke-width: 1.5; }
 .card-rail .act-done { background: var(--accent); }
 .card-rail .act-ready:hover, .card-rail .act-ready:focus-visible { background: var(--accent); }
 .card-rail > :first-child { border-top-right-radius: 11px; }
