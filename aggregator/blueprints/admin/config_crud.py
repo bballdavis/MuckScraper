@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from flask import render_template, request, redirect, url_for
+from flask import jsonify, render_template, request, redirect, url_for
 from aggregator.permissions import ROLE_ADMIN, role_required
 from sqlalchemy import func
 from aggregator import db
@@ -374,9 +374,41 @@ def update_scheduled_fetch(fetch_id):
         setattr(fetch, key, value)
     if sort_order is not None:
         fetch.sort_order = sort_order
-    fetch.is_active = request.form.get("is_active") == "on"
+    # The card's switch saves on its own (set_scheduled_fetch_active), so the
+    # editor leaves the state alone unless a form sends it.
+    if "is_active" in request.form:
+        fetch.is_active = request.form.get("is_active") in ("on", "true", "1")
     db.session.commit()
-    return redirect(url_for("admin.scheduled_fetches_page"))
+    return redirect(url_for("admin.scheduled_fetches_page", _anchor=f"fetch-{fetch.id}"))
+
+
+@admin.route("/scheduled-fetches/<int:fetch_id>/active", methods=["POST"])
+@role_required(ROLE_ADMIN)
+def set_scheduled_fetch_active(fetch_id):
+    """The card's switch: turn one fetch on or off without touching the rest."""
+    fetch = ScheduledFetch.query.get_or_404(fetch_id)
+    payload = request.get_json(silent=True) or {}
+    fetch.is_active = bool(payload.get("active"))
+    db.session.commit()
+    return jsonify({"id": fetch.id, "active": fetch.is_active})
+
+
+@admin.route("/scheduled-fetches/reorder", methods=["POST"])
+@role_required(ROLE_ADMIN)
+def reorder_scheduled_fetches():
+    """Drag and drop: the page posts every fetch id in its new run order."""
+    payload = request.get_json(silent=True) or {}
+    try:
+        ids = [int(i) for i in payload.get("ids", [])]
+    except (TypeError, ValueError):
+        return jsonify({"error": "ids must be integers"}), 400
+    fetches = {f.id: f for f in ScheduledFetch.query.all()}
+    if sorted(ids) != sorted(fetches):
+        return jsonify({"error": "ids must list every scheduled fetch once"}), 400
+    for position, fetch_id in enumerate(ids, start=1):
+        fetches[fetch_id].sort_order = position
+    db.session.commit()
+    return jsonify({"ids": ids})
 
 
 @admin.route("/scheduled-fetches/<int:fetch_id>/delete", methods=["POST"])
