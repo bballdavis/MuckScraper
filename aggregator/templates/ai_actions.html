@@ -1,0 +1,49 @@
+{#- Summary and multi-source analysis as one icon each, both a button and a
+    status (Philip, 2026-10-22): filled in the theme colour once it has run
+    (no longer a button), the icon in the theme colour while it can be run
+    (a button that starts the AI task), grey when it can't. Hover or focus
+    shows a tooltip saying what it does or when it ran. Used in the
+    right-hand rail of the compact story cards, the source rows on the story
+    page and the story page section headings. Styles: theme.css .act.
+    Pages that use it define startAiTask() (articles.html, story.html).
+
+        {% from 'ai_actions.html' import ai_action with context %}
+        {{ ai_action('summary', 'done', 'Summary written', 'Open the story to read it.') }}
+        {{ ai_action('analysis', 'ready', 'Run the analysis', '…', "startAiTask('story_deep_report', 7, this)") }}
+-#}
+{% from 'icons.html' import icon %}
+{% set ai_action_icons = {'summary': 'file-text', 'analysis': 'scale'} %}
+
+{%- macro ai_action(kind, state, tip_title, tip_body='', onclick=none, extra_class='') -%}
+{%- set inner -%}
+{{ icon(ai_action_icons[kind]) }}<span class="tip" role="tooltip"><strong>{{ tip_title }}</strong>{% if tip_body %} {{ tip_body }}{% endif %}</span>
+{%- endset -%}
+{%- if state == 'ready' and onclick -%}
+<button type="button" class="act act-ready {{ extra_class }}" onclick="{{ onclick }}" aria-label="{{ tip_title }}">{{ inner }}</button>
+{%- else -%}
+<span class="act act-{{ state }} {{ extra_class }}" tabindex="0" aria-label="{{ tip_title }}{% if tip_body %}: {{ tip_body }}{% endif %}">{{ inner }}</span>
+{%- endif -%}
+{%- endmacro -%}
+
+{#- The story's two actions, for a story card or the story page. -#}
+{%- macro story_summary_action(story, can_run, extra_class='') -%}
+{%- if story.summary and story.summary != story.title -%}
+{{ ai_action('summary', 'done', 'Summary written' ~ (' ' ~ (story.summary_generated_at|short_datetime) if story.summary_generated_at else ''), 'Open the story to read the executive summary.', extra_class=extra_class) }}
+{%- elif can_run -%}
+{{ ai_action('summary', 'ready', 'Write the executive summary', 'Summarizes what every source in this story reports. Runs in the background; the page reloads when it is done.', "startAiTask('story_summary', %d, this)" % story.id, extra_class) }}
+{%- else -%}
+{{ ai_action('summary', 'off', 'No summary yet', 'It is written automatically for stories in the Headlines edition.', extra_class=extra_class) }}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro story_analysis_action(story, can_run, extra_class='') -%}
+{%- if story.deep_report -%}
+{{ ai_action('analysis', 'done', 'Multi-source analysis written', 'Open the story to see how Left, Center and Right outlets cover it.', extra_class=extra_class) }}
+{%- elif story.articles|length < 2 -%}
+{{ ai_action('analysis', 'off', 'No multi-source analysis', 'It needs two or more sources to compare.', extra_class=extra_class) }}
+{%- elif can_run -%}
+{{ ai_action('analysis', 'ready', 'Run the multi-source analysis', 'Compares how Left, Center and Right outlets cover this story. Runs in the background; the page reloads when it is done.', "startAiTask('story_deep_report', %d, this)" % story.id, extra_class) }}
+{%- else -%}
+{{ ai_action('analysis', 'off', 'No multi-source analysis yet', 'It is written automatically for stories in the Headlines edition.', extra_class=extra_class) }}
+{%- endif -%}
+{%- endmacro -%}

@@ -33,10 +33,18 @@ All notable changes to MuckScraper are documented here.
   UPDATED: …). Section headings (Executive Summary, Multi-Source Analysis)
   sit above their callouts, with about half the padding. Each source on a
   story page shows the outlet, time and lean on one line, then three
-  same-size buttons: Article (its summary and text), Source (the
-  publisher's page) and the read
-  status, which explains itself on hover. The Analysis chip is gone from
-  story cards.
+  same-size buttons, Article (its summary and text) and Source (the
+  publisher's page), and an icon-only read-status chip (green, amber or
+  red) whose tooltip explains it. The editor's note is one row (label, then
+  full/partial/blocked counts at the right) over the note itself. The
+  Analysis chip is gone from story cards.
+- **Summary and analysis icons.** A document icon for the summary and
+  balance scales for the multi-source analysis, used everywhere: in a rail
+  down the right side of each story card (with the ⋯ menu), on each source
+  row, and beside the story page's section headings (replacing "Summarize
+  Story" and "Analyze Story"). Filled means it has run; the icon in the
+  theme colour is a button that runs it; grey means it isn't available.
+  Hover explains which.
 - **Live search results.** Typing in the top bar shows the best matching
   stories (thumbnail, article and outlet counts, Left/Center/Right counts and
   bar) and articles (outlet and lean) as you type, from the new

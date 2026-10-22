@@ -3,6 +3,7 @@
 {% from '_feed_topbar.html' import feed_topbar with context %}
 {% from 'title_meta.html' import title_meta, meta_item %}
 {% from 'breadcrumb.html' import float_back with context %}
+{% from 'ai_actions.html' import ai_action, story_summary_action, story_analysis_action with context %}
 {% from 'oped_columns.html' import oped_columns, oped_roundup with context %}
 <!DOCTYPE html>
 <html data-theme="light">
@@ -58,7 +59,6 @@
             color: var(--accent-text);
             letter-spacing: 2px;
         }
-        .section-head .btn-view { padding: 4px 12px; font-size: var(--fs-label); cursor: pointer; }
 
         .analysis-box {
             background: var(--summary-bg);
@@ -135,9 +135,9 @@
         }
         .btn-view:hover { background: var(--accent); color: white; }
 
-        /* Source row buttons: one size and shape; Summary in the accent,
-           the rest grey-trimmed. */
-        .article-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+        /* Source row buttons: one size and shape; Article in the accent,
+           Source grey-trimmed; the read status is an icon-only chip. */
+        .article-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; }
         .pill {
             height: 30px; min-width: 104px; padding: 0 12px;
             display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -150,13 +150,27 @@
         .pill:hover { border-color: var(--text-faint); color: var(--text); }
         .pill-primary { border-color: var(--accent); color: var(--accent-text); }
         .pill-primary:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
-        .pill-status { cursor: help; }
-        .pill-status.read-success .icon { color: #1d6f42; }
-        .pill-status.read-fallback .icon { color: #8a5a00; }
-        .pill-status.read-blocked .icon, .pill-status.read-failed .icon { color: #a33636; }
-        [data-theme="dark"] .pill-status.read-success .icon { color: #6fcf97; }
-        [data-theme="dark"] .pill-status.read-fallback .icon { color: #f2c46d; }
-        [data-theme="dark"] .pill-status.read-blocked .icon, [data-theme="dark"] .pill-status.read-failed .icon { color: #f08a8a; }
+        .read-chip {
+            position: relative; width: 30px; height: 30px; border-radius: 8px;
+            display: inline-flex; align-items: center; justify-content: center; font-size: 16px; cursor: help;
+        }
+        .read-success { background: rgba(29,111,66,0.12); color: #1d6f42; }
+        .read-fallback { background: rgba(196,128,0,0.15); color: #a86a00; }
+        .read-blocked { background: rgba(163,54,54,0.12); color: #a33636; }
+        [data-theme="dark"] .read-success { color: #6fcf97; }
+        [data-theme="dark"] .read-fallback { color: #f2c46d; }
+        [data-theme="dark"] .read-blocked { color: #f08a8a; }
+
+        /* Each source row: the content, then a rail of summary and analysis
+           icons down the right side, as on the story cards. */
+        .article-item { flex-direction: row; gap: 0; padding: 0; }
+        .article-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 16px 16px 16px 0; }
+        .row-rail { flex: 0 0 30px; display: flex; flex-direction: column; border-left: 1px solid var(--border); }
+        .row-rail > * { flex: 1 1 0; }
+        .row-rail > * + * { border-top: 1px solid var(--border); }
+        .row-rail .act { width: 100%; height: auto; border: 0; border-radius: 0; background: transparent; font-size: 14px; }
+        .row-rail .act-done { background: var(--accent); }
+        .row-rail .act-ready:hover, .row-rail .act-ready:focus-visible { background: var(--accent); }
 
         .status-msg {
             padding: 12px 14px;
@@ -169,39 +183,29 @@
 
         .editors-note {
             margin-bottom: 8px;
-            padding: 20px 24px;
+            padding: 12px 16px;
             border: 1px solid var(--border);
             background: rgba(0,0,0,0.025);
-            border-radius: 16px;
+            border-radius: 12px;
         }
+        .editors-note-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
         .editors-note-label {
             font-size: var(--fs-label);
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 2px;
             color: var(--accent-text);
-            margin-bottom: 10px;
+        }
+        .editors-note-chips { margin-left: auto; display: flex; gap: 6px; }
+        .note-chip {
+            height: 18px; display: inline-flex; align-items: center; padding: 0 6px;
+            border-radius: 3px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+            text-transform: uppercase; white-space: nowrap;
         }
         .editors-note-text {
-            font-size: 15px;
-            line-height: 1.6;
+            font-size: 14px;
+            line-height: 1.55;
             color: var(--text-muted);
-        }
-        .editors-note-breakdown {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 14px;
-        }
-        .note-chip {
-            font-size: var(--fs-label);
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.6px;
-            padding: 4px 8px;
-            border-radius: 999px;
-            border: 1px solid var(--border);
-            background: var(--surface);
         }
         .scrape-note {
             display: inline-block;
@@ -244,8 +248,17 @@
     {% endcall %}
 
         {% if story.scrape_quality and story.scrape_quality.total > 0 %}
+        {#- One header row (label, then the read counts as chips at the right),
+            the full note below (Philip, 2026-10-22: option B, modified). -#}
         <div class="editors-note">
-            <div class="editors-note-label">Editor's Note</div>
+            <div class="editors-note-head">
+                <span class="editors-note-label">Editor's Note</span>
+                <span class="editors-note-chips">
+                    <span class="note-chip read-success">{{ story.scrape_quality.success }} full</span>
+                    <span class="note-chip read-fallback">{{ story.scrape_quality.fallback }} partial</span>
+                    <span class="note-chip read-blocked">{{ story.scrape_quality.blocked }} blocked</span>
+                </span>
+            </div>
             <div class="editors-note-text">
                 {% if story.scrape_quality.full_pct == 100 %}
                     All of the source articles in this report were fully read by the system before the summary and analysis were generated.
@@ -257,19 +270,12 @@
                     Only {{ story.scrape_quality.readable_pct }}% of the source articles were readable by the system, and just {{ story.scrape_quality.full_pct }}% were fully read. Blocked or partial scrapes can thin out the source material behind the summary and analysis.
                 {% endif %}
             </div>
-            <div class="editors-note-breakdown">
-                <span class="note-chip">Full Reads: {{ story.scrape_quality.success }}</span>
-                <span class="note-chip">Partial Reads: {{ story.scrape_quality.fallback }}</span>
-                <span class="note-chip">Blocked Reads: {{ story.scrape_quality.blocked }}</span>
-            </div>
         </div>
         {% endif %}
 
         <div class="section-head">
             <h2 class="section-label">Executive Summary</h2>
-            {% if can('scraper') and ollama_online and (not story.summary or story.summary == story.title or not story.deep_report) %}
-                <button type="button" class="btn-view" onclick="startAiTask('story_summary', {{ story.id }}, this)">Summarize Story</button>
-            {% endif %}
+            {{ story_summary_action(story, can('scraper') and ollama_online) }}
         </div>
         <div class="analysis-box">
             {% if story.summary %}
@@ -294,9 +300,7 @@
 
         <div class="section-head">
             <h2 class="section-label">Multi-Source Analysis</h2>
-            {% if can('scraper') and ollama_online and story.articles|length >= 2 and not story.deep_report %}
-                <button type="button" class="btn-view" onclick="startAiTask('story_deep_report', {{ story.id }}, this)">Analyze Story</button>
-            {% endif %}
+            {{ story_analysis_action(story, can('scraper') and ollama_online) }}
         </div>
         <div class="analysis-box">
             {% if story.deep_report %}
@@ -337,33 +341,49 @@
         <div class="article-list">
             <div class="section-head"><h2 class="section-label">Source Articles</h2></div>
             {#- One row per source: outlet and time, lean chip at the right; the
-                title; then same-size buttons: Article (our article page),
-                Source (the publisher's page) and the read status, whose
-                tooltip explains it (Philip, 2026-10-22). -#}
+                title; then same-size buttons, Article (our page with its
+                summary and text) and Source (the publisher's page), and an
+                icon-only read-status chip whose tooltip explains it. The
+                article's summary and analysis sit in a rail on the right, as
+                on the story cards (Philip, 2026-10-22). -#}
             {% set read_states = {
-                'success':  ('circle-check', 'Full read', 'MuckScraper read the full article before writing the summary and analysis.'),
-                'fallback': ('circle-dashed', 'Partial read', "Only the publisher's excerpt could be read, so some detail may be missing."),
-                'blocked':  ('ban', 'Blocked', 'The publisher blocked full-text reading; the summary and analysis use the headline and excerpt only.'),
+                'success':  ('circle-check', 'Full read', 'MuckScraper read the whole article, so the summary and analysis draw on its full text.'),
+                'fallback': ('circle-alert', 'Partial read', "Only the publisher's excerpt or a partial copy could be read, so some detail or quotes may be missing."),
+                'blocked':  ('ban', 'Not read', 'The publisher blocked full-text reading or the page could not be fetched. The summary and analysis use only the headline and excerpt.'),
             } %}
             {% for article in story.display_articles %}
+                {% set status = article.scrape_status if article.scrape_status in ['success', 'fallback'] else 'blocked' %}
+                {% set rs = read_states[status] %}
                 <div class="article-item">
-                    <div class="article-meta">
-                        <span class="article-outlet">{{ article.outlet.name }}</span>
-                        <span class="local-date" data-utc="{{ article.date.isoformat() }}Z">{{ article.date|short_datetime }}</span>
-                        {{ bias_tag(article.outlet.bias_score if article.outlet else none, unrated=false) }}
+                    <div class="article-main">
+                        <div class="article-meta">
+                            <span class="article-outlet">{{ article.outlet.name }}</span>
+                            <span class="local-date" data-utc="{{ article.date.isoformat() }}Z">{{ article.date|short_datetime }}</span>
+                            {{ bias_tag(article.outlet.bias_score if article.outlet else none, unrated=false) }}
+                        </div>
+                        <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="article-link">{{ article.title }}</a>
+                        {% set copy_note = copy_label(article) %}
+                        {% if copy_note %}
+                        <div class="scrape-note copy-note" title="This article is mostly the same text as another one in the story, so it is not counted as a separate source in the edition, summary or analysis.">{{ copy_note }} · not counted as a separate source</div>
+                        {% endif %}
+                        <div class="article-actions">
+                            <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="pill pill-primary">{{ icon('newspaper') }} Article</a>
+                            <a href="{{ article.url }}" target="_blank" rel="noopener" class="pill">{{ icon('external-link') }} Source</a>
+                            <span class="read-chip read-{{ status }} tip-above" tabindex="0" aria-label="{{ rs[1] }}: {{ rs[2] }}">{{ icon(rs[0]) }}<span class="tip" role="tooltip"><strong>{{ rs[1] }}</strong> {{ rs[2] }}</span></span>
+                        </div>
                     </div>
-                    <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="article-link">{{ article.title }}</a>
-                    {% set copy_note = copy_label(article) %}
-                    {% if copy_note %}
-                    <div class="scrape-note copy-note" title="This article is mostly the same text as another one in the story, so it is not counted as a separate source in the edition, summary or analysis.">{{ copy_note }} · not counted as a separate source</div>
-                    {% endif %}
-                    {% set rs = read_states.get(article.scrape_status or 'blocked', read_states['blocked']) %}
-                    <div class="article-actions">
-                        <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="pill pill-primary">{{ icon('newspaper') }} Article</a>
-                        <a href="{{ article.url }}" target="_blank" rel="noopener" class="pill">{{ icon('external-link') }} Source</a>
-                        <span class="pill pill-status read-{{ article.scrape_status or 'blocked' }}" tabindex="0" title="{{ rs[2] }}" aria-label="{{ rs[1] }}: {{ rs[2] }}">{{ icon(rs[0]) }} {{ rs[1] }}</span>
-                        {% if not article.summary and ollama_online and can('scraper') %}
-                            <button type="button" class="pill" onclick="startAiTask('article_summary', {{ article.id }}, this)">{{ icon('zap') }} Summarize</button>
+                    <div class="row-rail">
+                        {% if article.summary %}
+                            {{ ai_action('summary', 'done', 'Summary written', 'Open the article to read it.') }}
+                        {% elif ollama_online and can('scraper') %}
+                            {{ ai_action('summary', 'ready', 'Summarize this article', 'Writes a short summary from the text MuckScraper could read. Runs in the background; the page reloads when it is done.', "startAiTask('article_summary', %d, this)" % article.id) }}
+                        {% else %}
+                            {{ ai_action('summary', 'off', 'No summary yet', 'Articles are summarized automatically when they can be read.') }}
+                        {% endif %}
+                        {% if article.deep_analysis %}
+                            {{ ai_action('analysis', 'done', 'Article analysis written', 'Open the article to read it.') }}
+                        {% else %}
+                            {{ ai_action('analysis', 'off', 'No article analysis', 'The multi-source analysis runs on the whole story, above.') }}
                         {% endif %}
                     </div>
                 </div>
@@ -436,7 +456,8 @@
                 activeAiTaskPoll = null;
                 if (button) {
                     button.disabled = false;
-                    button.textContent = button.dataset.originalText;
+                    button.classList.remove('busy');
+                    if (button.dataset.originalText) button.textContent = button.dataset.originalText;
                 }
             }
         }, 2000);
@@ -444,9 +465,10 @@
 
     async function startAiTask(taskType, resourceId, button) {
         if (button) {
-            button.dataset.originalText = button.textContent;
             button.disabled = true;
-            button.textContent = 'Working...';
+            // Icon buttons (ai_actions.html) pulse; text buttons say so.
+            if (button.classList.contains('act')) button.classList.add('busy');
+            else { button.dataset.originalText = button.textContent; button.textContent = 'Working...'; }
         }
 
         const response = await fetch(aiTaskStartUrl, {
@@ -467,7 +489,8 @@
         if (!response.ok && response.status !== 409) {
             if (button) {
                 button.disabled = false;
-                button.textContent = button.dataset.originalText;
+                button.classList.remove('busy');
+                if (button.dataset.originalText) button.textContent = button.dataset.originalText;
             }
             return;
         }
