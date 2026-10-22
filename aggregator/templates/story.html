@@ -337,8 +337,8 @@
         <div class="article-list">
             <div class="section-head"><h2 class="section-label">Source Articles</h2></div>
             {#- One row per source: outlet and time, lean chip at the right; the
-                title; then same-size buttons: Summary (the article page),
-                Article (the publisher's page) and the read status, whose
+                title; then same-size buttons: Article (our article page),
+                Source (the publisher's page) and the read status, whose
                 tooltip explains it (Philip, 2026-10-22). -#}
             {% set read_states = {
                 'success':  ('circle-check', 'Full read', 'MuckScraper read the full article before writing the summary and analysis.'),
@@ -359,8 +359,8 @@
                     {% endif %}
                     {% set rs = read_states.get(article.scrape_status or 'blocked', read_states['blocked']) %}
                     <div class="article-actions">
-                        <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="pill pill-primary">{{ icon('newspaper') }} Summary</a>
-                        <a href="{{ article.url }}" target="_blank" rel="noopener" class="pill">{{ icon('external-link') }} Article</a>
+                        <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="pill pill-primary">{{ icon('newspaper') }} Article</a>
+                        <a href="{{ article.url }}" target="_blank" rel="noopener" class="pill">{{ icon('external-link') }} Source</a>
                         <span class="pill pill-status read-{{ article.scrape_status or 'blocked' }}" tabindex="0" title="{{ rs[2] }}" aria-label="{{ rs[1] }}: {{ rs[2] }}">{{ icon(rs[0]) }} {{ rs[1] }}</span>
                         {% if not article.summary and ollama_online and can('scraper') %}
                             <button type="button" class="pill" onclick="startAiTask('article_summary', {{ article.id }}, this)">{{ icon('zap') }} Summarize</button>
