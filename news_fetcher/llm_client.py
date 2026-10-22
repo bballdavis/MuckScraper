@@ -1,9 +1,9 @@
 # news_fetcher/llm_client.py
 #
 # Thin dispatch layer so the rest of the pipeline doesn't care whether the
-# backend is a home Ollama box, Gemini, or any OpenAI-compatible endpoint
-# (Groq, OpenRouter, and through OpenRouter's base URL anything else speaking
-# that API). Selected independently for text generation and embeddings via
+# backend is a home Ollama box, Gemini, Anthropic, or any OpenAI-compatible
+# endpoint (Groq, OpenRouter, and through OpenRouter's base URL anything else
+# speaking that API). Selected independently for text generation and embeddings via
 # LLM_PROVIDER / EMBEDDING_PROVIDER so either can be flipped back to "ollama"
 # with no code changes once Ollama is reachable again.
 #
@@ -105,6 +105,19 @@ OPENROUTER_SITE_URL = os.environ.get("OPENROUTER_SITE_URL", "")
 OPENROUTER_APP_NAME = os.environ.get("OPENROUTER_APP_NAME", "")
 
 
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+# No default model, for the same reason as GROQ_MODEL: a baked-in name goes
+# stale when the model is retired, and an unset one reads as "not configured".
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "")
+ANTHROPIC_FAST_MODEL = os.environ.get("ANTHROPIC_FAST_MODEL", "") or ANTHROPIC_MODEL
+ANTHROPIC_HOST = os.environ.get("ANTHROPIC_HOST", "https://api.anthropic.com/v1")
+ANTHROPIC_VERSION = "2023-06-01"
+# The Messages API requires max_tokens on every call, unlike the other
+# providers here. 4096 is comfortably above the longest deep report; a
+# response that hits it is truncated and logged rather than dropped.
+ANTHROPIC_MAX_TOKENS = int(os.environ.get("ANTHROPIC_MAX_TOKENS", "4096"))
+
+
 def _openrouter_headers():
     headers = {}
     if OPENROUTER_SITE_URL:
@@ -198,6 +211,8 @@ def is_configured(tier=TIER_QUALITY):
     provider = provider_for_tier(tier)
     if provider == "gemini":
         return bool(GEMINI_API_KEY)
+    if provider == "anthropic":
+        return bool(ANTHROPIC_API_KEY and ANTHROPIC_MODEL)
     if provider in OPENAI_COMPATIBLE_PROVIDERS:
         config = _openai_compatible_config(provider)
         # Both providers in this family require an explicit model name.
@@ -219,6 +234,8 @@ def model_for_tier(tier=TIER_QUALITY):
     provider = provider_for_tier(tier)
     if provider == "gemini":
         return GEMINI_FAST_MODEL if fast else GEMINI_MODEL
+    if provider == "anthropic":
+        return ANTHROPIC_FAST_MODEL if fast else ANTHROPIC_MODEL
     if provider in OPENAI_COMPATIBLE_PROVIDERS:
         config = _openai_compatible_config(provider)
         return config["fast_model"] if fast else config["model"]
@@ -237,6 +254,8 @@ def generate_text(prompt, timeout=30, tier=TIER_QUALITY):
     model = model_for_tier(tier)
     if provider == "gemini":
         return _generate_text_gemini(prompt, timeout, model)
+    if provider == "anthropic":
+        return _generate_text_anthropic(prompt, timeout, model)
     if provider in OPENAI_COMPATIBLE_PROVIDERS:
         return _generate_text_openai_compatible(prompt, timeout, model, provider)
     return _generate_text_ollama(prompt, timeout, model)
@@ -519,6 +538,61 @@ def _generate_text_openai_compatible(prompt, timeout, model, provider, _attempt=
         return None
 
 
+# Anthropic answers 529 when its API is overloaded, which like a 429 is
+# transient and worth waiting out.
+_ANTHROPIC_RETRY_STATUSES = (429, 529)
+
+
+def _generate_text_anthropic(prompt, timeout, model=None, _attempt=0):
+    """Anthropic's Messages API. Not OpenAI-compatible (different auth header,
+    a required max_tokens, and content returned as a list of blocks), so it
+    gets its own path rather than a config entry."""
+    if not ANTHROPIC_API_KEY:
+        return None
+    model = model or ANTHROPIC_MODEL
+    try:
+        response = requests.post(
+            f"{ANTHROPIC_HOST.rstrip('/')}/messages",
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": ANTHROPIC_VERSION,
+            },
+            json={
+                "model": model,
+                "max_tokens": ANTHROPIC_MAX_TOKENS,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=timeout,
+        )
+        if response.status_code in _ANTHROPIC_RETRY_STATUSES and _attempt < OPENAI_COMPATIBLE_MAX_RETRIES:
+            wait_seconds = min(
+                float(response.headers.get("retry-after", 15)) + 1,
+                OPENAI_COMPATIBLE_MAX_RETRY_WAIT_SECONDS,
+            )
+            logger.info(
+                f"  [llm_client] Anthropic returned {response.status_code}, "
+                f"retrying in {wait_seconds:.0f}s"
+            )
+            time.sleep(wait_seconds)
+            return _generate_text_anthropic(prompt, timeout, model, _attempt=_attempt + 1)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("stop_reason") == "max_tokens":
+            logger.warning(
+                f"  [llm_client] Anthropic response hit ANTHROPIC_MAX_TOKENS="
+                f"{ANTHROPIC_MAX_TOKENS} and was truncated"
+            )
+        text = "".join(
+            block.get("text", "")
+            for block in data.get("content", [])
+            if block.get("type") == "text"
+        )
+        return text.strip() or None
+    except Exception as e:
+        logger.info(f"  [llm_client] Anthropic generate error: {e}")
+        return None
+
+
 def _generate_text_groq(prompt, timeout, model=None, _attempt=0):
     """Retained as a named entry point: it predates the generalization and is
     referenced by existing tests and call sites."""
@@ -534,6 +608,7 @@ def _generate_text_openrouter(prompt, timeout, model=None, _attempt=0):
 _NO_EMBEDDING_PROVIDERS = {
     "groq": "Groq serves no embedding models",
     "openrouter": "OpenRouter routes chat completions only, not embeddings",
+    "anthropic": "Anthropic serves no embedding models",
 }
 _warned_embedding_providers = set()
 
@@ -616,6 +691,8 @@ def _check_provider_status(provider):
     the best available signal."""
     if provider == "gemini":
         return bool(GEMINI_API_KEY)
+    if provider == "anthropic":
+        return bool(ANTHROPIC_API_KEY)
     if provider in OPENAI_COMPATIBLE_PROVIDERS:
         return bool(_openai_compatible_config(provider)["api_key"])
     return _check_ollama_status()
