@@ -1,4 +1,4 @@
-"""Tests for the Mobile API (aggregator/api/, aggregator/api_app.py).
+"""Tests for the API (aggregator/api/, aggregator/api_app.py).
 
 The route checks need no database. The end-to-end tests pair a device and
 call every endpoint against a scratch Postgres database named by
@@ -57,9 +57,15 @@ class ScheduleTests(unittest.TestCase):
         for junk in ([], {"depth": "everything"}, {"minimum_sources": True},
                      {"run_times": [{"id": "a", "time": "7:00", "days": [1], "is_enabled": True}]},
                      {"run_times": [{"id": "a", "time": "07:00", "days": [8], "is_enabled": True}]},
-                     {"sections": [{"section": "World", "is_enabled": True, "amount": 21}]}):
+                     {"sections": [{"section": "World", "is_enabled": True, "amount": 101}]}):
             with self.assertRaises(ScheduleError):
                 clean_schedule(junk)
+
+    def test_every_section_amount_is_a_story_count(self):
+        from aggregator.newsbox import clean_schedule
+        settings = clean_schedule({"sections": [{"section": "Headlines", "is_enabled": True, "amount": 25},
+                                                {"section": "World", "is_enabled": True, "amount": 25}]})
+        self.assertEqual([s["amount"] for s in settings["sections"]], [25, 25])
 
 
 class SafeFetchTests(unittest.TestCase):
@@ -183,6 +189,38 @@ class ApiEndToEndTests(unittest.TestCase):
         again = self.client.post("/api/v1/devices/pair", json={"code": code})
         self.assertEqual(again.status_code, 400)
         self.assertEqual(again.get_json()["error"]["code"], "invalid_code")
+
+    def test_api_key_works_like_a_paired_device_once_keys_are_on(self):
+        from datetime import timedelta
+        from aggregator import db
+        from aggregator.api import settings
+        from aggregator.api.auth import create_api_key
+        from aggregator.models import User
+        reader = User.query.get(self.ids["reader"])
+        token, key = create_api_key(reader, "Home dashboard", ["read"], timedelta(days=30))
+        db.session.commit()
+        self.assertTrue(token.startswith("msk_"))
+        off = self._get("/api/v1/me", token)
+        self.assertEqual((off.status_code, off.get_json()["error"]["code"]), (401, "api_keys_off"))
+        settings.save({"api_keys": True})
+        db.session.commit()
+        try:
+            me = self._get("/api/v1/me", token).get_json()
+            self.assertEqual((me["device"]["kind"], me["device"]["name"]), ("key", "Home dashboard"))
+            self.assertEqual(self._get("/api/v1/stories", token).status_code, 200)
+            r = self.client.post(f"/api/v1/stories/{self.ids['story']}/summarize", json={},
+                                 headers={"Authorization": f"Bearer {token}"})
+            self.assertEqual(r.status_code, 403)
+            forever, key = create_api_key(reader, "Cron job", ["read", "summarize"])
+            db.session.commit()
+            self.assertIsNone(key.expires_at)
+            self.assertEqual(self._get("/api/v1/me", forever).status_code, 200)
+        finally:
+            settings.save({"api_keys": False})
+            db.session.commit()
+        # Turning keys off again stops them; paired devices are unaffected.
+        self.assertEqual(self._get("/api/v1/me", token).status_code, 401)
+        self.assertEqual(self._get("/api/v1/me", self._pair()).status_code, 200)
 
     def test_expired_code_and_disabled_user_cannot_pair(self):
         r = self.client.post("/api/v1/devices/pair", json={"code": self._code(expired=True)})
@@ -464,15 +502,15 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.get_json())
         self.assertIsNotNone(r.get_json()["next_run_at"])
         for bad_value in ({"run_times": [{"id": "x", "time": "25:00", "days": [1], "is_enabled": True}]},
-                          {"sections": [{"section": "Headlines", "is_enabled": True, "amount": 9}]},
+                          {"sections": [{"section": "Headlines", "is_enabled": True, "amount": 101}]},
                           {"timezone": "Mars/Base"}, {"surprise": 1}):
             r = self._send("PUT", "/api/v1/me/schedules", token, json={**schedule, **bad_value})
             self.assertEqual(r.status_code, 400, bad_value)
         run = self._send("POST", "/api/v1/me/schedules/run", token)
         self.assertEqual(run.status_code, 202, run.get_json())
         self.assertEqual(run.get_json()["added"], 1)
-        item = self._get("/api/v1/me/newsbox?origin=auto", token).get_json()["items"][0]
-        self.assertEqual((item["state"], item["auto_run_id"]), ("ready", run.get_json()["run_id"]))
+        item = self._get("/api/v1/me/newsbox?origin=scheduled", token).get_json()["items"][0]
+        self.assertEqual((item["state"], item["run_id"]), ("ready", run.get_json()["run_id"]))
 
     def test_due_schedules_run_and_move_on(self):
         from aggregator import db, newsbox
@@ -485,7 +523,7 @@ class ApiEndToEndTests(unittest.TestCase):
         row.next_run_at = datetime.utcnow() - timedelta(minutes=1)
         db.session.commit()
         self.assertEqual(newsbox.run_due_schedules(), 1)
-        self.assertEqual(NewsBoxItem.query.filter_by(user_id=self.ids["reader"], origin="auto").count(), 1)
+        self.assertEqual(NewsBoxItem.query.filter_by(user_id=self.ids["reader"], origin="scheduled").count(), 1)
         self.assertGreater(SummarySchedule.query.get(self.ids["reader"]).next_run_at, datetime.utcnow())
         self.assertEqual(newsbox.run_due_schedules(), 0)
 
