@@ -27,7 +27,11 @@ JOB_KIND = "newsbox_summary"
 # Below the pipeline and the admin AI tasks (priority 10), above bulk actions.
 JOB_PRIORITY = 5
 
-ORIGINS = ("swiped", "saved", "auto")
+ORIGINS = ("swiped", "saved", "auto", "breaking")
+# What an unfinished item is waiting on, in order. A Breaking headline sent
+# from the app starts at "scrape" (aggregator/breaking.py); a story starts
+# at "summary" or "analysis".
+STEPS = ("scrape", "group", "summary", "analysis")
 DEPTHS = ("summary", "analysis", "summary_analysis")
 # What each depth asks to have written.
 _PARTS = {"summary": {"summary"}, "analysis": {"analysis"}, "summary_analysis": {"summary", "analysis"}}
@@ -81,6 +85,17 @@ def _has(story, depth):
     return True
 
 
+def has_parts(story, depth):
+    """Public name for _has, for aggregator/breaking.py."""
+    return _has(story, depth)
+
+
+def _next_step(story, depth):
+    """The step a pending item for `story` is waiting on."""
+    parts = _needs(story, depth)
+    return "summary" if "summary" in parts and not (story.summary or "").strip() else "analysis"
+
+
 def _depth_of(parts):
     return next(d for d in DEPTHS if _PARTS[d] == parts)
 
@@ -111,16 +126,76 @@ def queue_story(user_id, story, origin, depth="summary", run_id=None):
     if _has(story, item.depth):
         if item.state != "ready":
             item.state, item.ready_at, item.error, item.is_unread = "ready", datetime.utcnow(), None, True
+        item.step = None
         db.session.flush()
         return item, False
     covered = ((prev_state in UNFINISHED and _covers(prev_depth, item.depth))
                or _job_in_flight(story.id, item.depth, exclude_id=item.id))
-    item.state, item.error = "pending", None
+    item.state, item.error, item.step = "pending", None, _next_step(story, item.depth)
     db.session.flush()
     if covered:
         return item, False
     jobs.enqueue(JOB_KIND, {"story_id": story.id, "depth": item.depth}, priority=JOB_PRIORITY)
     return item, True
+
+
+def queue_summary(story, depth="summary"):
+    """Make sure `story` gets what `depth` asks for, with nobody's NewsBox
+    waiting on it (the web Breaking News bar). Returns True when a job was
+    queued. Commits when it queues."""
+    if _has(story, depth) or _job_in_flight(story.id, depth):
+        return False
+    jobs.enqueue(JOB_KIND, {"story_id": story.id, "depth": depth}, priority=JOB_PRIORITY)
+    return True
+
+
+def queue_feed_entry(user_id, entry, depth="summary"):
+    """Put a Breaking headline in the user's NewsBox. Once it is in a story
+    this is queue_story(); before that the item waits on the scrape job
+    (aggregator/breaking.py), which attaches the story. Caller commits."""
+    story = entry.article.story if entry.article is not None else None
+    if story is not None:
+        return queue_story(user_id, story, "breaking", depth)[0]
+    item = NewsBoxItem.query.filter_by(user_id=user_id, feed_entry_id=entry.id, story_id=None).first()
+    if item is None:
+        item = NewsBoxItem(user_id=user_id, feed_entry_id=entry.id, origin="breaking", depth=depth,
+                           is_unread=False, added_at=datetime.utcnow())
+        db.session.add(item)
+    else:
+        item.depth = _deeper(item.depth, depth)
+    item.state, item.step, item.error = "pending", "scrape", None
+    db.session.flush()
+    return item
+
+
+def attach_story(item, story):
+    """The scrape job found the item's story: give it the story and queue its
+    summary. When the user already has that story in NewsBox, the two merge
+    into the older item. Caller commits."""
+    existing = NewsBoxItem.query.filter(NewsBoxItem.user_id == item.user_id, NewsBoxItem.story_id == story.id,
+                                        NewsBoxItem.id != item.id).first()
+    depth = item.depth
+    if existing is not None:
+        db.session.delete(item)
+        db.session.flush()
+        return queue_story(existing.user_id, story, existing.origin, depth)[0]
+    item.story_id = story.id
+    if _has(story, depth):
+        item.state, item.ready_at, item.error, item.is_unread, item.step = "ready", datetime.utcnow(), None, True, None
+        db.session.flush()
+        return item
+    item.state, item.error, item.step = "pending", None, _next_step(story, depth)
+    db.session.flush()
+    # Not queue_story(): this item was waiting on the scrape, not a summary.
+    if not _job_in_flight(story.id, depth, exclude_id=item.id):
+        jobs.enqueue(JOB_KIND, {"story_id": story.id, "depth": depth}, priority=JOB_PRIORITY)
+    return item
+
+
+def _set_step(story_id, step):
+    for item in _waiting(story_id):
+        item.step = step
+    db.session.commit()
 
 
 def _job_in_flight(story_id, depth, exclude_id=None):
@@ -159,12 +234,14 @@ def run_summary_job(payload):
             raise RuntimeError("The summarization model is offline.")
         parts = _needs(story, depth)
         if "summary" in parts and not (story.summary or "").strip():
+            _set_step(story.id, "summary")
             summary = summarize_story(story)
             if not summary:
                 raise RuntimeError("No summary was written.")
             story.summary = summary
             db.session.commit()
         if not _has(story, depth):
+            _set_step(story.id, "analysis")
             report = generate_deep_report(story)
             if not report:
                 raise RuntimeError("No analysis was written.")
@@ -174,16 +251,16 @@ def run_summary_job(payload):
     now = datetime.utcnow()
     for item in _waiting(story.id):
         if _has(story, item.depth):
-            item.state, item.ready_at, item.error, item.is_unread = "ready", now, None, True
+            item.state, item.ready_at, item.error, item.is_unread, item.step = "ready", now, None, True, None
         else:
             # Asked for more while this job ran; queue_story added a job for it.
-            item.state = "pending"
+            item.state, item.step = "pending", _next_step(story, item.depth)
     db.session.commit()
 
 
 def fail_summary_job(payload, message):
     for item in _waiting(payload.get("story_id")):
-        item.state, item.error = "failed", (message or "Failed.")[:300]
+        item.state, item.error, item.step = "failed", (message or "Failed.")[:300], None
     db.session.commit()
 
 

@@ -3,8 +3,9 @@ from collections import OrderedDict
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify
 from flask_login import current_user
-from aggregator import feed_prefs
-from aggregator.permissions import public_or_login, public_read_enabled
+from aggregator import breaking, feed_prefs
+from aggregator.models import FeedEntry
+from aggregator.permissions import ROLE_SCRAPER, public_or_login, public_read_enabled, role_required
 from aggregator.models import Article, Story, Topic, RawArticlePayload, Edition, EditionStory
 from aggregator.opinion import opinion_for_story, published_edition_opinion_cards, split_by_leaning
 from aggregator.story_view import apply_aggregator_filter, annotate_edition_story_flags
@@ -87,19 +88,67 @@ def headlines_feed():
         apply_aggregator_filter(story)
 
     total_pages = max(1, (total_stories + per_page - 1) // per_page)
+    is_past_edition = bool(newest_edition and latest_edition and latest_edition.id != newest_edition.id)
 
     return render_template(
         "headlines_feed.html",
+        # The Breaking News bar shows on the current edition only.
+        **({} if is_past_edition else _breaking_context()),
         stories=stories,
         edition_label=edition_label,
         edition=latest_edition,
-        is_past_edition=bool(newest_edition and latest_edition and latest_edition.id != newest_edition.id),
+        is_past_edition=is_past_edition,
         opinion_count=len(published_edition_opinion_cards(latest_edition)) if latest_edition else 0,
         page=page,
         total_pages=total_pages,
         topics=Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all(),
         active_nav="headlines",
     )
+
+
+def _age_label(when, now):
+    minutes = max(0, int((now - when).total_seconds() // 60))
+    if minutes < 60:
+        return f"{max(1, minutes)}m"
+    return f"{minutes // 60}h"
+
+
+def _breaking_context():
+    """Template values for the Breaking News bar (_breaking_bar.html)."""
+    now = datetime.utcnow()
+    rows = []
+    for entry in breaking.bar_entries(now=now):
+        state = breaking.entry_state(entry, now)
+        rows.append({"entry": entry, "state": state, "story": breaking.story_of(entry),
+                     "age": _age_label(entry.published_at, now)})
+    return {
+        "breaking_rows": rows,
+        "breaking_working": any(r["state"] in breaking.WORKING for r in rows),
+        "actionable": breaking.ACTIONABLE,
+        "working": breaking.WORKING,
+    }
+
+
+@public.route("/headlines/breaking")
+@public_or_login
+def breaking_bar():
+    """The Breaking News bar alone, for Headlines to refresh in place. Empty
+    when nothing is breaking."""
+    context = _breaking_context()
+    if not context["breaking_rows"]:
+        return ""
+    return render_template("_breaking_bar.html", **context)
+
+
+@public.route("/headlines/breaking/<int:entry_id>/summarize", methods=["POST"])
+@role_required(ROLE_SCRAPER)
+def summarize_breaking(entry_id):
+    """Scrape a breaking headline (if needed) and summarize its story, in the
+    background (aggregator/breaking.py)."""
+    entry = FeedEntry.query.get_or_404(entry_id)
+    if breaking.entry_state(entry) in breaking.ACTIONABLE:
+        breaking.request(entry)
+    return jsonify({"state": breaking.entry_state(entry)}), 202
 
 
 @public.route("/headlines/opinion")
