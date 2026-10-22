@@ -159,56 +159,34 @@
             font-size: 14px;
         }
 
-        /* Scrape telemetry (signed in) and the plain read status (signed
-           out), in the story page's Editor's Note box: the label, the status
-           chip at the right, then the detail. */
-        .editors-note {
-            margin-bottom: 8px;
-            padding: 12px 16px;
-            border: 1px solid var(--border);
-            background: rgba(0,0,0,0.025);
-            border-radius: 12px;
-        }
-        .editors-note-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-        .editors-note-label {
-            font-size: var(--fs-label);
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: var(--accent-text);
-        }
-        .editors-note-chips { margin-left: auto; display: flex; gap: 6px; }
-        .editors-note-text { font-size: 14px; line-height: 1.55; color: var(--text-muted); }
-        .note-chip {
-            height: 18px; display: inline-flex; align-items: center; padding: 0 6px;
-            border-radius: 3px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
-            text-transform: uppercase; white-space: nowrap;
-        }
-        .scrape-success { background: rgba(29,111,66,0.12); color: #1d6f42; }
-        .scrape-fallback { background: rgba(196,128,0,0.15); color: #a86a00; }
-        .scrape-blocked, .scrape-failed { background: rgba(163,54,54,0.12); color: #a33636; }
-        .scrape-skipped, .scrape-pending { background: rgba(102,102,102,0.12); color: var(--text-muted); }
-        [data-theme="dark"] .scrape-success { color: #6fcf97; }
-        [data-theme="dark"] .scrape-fallback { color: #f2c46d; }
-        [data-theme="dark"] .scrape-blocked, [data-theme="dark"] .scrape-failed { color: #f08a8a; }
-        .scrape-facts { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--text-muted); }
-        .scrape-facts dt { display: inline; font-size: var(--fs-label); font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-faint); }
-        .scrape-facts dd { display: inline; margin-left: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; word-break: break-word; }
-        .scrape-facts .scrape-reason { flex-basis: 100%; }
-
-        /* The link to the publisher's page, at the right of the line under
-           the title with the lean chip; sized like the story page's pills. */
-        .tm-end { display: inline-flex; align-items: center; gap: 10px; }
-        .source-pill {
-            height: 30px; padding: 0 12px;
-            display: inline-flex; align-items: center; gap: 6px;
-            border: 1px solid var(--accent); border-radius: 8px;
+        /* Under the title: a Source button (the publisher's page) and, at its
+           right, the read status as an icon-only chip whose tooltip gives the
+           detail, as on the story page's source rows (Philip, 2026-10-22). */
+        .source-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; }
+        .pill {
+            height: 30px; min-width: 104px; padding: 0 12px;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            border: 1px solid var(--accent); border-radius: 8px; background: transparent;
             color: var(--accent-text); font-size: 12px; font-weight: 700;
-            text-decoration: none; white-space: nowrap; letter-spacing: 0; text-transform: none;
+            text-decoration: none; white-space: nowrap;
             transition: background 0.15s, color 0.15s;
         }
-        .source-pill .icon { font-size: 14px; }
-        .source-pill:hover, .source-pill:focus-visible { background: var(--accent); color: #fff; outline: none; }
+        .pill .icon { font-size: 14px; }
+        .pill:hover, .pill:focus-visible { background: var(--accent); color: #fff; outline: none; }
+        .read-chip {
+            position: relative; width: 30px; height: 30px; border-radius: 8px;
+            display: inline-flex; align-items: center; justify-content: center; font-size: 16px; cursor: help;
+        }
+        .read-chip .tip { left: 0; right: auto; top: calc(100% + 8px); transform: none; max-width: 320px; }
+        .read-chip:focus > .tip { opacity: 1; visibility: visible; }  /* a tap on a phone */
+        .tip-facts { display: block; margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; color: #c8c8d4; word-break: break-word; }
+        .read-success { background: rgba(29,111,66,0.12); color: #1d6f42; }
+        .read-fallback { background: rgba(196,128,0,0.15); color: #a86a00; }
+        .read-blocked { background: rgba(163,54,54,0.12); color: #a33636; }
+        .read-pending { background: rgba(102,102,102,0.12); color: var(--text-muted); }
+        [data-theme="dark"] .read-success { color: #6fcf97; }
+        [data-theme="dark"] .read-fallback { color: #f2c46d; }
+        [data-theme="dark"] .read-blocked { color: #f08a8a; }
 
         .summary-bullets {
             margin: 8px 0 1em 1.5em;
@@ -335,7 +313,7 @@
 {%- endif -%}
 {%- endif -%}
 {%- endset -%}
-{{ float_back(url_for('public.view_story', story_id=article.story_id, back=incoming_back()) if article.story_id else feed_back_url(article_back_anchor(article)), 'Back to Story' if article.story_id else 'Back to Feed', rail) }}
+{{ float_back(url_for('public.view_story', story_id=article.story_id, back=incoming_back()) if article.story_id else feed_back_url(article_back_anchor(article)), 'Back to Story' if article.story_id else 'Back to Feed', rail, collapse=can('scraper')) }}
     <div class="article-card">
         {% include '_flashes.html' %}
         <div id="ai-task-status" style="display:none; margin-bottom:20px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.03); color:var(--text-muted); font-size:13px;"></div>
@@ -349,10 +327,7 @@
             {{ meta_item('Source', article.outlet.name if article.outlet else 'Unknown') }}
             {{ meta_item('Published', when=article.date) }}
             {% if article.last_updated and article.last_updated != article.date %}{{ meta_item('Last updated', when=article.last_updated) }}{% endif %}
-            <span class="tm-end">
-                {{ bias_tag(lean) }}
-                <a class="source-pill" href="{{ article.url }}" target="_blank" rel="noopener">{{ icon('external-link') }} Original article</a>
-            </span>
+            {{ bias_tag(lean) }}
         {% endcall %}
 
         {% if article.has_usable_image %}
@@ -377,24 +352,16 @@
             'skipped': 'No summary: MuckScraper does not read articles from this source in full.',
         }.get(article.scrape_status) %}
 
-        {#- Signed-in readers see the scrape telemetry first, under the title
-            (Regis, 2026-10-10), in the story page's Editor's Note box. -#}
-        <div class="editors-note">
-            <div class="editors-note-head">
-                <span class="editors-note-label">{{ 'Scrape Telemetry' if current_user.is_authenticated else 'How we read this article' }}</span>
-                <span class="editors-note-chips">
-                    <span class="note-chip scrape-{{ scrape_status }}">{{ {'success': 'Scrape OK', 'fallback': 'Fallback used', 'blocked': 'Blocked', 'skipped': 'Skipped', 'failed': 'Failed'}.get(scrape_status, 'Pending') if current_user.is_authenticated else read_status[0] }}</span>
-                </span>
-            </div>
-            {% if current_user.is_authenticated %}
-            <dl class="scrape-facts">
-                <div><dt>Method</dt><dd>{{ article.scrape_method or 'n/a' }}</dd></div>
-                <div><dt>HTTP status</dt><dd>{{ article.scrape_http_status or 'n/a' }}</dd></div>
-                {% if article.scrape_failure_reason %}<div class="scrape-reason"><dt>Failure reason</dt><dd>{{ article.scrape_failure_reason }}</dd></div>{% endif %}
-            </dl>
-            {% else %}
-            <div class="editors-note-text">{{ read_status[1] }}</div>
-            {% endif %}
+        {#- The Source button, then the read status as an icon chip; its
+            tooltip explains it, and signed-in readers also get the scrape
+            telemetry there (Regis, 2026-10-10: technical fields signed-in only). -#}
+        {% set chip = {'success': ('success', 'circle-check'), 'fallback': ('fallback', 'circle-alert'),
+                       'blocked': ('blocked', 'ban'), 'failed': ('blocked', 'ban'),
+                       'skipped': ('pending', 'ban'), 'pending': ('pending', 'circle-alert')}[scrape_status] %}
+        <div class="source-row">
+            <a href="{{ article.url }}" target="_blank" rel="noopener" class="pill">{{ icon('link') }} Source</a>
+            <span class="read-chip read-{{ chip[0] }}" tabindex="0" aria-label="{{ read_status[0] }}: {{ read_status[1] }}">{{ icon(chip[1]) }}<span class="tip" role="tooltip"><strong>{{ read_status[0] }}</strong> {{ read_status[1] }}
+                {%- if current_user.is_authenticated %}<span class="tip-facts">Method: {{ article.scrape_method or 'n/a' }} · HTTP {{ article.scrape_http_status or 'n/a' }}{% if article.scrape_failure_reason %}<br>{{ article.scrape_failure_reason }}{% endif %}</span>{% endif %}</span></span>
         </div>
 
         <div class="section-head"><h2 class="section-label">Executive Summary</h2></div>
@@ -402,7 +369,7 @@
             {% if article.summary %}
                 <p>{{ article.summary | summary_paragraph }}</p>
             {% elif summary_blocked_reason and not (article.content and article.content|length > 100) %}
-                <div class="status-msg">{{ summary_blocked_reason }} Read it at the source with the Original article link above.</div>
+                <div class="status-msg">{{ summary_blocked_reason }} Read it at the source with the Source button above.</div>
             {% elif not ollama_online %}
                 <div class="status-msg">Summary will be generated when the AI provider is back online. This article has been added to the queue.</div>
             {% else %}
