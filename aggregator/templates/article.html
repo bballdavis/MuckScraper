@@ -1,7 +1,9 @@
 {% from 'story_card_macros.html' import bias_tag with context %}
-{% from 'account_menu.html' import account_menu with context %}
 <!-- muckscraperHeadlinesGoogleNEW/aggregator/templates/article.html -->
-{% from 'icons.html' import icon, theme_toggle_label %}
+{% from 'icons.html' import icon %}
+{% from '_feed_topbar.html' import feed_topbar with context %}
+{% from 'title_meta.html' import title_meta, meta_item %}
+{% from 'breadcrumb.html' import float_back with context %}
 <!DOCTYPE html>
 <html data-theme="light">
 <head>
@@ -16,6 +18,8 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
     <title>{{ article.title }} — MuckScraper</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/feed_header.css') }}">
+    <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
     <style>
         :root {
             --shadow:        0 10px 30px rgba(0,0,0,0.08);
@@ -35,33 +39,20 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        .topbar {
-            background: var(--topbar-bg);
-            padding: 16px 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
 
-        .topbar a { color: #89b4fa; text-decoration: none; font-size: 14px; font-weight: 600; }
-        .topbar-title { color: var(--topbar-text); font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
         .public-source { margin: 8px 0 32px; text-align: center; }
         /* The top bar is dark in both themes, so the button keeps light text. */
-        .theme-toggle { background: none; border: 1px solid #444; color: #cdd6f4; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
 
         .container {
             max-width: var(--width-read);
-            margin: 60px auto;
+            margin: 28px auto;
             padding: 0 20px;
         }
 
         .article-card {
             background: var(--surface);
             border-radius: 24px;
-            padding: 48px;
+            padding: 40px;
             box-shadow: var(--shadow);
             border: 1px solid var(--border);
         }
@@ -94,13 +85,16 @@
         }
 
         .bias-tag {
-            display: inline-block;
-            font-size: var(--fs-label);
-            font-weight: 800;
-            padding: 3px 10px;
-            border-radius: 8px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            padding: 0 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
         }
 
         .bias-none { background-color: #ddd; color: #666;  }
@@ -121,7 +115,7 @@
             font-size: 36px;
             font-weight: 800;
             color: var(--text);
-            margin-bottom: 24px;
+            margin-bottom: 12px;
             line-height: 1.2;
             letter-spacing: -1px;
         }
@@ -129,14 +123,14 @@
         .divider {
             border: none;
             border-top: 1px solid var(--border);
-            margin: 32px 0;
+            margin: 16px 0;
         }
 
         .summary {
             background: var(--summary-bg);
-            border-left: 5px solid var(--accent);
-            padding: 24px 32px;
-            margin-bottom: 40px;
+            border-left: 4px solid var(--accent);
+            padding: 16px 20px;
+            margin-bottom: 20px;
             font-size: 16px;
             line-height: 1.6;
             color: var(--text);
@@ -149,7 +143,7 @@
             text-transform: uppercase;
             color: var(--accent-text);
             letter-spacing: 2px;
-            margin-bottom: 12px;
+            margin: 24px 0 10px;
         }
 
         .summary p { margin-bottom: 1em; }
@@ -164,7 +158,7 @@
         }
 
         .scrape-panel {
-            margin: 20px 0 28px;
+            margin: 16px 0 0;
             padding: 16px 18px;
             border-radius: 14px;
             border: 1px solid var(--border);
@@ -333,52 +327,34 @@
             .article-card { padding: 24px; border-radius: 0; }
             .container { margin: 0; padding: 0; }
             h1 { font-size: 28px; }
-            .topbar { padding: 16px 20px; }
         }
         {% include 'sidebar_styles.html' %}
     </style>
 </head>
 <body>
 
-<div class="layout">
+{#- The feed's top bar, full width above the sidebar (_feed_topbar.html). -#}
+{%- set sidebar_toggle_in_topbar = true -%}
+{{ feed_topbar('Article', url_for('admin.list_articles')) }}
+<div class="layout feed-layout">
 {% include 'sidebar_nav.html' %}
 <div class="page-body">
 
-{% from 'breadcrumb.html' import back_link %}
-<div class="topbar">
-    <div class="topbar-left crumb-bar">
-        <span class="topbar-title">MuckScraper</span>
-        {% if article.story_id %}
-        {{ back_link(url_for('public.view_story', story_id=article.story_id, back=incoming_back()), 'Back to Story') }}
-        {% else %}
-        {{ back_link(feed_back_url(article_back_anchor(article)), 'Back to Feed') }}
-        {% endif %}
-    </div>
-    <div style="display:flex; align-items:center; gap:12px;">
-        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">{{ theme_toggle_label() }}</button>
-        {{ account_menu() }}
-    </div>
-</div>
-
 <div class="container">
+{{ float_back(url_for('public.view_story', story_id=article.story_id, back=incoming_back()) if article.story_id else feed_back_url(article_back_anchor(article)), 'Back to Story' if article.story_id else 'Back to Feed') }}
     <div class="article-card">
         <div id="ai-task-status" style="display:none; margin-bottom:20px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.03); color:var(--text-muted); font-size:13px;"></div>
 
-        <div class="article-meta">
-            <span class="outlet-name">{{ article.outlet.name }}</span>
-            <span class="article-date local-date" data-utc="{{ article.date.isoformat() }}Z">{{ article.date.strftime('%B %d, %Y') }}</span>
-            {% if article.last_updated and article.last_updated != article.date %}
-                <span style="color:var(--text-faint); font-size:12px;">•</span>
-                <span class="article-date">Updated: <span class="local-date" data-utc="{{ article.last_updated.isoformat() }}Z">{{ article.last_updated.strftime('%B %d, %Y %H:%M') }}</span></span>
-            {% endif %}
-
-            {{ bias_tag(article.outlet.bias_score if article.outlet else none) }}
-        </div>
-
         <h1><a href="{{ article.url }}" target="_blank" style="color: inherit; text-decoration: none;">{{ article.title }}</a></h1>
+        {% call title_meta() %}
+            {{ meta_item('Source', article.outlet.name if article.outlet else 'Unknown') }}
+            {{ meta_item('Published', when=article.date) }}
+            {% if article.last_updated and article.last_updated != article.date %}{{ meta_item('Last updated', when=article.last_updated) }}{% endif %}
+            {{ bias_tag(article.outlet.bias_score if article.outlet else none) }}
+        {% endcall %}
 
         {% if article.has_usable_image %}
-            <img src="{{ article.image_url }}" alt="Article Image" style="width: 100%; border-radius: 16px; margin-bottom: 32px; box-shadow: var(--shadow);">
+            <img src="{{ article.image_url }}" alt="Article Image" style="width: 100%; border-radius: 16px; margin-bottom: 16px; box-shadow: var(--shadow);">
         {% endif %}
 
         <hr class="divider">
@@ -440,8 +416,8 @@
         </div>
         {% endif %}
 
+        <h2 class="summary-label">Executive Summary</h2>
         <div class="summary">
-            <div class="summary-label">Executive Summary</div>
             {% if article.summary %}
                 <p>{{ article.summary | summary_paragraph }}</p>
             {% elif summary_blocked_reason and not (article.content and article.content|length > 100) %}
@@ -454,8 +430,8 @@
         </div>
 
         {% if article.deep_analysis %}
+        <h2 class="summary-label">Deep Analysis</h2>
         <div class="summary">
-            <div class="summary-label">Deep Analysis</div>
             {% for line in article.deep_analysis.split('\n') %}
                 {% set l = line.strip() %}
                 {% if l %}

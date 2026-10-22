@@ -258,7 +258,8 @@
                 activeAiTaskPoll = null;
                 if (button) {
                     button.disabled = false;
-                    button.textContent = button.dataset.originalText;
+                    button.classList.remove('busy');
+                    if (button.dataset.originalText) button.textContent = button.dataset.originalText;
                 }
             }
         }, 2000);
@@ -266,9 +267,10 @@
 
     async function startAiTask(taskType, resourceId, button) {
         if (button) {
-            button.dataset.originalText = button.textContent;
             button.disabled = true;
-            button.textContent = 'Working...';
+            // Icon buttons (ai_actions.html) pulse; text buttons say so.
+            if (button.classList.contains('act')) button.classList.add('busy');
+            else { button.dataset.originalText = button.textContent; button.textContent = 'Working...'; }
         }
 
         const response = await fetch(aiTaskStartUrl, {
@@ -289,7 +291,8 @@
         if (!response.ok && response.status !== 409) {
             if (button) {
                 button.disabled = false;
-                button.textContent = button.dataset.originalText;
+                button.classList.remove('busy');
+                if (button.dataset.originalText) button.textContent = button.dataset.originalText;
             }
             return;
         }
