@@ -291,7 +291,7 @@ class ApiEndToEndTests(unittest.TestCase):
             codes = [self._get("/api/v1/topics", token).status_code for _ in range(3)]
             self.assertEqual(codes[-1], 429)
         finally:
-            settings.save({"per_device_per_minute": 120})
+            settings.save({"per_device_per_minute": 300})
             db.session.commit()
         settings.save({"enabled": False})
         db.session.commit()

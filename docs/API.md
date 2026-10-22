@@ -13,7 +13,11 @@ internet. The web app and admin stay on your network.
 2. Put a tunnel or reverse proxy with TLS in front of that port (Cloudflare
    Tunnel, Tailscale, Caddy). Set `API_PROXY_HOPS` to the number of proxies in
    front of the API, so rate limits see the phone's real address (`0` if the
-   phone connects directly).
+   phone connects directly). Behind Cloudflare, also set
+   `API_CLIENT_IP_HEADER=CF-Connecting-IP`: otherwise everyone reaching the
+   same Cloudflare edge shares one per-address limit. Only do that when the
+   API can't be reached around Cloudflare, since a direct caller could send
+   the header themselves.
 3. In **Settings › Mobile API**, enter the public address
    (`https://api.example.com`), pick a user and press **Create pairing code**.
 4. In MuckScroller, scan the QR code or type the code. The code works once
