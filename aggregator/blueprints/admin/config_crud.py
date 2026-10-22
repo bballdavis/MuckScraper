@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from flask import jsonify, render_template, request, redirect, url_for
+from flask import abort, jsonify, render_template, request, redirect, url_for
 from aggregator.permissions import ROLE_ADMIN, role_required
 from sqlalchemy import func
 from aggregator import db
@@ -238,18 +238,30 @@ def delete_pipeline_schedule(entry_id):
 INGESTION_BLOCK_KINDS = ["source", "title_keyword"]
 
 
-@admin.route("/ingestion-blocks")
+# Each kind has its own page under Settings › Blocklists, keyed by a slug.
+INGESTION_BLOCK_SLUGS = {"sources": "source", "keywords": "title_keyword"}
+INGESTION_BLOCK_SLUG_FOR = {kind: slug for slug, kind in INGESTION_BLOCK_SLUGS.items()}
+
+
+@admin.route("/ingestion-blocks", defaults={"slug": "sources"})
+@admin.route("/ingestion-blocks/<slug>")
 @role_required(ROLE_ADMIN)
-def ingestion_blocks_page():
-    blocks_by_kind = {
-        kind: IngestionBlock.query.filter_by(kind=kind).order_by(
-            IngestionBlock.note.asc(), IngestionBlock.pattern.asc()
-        ).all()
-        for kind in INGESTION_BLOCK_KINDS
-    }
-    return render_template(
-        "ingestion_blocks.html", blocks_by_kind=blocks_by_kind, kinds=INGESTION_BLOCK_KINDS,
-    )
+def ingestion_blocks_page(slug):
+    kind = INGESTION_BLOCK_SLUGS.get(slug)
+    if kind is None:
+        abort(404)
+    blocks = IngestionBlock.query.filter_by(kind=kind).order_by(
+        IngestionBlock.note.asc(), IngestionBlock.pattern.asc()
+    ).all()
+    return render_template("ingestion_blocks.html", blocks=blocks, kind=kind)
+
+
+def _ingestion_blocks_redirect(kind, block_id=None):
+    return redirect(url_for(
+        "admin.ingestion_blocks_page",
+        slug=INGESTION_BLOCK_SLUG_FOR.get(kind, "sources"),
+        _anchor=f"block-{block_id}" if block_id else None,
+    ))
 
 
 @admin.route("/ingestion-blocks/add", methods=["POST"])
@@ -266,7 +278,7 @@ def add_ingestion_block():
         db.session.add(IngestionBlock(kind=kind, pattern=pattern, note=note, is_active=True))
         db.session.commit()
         logger.info(f"[IngestionBlocks] Added {kind} block: {pattern}")
-    return redirect(url_for("admin.ingestion_blocks_page"))
+    return _ingestion_blocks_redirect(kind)
 
 
 @admin.route("/ingestion-blocks/<int:block_id>/update", methods=["POST"])
@@ -285,16 +297,17 @@ def update_ingestion_block(block_id):
     block.note = request.form.get("note", "").strip() or None
     block.is_active = request.form.get("is_active") == "on"
     db.session.commit()
-    return redirect(url_for("admin.ingestion_blocks_page"))
+    return _ingestion_blocks_redirect(block.kind, block.id)
 
 
 @admin.route("/ingestion-blocks/<int:block_id>/delete", methods=["POST"])
 @role_required(ROLE_ADMIN)
 def delete_ingestion_block(block_id):
     block = IngestionBlock.query.get_or_404(block_id)
+    kind = block.kind
     db.session.delete(block)
     db.session.commit()
-    return redirect(url_for("admin.ingestion_blocks_page"))
+    return _ingestion_blocks_redirect(kind)
 
 
 SCHEDULED_FETCH_MODES = ["query", "top"]
