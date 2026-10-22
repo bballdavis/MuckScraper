@@ -258,3 +258,4 @@
     .data-table.stack-sm td:has(input[type="text"]) { flex: 1 1 120px; }
     .data-table.stack-sm td:has(input[type="text"]) input { width: 100%; }
 }
+.settings-content a:not(.btn):not(.crumb-back) { color: var(--accent-text); }
