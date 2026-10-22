@@ -552,21 +552,24 @@ class ConfigSetting(db.Model):
     updated_by   = db.Column(db.String(64), nullable=True)
 
 
-# Mobile API (aggregator/api/, served by aggregator/api_app.py). Scopes a
-# device token can carry; "read" covers every read endpoint and the user's own
+# The API (aggregator/api/, served by aggregator/api_app.py). Scopes a
+# device token or API key can carry; "read" covers every read endpoint and the user's own
 # preferences and NewsBox read state; "summarize" lets it queue summaries
 # (POST /stories/{id}/summarize) and edit or run the user's schedule.
 API_SCOPES = ("read", "summarize")
 
 
 class ApiDevice(db.Model):
-    """A phone paired with the API. Only the SHA-256 of its bearer token is
-    stored; the token itself is shown once, to the device that paired."""
+    """A bearer token for the API: a phone that paired with a code
+    (kind "device") or an API key an admin created in Settings for any other
+    client (kind "key"). Only the SHA-256 of the token is stored; the token
+    itself is shown once, to the device that paired or the admin."""
     __tablename__ = "api_devices"
 
     id           = db.Column(db.Integer, primary_key=True)
     user_id      = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name         = db.Column(db.String(80), nullable=False)
+    kind         = db.Column(db.String(16), nullable=False, default="device", server_default="device")
     token_hash   = db.Column(db.String(64), nullable=False, unique=True)
     scopes       = db.Column(db.String(200), nullable=False, default="read", server_default="read")
     created_at   = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -617,7 +620,7 @@ class ApiRateCounter(db.Model):
 
 class NewsBoxItem(db.Model):
     """A story in one user's NewsBox (aggregator/newsbox.py): summarized for
-    them from the app (a swipe or a save) or by their schedule. `state` goes
+    them from a client (a request or a bookmark) or by their schedule. `state` goes
     pending -> in_progress -> ready, or failed; the summary itself lives on
     the Story and is shared by everyone."""
     __tablename__ = "newsbox_items"
@@ -633,7 +636,7 @@ class NewsBoxItem(db.Model):
     # scraped (feed_entry_id is set then); the scrape job fills it in.
     story_id   = db.Column(db.Integer, db.ForeignKey("stories.id", ondelete="CASCADE"), nullable=True)
     feed_entry_id = db.Column(db.Integer, db.ForeignKey("feed_entries.id", ondelete="SET NULL"), nullable=True)
-    origin     = db.Column(db.String(16), nullable=False)   # swiped / saved / auto / breaking
+    origin     = db.Column(db.String(16), nullable=False)   # requested / saved / scheduled / breaking
     depth      = db.Column(db.String(24), nullable=False, default="summary", server_default="summary")
     state      = db.Column(db.String(16), nullable=False, default="pending", server_default="pending")
     # Items from one scheduled run share this id.

@@ -63,7 +63,8 @@ SCHEMAS = {
                          id=_I, label=_S, kind=_S, date={"type": "string", "format": "date"},
                          published_at=_DT, story_count=_NI),
     "Device": _obj(["id", "name", "scopes", "created_at", "expires_at"],
-                   id=_I, name=_S, scopes={"type": "array", "items": _S}, created_at=_DT, expires_at=_NDT),
+                   id=_I, name=_S, kind={"type": "string", "enum": ["device", "key"]},
+                   scopes={"type": "array", "items": _S}, created_at=_DT, expires_at=_NDT),
     "Preferences": _obj(["start_page", "range", "hide_single"],
                         start_page={"type": "string", "enum": ["headlines", "all", "grouped"]},
                         range={"type": "string", "enum": ["24h", "7d", "30d", "all"]},
@@ -79,17 +80,17 @@ SCHEMAS = {
         state={"type": "string", "enum": ["new", "scraping", "scraped", "summarizing", "summarized", "failed"]},
         story_id=_NI, error=_NS),
     "NewsBoxItem": _obj(
-        ["id", "story", "headline", "origin", "state", "step", "progress", "is_unread", "auto_run_id", "added_at",
+        ["id", "story", "headline", "origin", "state", "step", "progress", "is_unread", "run_id", "added_at",
          "ready_at", "error"],
         id=_I,
         story={"oneOf": [_ref("StorySummary"), {"type": "null"}],
                "description": "Null while a Breaking headline is still being scraped; headline stands in"},
         headline={"oneOf": [_ref("FeedHeadline"), {"type": "null"}]},
-        origin={"type": "string", "enum": ["swiped", "saved", "auto", "breaking"]},
+        origin={"type": "string", "enum": ["requested", "saved", "scheduled", "breaking"]},
         state={"type": "string", "enum": ["pending", "in_progress", "ready", "failed"]},
         step={"type": ["string", "null"], "enum": ["scrape", "group", "summary", "analysis", None],
               "description": "What an unfinished item is waiting on"},
-        progress={"type": ["number", "null"]}, is_unread=_B, auto_run_id=_NS, added_at=_DT, ready_at=_NDT,
+        progress={"type": ["number", "null"]}, is_unread=_B, run_id=_NS, added_at=_DT, ready_at=_NDT,
         error=_NS),
     "Schedule": _obj(
         ["is_enabled", "timezone", "run_times", "sections", "depth", "skip_already_summarized",
@@ -100,8 +101,9 @@ SCHEMAS = {
             days={"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 7}}, is_enabled=_B)},
         sections={"type": "array", "maxItems": 30, "items": _obj(
             ["section", "is_enabled", "amount"], section=_S, is_enabled=_B,
-            amount={"type": "integer", "minimum": 1, "maximum": 20,
-                    "description": "Pages of 20 for Headlines (1-5), top N for a topic"})},
+            amount={"type": "integer", "minimum": 1, "maximum": 100,
+                    "description": "Number of stories: the top N of the latest edition for Headlines, "
+                                   "the N most-covered in the last day for a topic"})},
         depth={"type": "string", "enum": ["summary", "analysis", "summary_analysis"]}, skip_already_summarized=_B,
         minimum_sources=_NI, notify_when_done=_B, next_run_at=_NDT, last_run_at=_NDT),
     "BookmarkVersion": _obj(
@@ -206,13 +208,14 @@ PATHS = {
         "requestBody": {"required": True, "content": {"application/json": {"schema": {
             "type": "object", "additionalProperties": False, "properties": {
                 "depth": {"type": "string", "enum": ["summary", "analysis", "summary_analysis"]},
-                "origin": {"type": "string", "enum": ["swiped", "saved"]}}}}}},
+                "origin": {"type": "string", "enum": ["requested", "saved"],
+                           "description": "Defaults to requested"}}}}}},
         "responses": {"200": _json(_ref("NewsBoxItem"), "Already summarized: ready"),
                       "202": _json(_ref("NewsBoxItem"), "Summary queued: pending"),
                       **_ERRORS, **_NOT_FOUND}}},
     "/me/newsbox": _get("newsbox", _json({"allOf": [_page(_ref("NewsBoxItem")), _obj(["unread_count"], unread_count=_I)]}),
                         [_q("state", {"type": "string", "enum": ["pending", "in_progress", "ready", "failed"]}),
-                         _q("origin", {"type": "string", "enum": ["swiped", "saved", "auto", "breaking"]}),
+                         _q("origin", {"type": "string", "enum": ["requested", "saved", "scheduled", "breaking"]}),
                          _q("unread", _B), _CURSOR, _LIMIT]),
     "/me/newsbox/{story_id}": {
         "patch": {"operationId": "updateNewsBoxItem", "parameters": [_path_id("story_id")],

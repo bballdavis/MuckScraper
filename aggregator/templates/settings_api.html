@@ -1,14 +1,15 @@
-{#- Settings › Mobile API (admin.mobile_api_page,
-    blueprints/admin/mobile_api.py): the API's switch, content policy and
-    limits, pairing codes with a QR for the MuckScroller app, and paired
-    devices. The API itself runs in its own container (aggregator/api_app.py). -#}
+{#- Settings › API (admin.api_page,
+    blueprints/admin/api_access.py): the API's switch, content policy and
+    limits, pairing codes with a QR for the MuckScroller app, API keys for
+    any other client, and the devices and keys that can call it. The API
+    itself runs in its own container (aggregator/api_app.py). -#}
 {% extends 'settings_base.html' %}
-{% block title %}Mobile API{% endblock %}
-{% block settings_key %}mobileapi{% endblock %}
+{% block title %}API{% endblock %}
+{% block settings_key %}api{% endblock %}
 {% block settings_body %}
 <div class="page-head">
-    <h1>Mobile API</h1>
-    <p>The JSON API the MuckScroller iPhone app reads. It runs as its own <code>api</code> container (<code>docker compose --profile api up -d</code>) with no admin or web pages, so it is the only part of MuckScraper to put behind your tunnel or proxy.</p>
+    <h1>API</h1>
+    <p>The JSON API the MuckScroller iPhone app reads, and anything else you point at it with an API key. It runs as its own <code>api</code> container (<code>docker compose --profile api up -d</code>) with no admin or web pages, so it is the only part of MuckScraper to put behind your tunnel or proxy.</p>
 </div>
 
 {% include '_flashes.html' %}
@@ -24,14 +25,14 @@
         <span class="stat-sub">{{ config.public_url or 'No public address set' }}</span>
     </div>
     <div class="stat">
-        <span class="stat-label">Paired devices</span>
+        <span class="stat-label">Devices and keys</span>
         <span class="stat-value">{{ live_count }}</span>
         <span class="stat-sub">{{ pending_codes }} pairing code{{ '' if pending_codes == 1 else 's' }} waiting</span>
     </div>
     <div class="stat">
         <span class="stat-label">Last request</span>
         <span class="stat-value">{{ last_request | local_datetime if last_request else 'None yet' }}</span>
-        <span class="stat-sub">From any device</span>
+        <span class="stat-sub">From any device or key</span>
     </div>
 </div>
 
@@ -55,7 +56,7 @@
         </div>
     </div>
     {%- endif %}
-    <form class="row" method="POST" action="{{ url_for('admin.create_mobile_pairing_code') }}">
+    <form class="row" method="POST" action="{{ url_for('admin.create_api_pairing_code') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label class="pair-user">
             <span class="row-label">User</span>
@@ -69,14 +70,65 @@
     </form>
 </section>
 
+<section class="panel" id="keys">
+    <div class="panel-head">
+        <div>
+            <h2>API keys</h2>
+            <p>For a script, a server, a home dashboard or another app. A key is the same bearer token a paired phone gets, with the same endpoints, rate limits and sign-out; it acts as the user you pick.</p>
+        </div>
+    </div>
+    {%- if not config.api_keys %}
+    <div class="row"><span class="muted">API keys are off. Turn on <strong>API keys</strong> under Settings below to create one.</span></div>
+    {%- endif %}
+    {%- if new_key %}
+    <div class="new-key">
+        <span class="row-sub">Key &ldquo;{{ new_key.name }}&rdquo; for {{ new_key.username }} ({{ new_key.scopes | join(', ') }}){% if new_key.expires_at %}, expires {{ new_key.expires_at | local_datetime }}{% else %}, never expires{% endif %}. Copy it now: it is shown only this once.</span>
+        <code class="key-token" id="new-key-token">{{ new_key.token }}</code>
+        <span class="row-sub">Send it as <code>Authorization: Bearer &lt;key&gt;</code>, for example:</span>
+        <code class="key-example">curl -H "Authorization: Bearer {{ new_key.token }}" {{ (config.public_url.rstrip('/') if config.public_url else 'http://localhost:5050') }}/api/v1/stories</code>
+    </div>
+    {%- endif %}
+    {%- if config.api_keys %}
+    <form class="key-form" method="POST" action="{{ url_for('admin.create_api_key_route') }}#keys">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="pair-user">
+            <span class="row-label">Name</span>
+            <input type="text" name="name" maxlength="80" required placeholder="Home dashboard">
+        </label>
+        <label class="pair-user">
+            <span class="row-label">User</span>
+            <select name="user_id" required>
+                {%- for u in users %}
+                <option value="{{ u.id }}"{% if u.id == current_user.id %} selected{% endif %}>{{ u.username }} ({{ u.role_label }})</option>
+                {%- endfor %}
+            </select>
+        </label>
+        <label class="pair-user">
+            <span class="row-label">Expires</span>
+            <select name="expires">
+                <option value="30">In 30 days</option>
+                <option value="90">In 90 days</option>
+                <option value="365" selected>In a year</option>
+                <option value="never">Never</option>
+            </select>
+        </label>
+        <label class="pair-user" title="Lets the key queue summaries, NewsBox items, bookmarks and schedule runs. Without it the key can only read.">
+            <input type="checkbox" name="summarize">
+            <span class="row-label">Can queue summaries</span>
+        </label>
+        <button type="submit" class="btn">Create API key</button>
+    </form>
+    {%- endif %}
+</section>
+
 <section class="panel" id="devices">
     <div class="panel-head">
         <div>
-            <h2>Devices</h2>
-            <p>Signing a device out takes effect on its next request. Disabling a user in Users signs out all of theirs.</p>
+            <h2>Devices and keys</h2>
+            <p>Signing a device or key out takes effect on its next request. Disabling a user in Users signs out all of theirs.</p>
         </div>
         {%- if live_count %}
-        <form method="POST" action="{{ url_for('admin.revoke_all_mobile_devices') }}" onsubmit="return confirm('Sign out every paired device?');">
+        <form method="POST" action="{{ url_for('admin.revoke_all_api_devices') }}" onsubmit="return confirm('Sign out every paired device and API key?');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-danger">Sign out all</button>
         </form>
@@ -85,24 +137,26 @@
     {%- if devices %}
     <div class="table-scroll">
         <table class="data-table">
-            <thead><tr><th scope="col">Device</th><th scope="col">User</th><th scope="col">Paired</th><th scope="col">Last used</th><th scope="col">Last IP</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <thead><tr><th scope="col">Name</th><th scope="col">Type</th><th scope="col">User</th><th scope="col">Created</th><th scope="col">Last used</th><th scope="col">Last IP</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
             <tbody>
             {%- for d in devices %}
                 <tr{% if not d.is_live %} class="muted"{% endif %}>
                     <td>{{ d.name }}</td>
+                    <td>{{ 'API key' if d.kind == 'key' else 'Paired device' }}</td>
                     <td>{{ d.user.username }}</td>
                     <td>{{ d.created_at | local_datetime }}</td>
                     <td>{{ d.last_used_at | local_datetime if d.last_used_at else '—' }}</td>
                     <td><code>{{ d.last_ip or '—' }}</code></td>
                     <td>
                         {%- if d.revoked_at %}<span class="chip">Signed out</span>
+                        {%- elif d.kind == 'key' and not config.api_keys %}<span class="chip">Keys off</span>
                         {%- elif not d.is_live %}<span class="chip">Expired</span>
                         {%- elif not d.user.is_active %}<span class="chip chip-danger">User disabled</span>
                         {%- else %}<span class="chip chip-safe">Active</span>{% endif %}
                     </td>
                     <td>
                         {%- if d.is_live %}
-                        <form method="POST" action="{{ url_for('admin.revoke_mobile_device', device_id=d.id) }}">
+                        <form method="POST" action="{{ url_for('admin.revoke_api_device', device_id=d.id) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-quiet">Sign out</button>
                         </form>
@@ -114,11 +168,11 @@
         </table>
     </div>
     {%- else %}
-    <div class="row"><span class="muted">No devices yet. Create a pairing code above.</span></div>
+    <div class="row"><span class="muted">No devices or keys yet. Create a pairing code or an API key above.</span></div>
     {%- endif %}
 </section>
 
-<form class="panel" method="POST" action="{{ url_for('admin.save_mobile_api_settings') }}">
+<form class="panel" method="POST" action="{{ url_for('admin.save_api_settings') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="panel-head"><h2>Settings</h2></div>
     <label class="row">
@@ -128,6 +182,10 @@
     <label class="row">
         <span><span class="row-label">Send full article text</span><span class="row-sub">Off: the app gets summaries and the publisher's link, as signed-out web visitors do. On: it also gets the scraped text.</span></span>
         <span class="switch"><input type="checkbox" name="full_text"{% if config.full_text %} checked{% endif %}><span aria-hidden="true"></span></span>
+    </label>
+    <label class="row">
+        <span><span class="row-label">API keys</span><span class="row-sub">Off: only phones paired with a code get in. On: you can create keys for scripts, servers and other apps. Turning it off stops existing keys too.</span></span>
+        <span class="switch"><input type="checkbox" name="api_keys"{% if config.api_keys %} checked{% endif %}><span aria-hidden="true"></span></span>
     </label>
     <div class="row">
         <span><label class="row-label" for="public_url">Public address</label><span class="row-sub">Where the phone reaches the API, e.g. https://api.example.com. Goes into the pairing QR code.</span></span>
@@ -187,6 +245,11 @@
     .pair-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 30px; font-weight: 700; letter-spacing: 3px; }
     .field-warn { color: var(--risk-danger-text); font-size: 13px; font-weight: 600; max-width: 420px; }
     .pair-user { display: flex; align-items: center; gap: 12px; }
+    .key-form { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 12px 16px; }
+    .key-form .btn { margin-left: auto; }
+    .new-key { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    .key-token { font-size: 15px; font-weight: 700; word-break: break-all; user-select: all; }
+    .key-example { font-size: 12px; word-break: break-all; color: var(--text-muted); }
     .wide-input { width: 320px; max-width: 100%; }
     .num-input { width: 110px; }
     tr.muted td { color: var(--text-muted); }
