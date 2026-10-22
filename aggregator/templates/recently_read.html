@@ -13,8 +13,14 @@
 <div class="app-main narrow">
     <div class="page-head">
         <h1>Recently Read</h1>
-        <p>Stories and articles you marked read, newest first. Read stories are hidden from Headlines; mark one unread to bring it back. The MuckScroller app shares this list.</p>
+        <p>Stories and articles you marked read, newest first. Read stories are hidden from Headlines; mark one unread to bring it back.</p>
     </div>
+
+    <form class="rr-search" method="get" action="{{ url_for('reading.recently_read') }}" role="search">
+        {{ icon('search') }}
+        <input type="search" name="q" value="{{ q }}" placeholder="Search what you've read" aria-label="Search what you've read">
+        {% if q %}<a class="rr-search-clear" href="{{ url_for('reading.recently_read') }}" aria-label="Clear search" title="Clear search">{{ icon('x') }}</a>{% endif %}
+    </form>
 
     <div class="panel">
         {% if items %}
@@ -46,7 +52,11 @@
             {% endfor %}
         </ul>
         {% else %}
+        {% if q %}
+        <div class="rr-empty">Nothing you've read matches “{{ q }}”.</div>
+        {% else %}
         <div class="rr-empty">Nothing marked read yet. On Headlines, point at a story and use the reading glasses beside it.</div>
+        {% endif %}
         {% endif %}
     </div>
     {{ pager(page, total_pages) }}

@@ -59,15 +59,32 @@ def read_ids(user_id, kind, ids=None):
     return {row[0] for row in query.all()}
 
 
-def recent(user_id, offset=0, limit=50, kind=None):
+def _search(query, q):
+    """Narrow a ReadItem query to items whose story headline or title, or
+    article title or outlet name, contains `q` (case-insensitive)."""
+    from aggregator.models import Outlet
+    words = (q or "").split()
+    if not words:
+        return query
+    query = (query.outerjoin(Story, ReadItem.story_id == Story.id)
+             .outerjoin(Article, ReadItem.article_id == Article.id)
+             .outerjoin(Outlet, Article.outlet_id == Outlet.id))
+    for word in words:
+        like = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        query = query.filter(db.or_(Story.headline.ilike(like), Story.title.ilike(like),
+                                    Article.title.ilike(like), Outlet.name.ilike(like)))
+    return query
+
+
+def recent(user_id, offset=0, limit=50, kind=None, q=None):
     """The user's read items, newest first, with their story or article (and
-    the article's outlet) loaded."""
-    query = ReadItem.query.filter_by(user_id=user_id).options(
+    the article's outlet) loaded. `q` searches titles and outlet names."""
+    query = _search(ReadItem.query.filter_by(user_id=user_id), q).options(
         joinedload(ReadItem.story), joinedload(ReadItem.article).joinedload(Article.outlet))
     if kind:
         query = query.filter(_column(kind).isnot(None))
     return query.order_by(ReadItem.read_at.desc(), ReadItem.id.desc()).offset(offset).limit(limit).all()
 
 
-def count(user_id):
-    return ReadItem.query.filter_by(user_id=user_id).count()
+def count(user_id, q=None):
+    return _search(ReadItem.query.filter_by(user_id=user_id), q).count()
