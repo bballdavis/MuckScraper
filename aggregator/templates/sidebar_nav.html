@@ -46,6 +46,10 @@
                         <span class="full-text">Op/Ed</span>
                     </a>
                     {%- if current_user.is_authenticated %}
+                    <a class="nav-link {% if active_nav == 'read' %}active{% endif %}" href="{{ url_for('reading.recently_read') }}"{% if active_nav == 'read' %} aria-current="page"{% endif %}>
+                        {{ icon('glasses') }}
+                        <span class="full-text">Recently read</span>
+                    </a>
                     <a class="nav-link {% if active_nav == 'search' %}active{% endif %}" href="{{ url_for('admin.search_page') }}"{% if active_nav == 'search' %} aria-current="page"{% endif %}>
                         {{ icon('table') }}
                         <span class="full-text">Search</span>

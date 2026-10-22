@@ -1,0 +1,135 @@
+/*
+ * Read state (static/js/reads.js): the reading-glasses button beside each
+ * Headlines card, the slide-out, the Undo toast, the read toggle on the
+ * story and article pages, and the Recently read list. Linked after
+ * theme.css. 3px corners, theme colours, no side borders.
+ */
+
+/* ── Headlines: the button beside the card ──
+   The button sits just past the card's right edge, centred on it. Its box
+   starts at the card's edge (the transparent left padding is the gap), so
+   the pointer never leaves the item on its way across and the button stays
+   up. Hiding also waits a moment, for a pointer that cuts the corner. */
+.hl-item { position: relative; margin-bottom: 28px; }
+.hl-item > .story { margin-bottom: 0; }
+.hl-read {
+    position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
+    padding: 12px 0 12px 8px; margin: 0; border: 0; background: transparent; cursor: pointer;
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.15s ease 0.3s, visibility 0s linear 0.45s;
+}
+.hl-item:hover > .hl-read, .hl-read:focus-visible, .hl-read:hover {
+    opacity: 1; visibility: visible; transition-delay: 0s;
+}
+.hl-read-icon {
+    position: relative; width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border); border-radius: 3px; background: var(--surface);
+    color: var(--accent-text); font-size: 17px; box-shadow: var(--shadow);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.hl-read:hover .hl-read-icon, .hl-read:focus-visible .hl-read-icon {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.hl-read:focus-visible { outline: none; }
+.hl-read .tip { left: auto; right: 0; top: auto; bottom: calc(100% + 6px); transform: none; }
+/* The card keeps its hover lift while the pointer is on the button. */
+.hl-item:hover > .story { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.1); }
+.hl-read:hover .tip, .hl-read:focus-visible .tip { opacity: 1; visibility: visible; }
+
+/* The same action inside the card's action row, for touch screens and
+   narrow windows, where there is no hover and no room beside the card. */
+.card-actions-row > .act-read { display: none; }
+@media (hover: none), (max-width: 900px) {
+    .hl-read { display: none; }
+    .card-actions-row > .act-read { display: inline-flex; }
+    /* A fourth square in the row: let the story button give way. */
+    .card-actions-row > .btn { min-width: 0; overflow: hidden; }
+}
+@media (max-width: 480px) {
+    .card-actions-row > .act { flex-basis: 36px; width: 36px; }
+}
+.act-read { color: var(--accent-text); cursor: pointer; }
+.act-read:hover, .act-read:focus-visible { background: var(--accent); border-color: var(--accent); color: #fff; outline: none; }
+
+/* "N read stories hidden" under the edition line. */
+.read-hidden-note { font-size: var(--fs-meta); color: var(--text-muted); margin: -2px 0 10px; }
+.read-hidden-note a { color: var(--accent-text); font-weight: 600; }
+
+/* ── Slide out, close up (reads.js slideOut / slideIn) ── */
+.read-leaving {
+    transform: translateX(48px); opacity: 0; pointer-events: none;
+    transition: transform 0.22s ease, opacity 0.22s ease;
+}
+.read-collapsing {
+    height: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important;
+    padding-top: 0 !important; padding-bottom: 0 !important; overflow: hidden;
+    transition: height 0.26s ease, margin 0.26s ease, padding 0.26s ease;
+}
+.rr-row.read-leaving, .hl-item.read-leaving { transition: transform 0.22s ease, opacity 0.22s ease; }
+@media (prefers-reduced-motion: reduce) {
+    .read-leaving, .read-collapsing { transition: none; }
+}
+
+/* ── Undo toast ── */
+.read-toast {
+    position: fixed; left: 50%; bottom: 24px; z-index: 1000;
+    transform: translate(-50%, 16px); opacity: 0; visibility: hidden;
+    display: flex; align-items: center; gap: 14px; overflow: hidden;
+    padding: 10px 12px 10px 16px; border-radius: 3px;
+    background: var(--topbar-bg); color: #e8e8f0; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    font: inherit; font-size: 14px;
+    transition: transform 0.18s ease, opacity 0.18s ease, visibility 0s linear 0.18s;
+}
+.read-toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; transition-delay: 0s; }
+.read-toast-undo {
+    height: 28px; padding: 0 12px; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 3px;
+    background: transparent; color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.read-toast-undo:hover, .read-toast-undo:focus-visible { background: rgba(255, 255, 255, 0.12); outline: none; }
+/* The five seconds, as a bar along the bottom. */
+.read-toast-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--accent-light); transform-origin: left; transform: scaleX(0); }
+.read-toast.show .read-toast-bar { animation: read-toast-count 5s linear forwards; }
+@keyframes read-toast-count { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* ── Story and article pages: read toggle ──
+   The glasses and a circle, empty while unread, filled once read. */
+.read-toggle {
+    position: relative; flex: 0 0 auto;
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 32px; padding: 0 8px 0 10px;
+    border: 1px solid var(--border); border-radius: 3px; background: var(--surface);
+    color: var(--text-muted); font: inherit; font-size: 17px; cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.read-toggle:hover, .read-toggle:focus-visible { border-color: var(--accent); color: var(--accent-text); outline: none; }
+.read-toggle:disabled { cursor: progress; }
+.read-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid currentColor; background: transparent; transition: background 0.15s;
+}
+.read-toggle.is-read { color: var(--accent-text); border-color: var(--accent); }
+.read-toggle.is-read .read-dot { background: currentColor; }
+.read-toggle .tip { left: auto; right: 0; top: calc(100% + 8px); transform: none; }
+
+/* ── Recently read ── */
+.rr-list { list-style: none; }
+.rr-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 16px; border-top: 1px solid var(--border); background: var(--surface);
+}
+.rr-row:first-child { border-top: 0; }
+.rr-main { flex: 1; min-width: 0; }
+.rr-title { display: block; color: var(--text); font-size: var(--fs-body); font-weight: 700; line-height: 1.35; text-decoration: none; }
+.rr-title:hover { color: var(--accent-text); text-decoration: underline; }
+.rr-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 4px; font-size: var(--fs-label); color: var(--text-muted); }
+.rr-gone { color: var(--text-faint); font-style: italic; }
+.rr-unmark { position: relative; }
+.rr-unmark .tip { right: 0; left: auto; top: auto; bottom: calc(100% + 8px); transform: none; }
+.rr-empty { padding: 48px 16px; text-align: center; color: var(--text-faint); }
+
+/* The page title with the toggle at its right. */
+.read-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.read-head > h1 { flex: 1; min-width: 0; }
+.read-head > .read-toggle { margin-top: 4px; }
+.rr-meta .bias-tag { height: 18px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: 3px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
