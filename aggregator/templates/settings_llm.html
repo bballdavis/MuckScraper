@@ -70,12 +70,17 @@
 </form>
 
 <section class="panel">
-    <div class="panel-head">
+    <div class="panel-head providers-head">
         <div>
             <h2>Providers</h2>
-            <p>Keys are encrypted before they are stored, with a key from {{ 'CONFIG_ENCRYPTION_KEY' if key_source == 'CONFIG_ENCRYPTION_KEY' else 'SECRET_KEY (set CONFIG_ENCRYPTION_KEY to use a separate one)' }}, and are never shown again after saving.</p>
+            <p>Use the Main, Fast and Embeddings chips on a provider to give it that job. Keys are encrypted before they are stored, with a key from {{ 'CONFIG_ENCRYPTION_KEY' if key_source == 'CONFIG_ENCRYPTION_KEY' else 'SECRET_KEY (set CONFIG_ENCRYPTION_KEY to use a separate one)' }}, and are never shown again after saving.</p>
         </div>
+        <button type="button" class="btn btn-quiet" id="providers-toggle-all">Expand all</button>
     </div>
+    <form id="role-assign" method="POST" action="{{ url_for('admin.assign_llm_role') }}" hidden>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="provider" value="">
+    </form>
     {%- for p in providers %}
     <details class="row provider" id="provider-{{ p.key }}"{% if p.roles %} open{% endif %}>
         <summary>
@@ -83,8 +88,19 @@
                 <span class="provider-chevron">{{ icon('chevron-down') }}</span>
                 <span class="row-label">{{ p.name }}</span>
                 {%- if p.is_new %}<span class="chip chip-new">NEW</span>{% endif %}
-                {%- for role in p.roles %}<span class="chip">{{ role }}</span>{% endfor %}
                 {%- if p.saved_count %}<span class="chip chip-saved">{{ p.saved_count }} saved</span>{% endif %}
+            </span>
+            <span class="provider-side">
+            <span class="role-toggles" role="group" aria-label="Jobs {{ p.name }} does">
+                {%- for t in p.toggles %}
+                {%- if t.active %}
+                <button type="button" class="role-toggle" aria-pressed="true" title="{{ role_hints[t.key] }}. {{ p.name }} does this now.">{{ icon('check') }}{{ t.label }}</button>
+                {%- elif t.ready %}
+                <button type="submit" class="role-toggle" aria-pressed="false" form="role-assign" name="role" value="{{ t.key }}" data-provider="{{ p.key }}" data-provider-name="{{ p.name }}" title="{{ role_hints[t.key] }}. Click to use {{ p.name }} for this.">{{ t.label }}</button>
+                {%- else %}
+                <button type="button" class="role-toggle needs-setup" aria-pressed="false" data-setup="{{ p.key }}" title="{{ role_hints[t.key] }}. Set up {{ p.name }} below to use it for this.">{{ t.label }}</button>
+                {%- endif %}
+                {%- endfor %}
             </span>
             <span class="provider-status">
                 {%- if p.key == 'ollama' and p.live %}
@@ -94,6 +110,7 @@
                 {%- else %}
                 <span class="muted"><span class="dot off"></span>Not configured</span>
                 {%- endif %}
+            </span>
             </span>
         </summary>
         <form class="provider-form config-field-form" method="POST" action="{{ url_for('admin.save_llm_provider', key=p.key) }}" autocomplete="off">
@@ -162,6 +179,19 @@
     details.provider[open] .provider-chevron { transform: rotate(0deg); color: var(--accent-text); }
     details.provider summary::-webkit-details-marker { display: none; }
     details.provider summary:hover { background: var(--btn-muted-bg); }
+    .providers-head > div { flex: 1 1 320px; }
+    #providers-toggle-all { flex: 0 0 auto; }
+    .provider-side { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 16px; }
+    /* Role chips: one segmented control per provider. Filled = this provider
+       does that job; outlined = click to hand it the job; dashed = it needs
+       setting up first (clicking opens its fields). */
+    .role-toggles { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); }
+    .role-toggle { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border: 1px solid transparent; border-radius: 3px; background: transparent; color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .role-toggle .icon { width: 12px; height: 12px; }
+    .role-toggle:hover { background: var(--btn-muted-bg); color: var(--text); }
+    .role-toggle:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 1px; }
+    .role-toggle[aria-pressed="true"] { background: var(--accent); color: #fff; cursor: default; }
+    .role-toggle.needs-setup { color: var(--text-faint); border: 1px dashed var(--border); }
     .provider-name { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .provider-status span { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
     .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 20px; margin: 0; padding: 2px 16px 12px; font-size: 13px; }
@@ -203,6 +233,49 @@
                 .finally(() => { button.disabled = false; });
         });
     });
+
+    // Role chips. A chip inside <summary> mustn't fold the section, a
+    // switch of embeddings asks first, and a provider that isn't set up for
+    // the job opens its fields instead.
+    (function () {
+        const form = document.getElementById('role-assign');
+        document.querySelectorAll('.role-toggle').forEach((chip) => {
+            chip.addEventListener('click', (event) => {
+                event.stopPropagation();
+                if (chip.dataset.setup) {
+                    event.preventDefault();
+                    const details = document.getElementById('provider-' + chip.dataset.setup);
+                    details.open = true;
+                    const empty = [...details.querySelectorAll('input:not([type=hidden]):not([type=checkbox])')].find(i => !i.value);
+                    (empty || details.querySelector('input:not([type=hidden])'))?.focus();
+                    return;
+                }
+                if (chip.getAttribute('aria-pressed') === 'true') { event.preventDefault(); return; }
+                if (chip.value === 'embeddings' && !confirm(
+                    'Switch embeddings to ' + chip.dataset.providerName + '?\n\n' +
+                    "Vectors from different models don't compare, so new articles stop grouping with existing stories until the corpus is re-embedded or older stories age out.")) {
+                    event.preventDefault();
+                    return;
+                }
+                form.elements.provider.value = chip.dataset.provider;
+            });
+        });
+    })();
+
+    // Expand or collapse every provider at once.
+    (function () {
+        const button = document.getElementById('providers-toggle-all');
+        const all = [...document.querySelectorAll('details.provider')];
+        if (!button) return;
+        const sync = () => { button.textContent = all.every(d => d.open) ? 'Collapse all' : 'Expand all'; };
+        button.addEventListener('click', () => {
+            const open = !all.every(d => d.open);
+            all.forEach(d => { d.open = open; });
+            sync();
+        });
+        all.forEach(d => d.addEventListener('toggle', sync));
+        sync();
+    })();
 
     // Warn before an embedding switch is saved.
     (function () {
