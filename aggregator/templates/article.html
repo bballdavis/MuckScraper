@@ -1,7 +1,7 @@
 {% from 'story_card_macros.html' import bias_tag with context %}
-{% from 'account_menu.html' import account_menu with context %}
 <!-- muckscraperHeadlinesGoogleNEW/aggregator/templates/article.html -->
-{% from 'icons.html' import icon, theme_toggle_label %}
+{% from 'icons.html' import icon %}
+{% from '_feed_topbar.html' import feed_topbar with context %}
 <!DOCTYPE html>
 <html data-theme="light">
 <head>
@@ -16,6 +16,8 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
     <title>{{ article.title }} — MuckScraper</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/feed_header.css') }}">
+    <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
     <style>
         :root {
             --shadow:        0 10px 30px rgba(0,0,0,0.08);
@@ -35,22 +37,9 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        .topbar {
-            background: var(--topbar-bg);
-            padding: 16px 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
 
-        .topbar a { color: #89b4fa; text-decoration: none; font-size: 14px; font-weight: 600; }
-        .topbar-title { color: var(--topbar-text); font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
         .public-source { margin: 8px 0 32px; text-align: center; }
         /* The top bar is dark in both themes, so the button keeps light text. */
-        .theme-toggle { background: none; border: 1px solid #444; color: #cdd6f4; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
 
         .container {
             max-width: var(--width-read);
@@ -333,32 +322,18 @@
             .article-card { padding: 24px; border-radius: 0; }
             .container { margin: 0; padding: 0; }
             h1 { font-size: 28px; }
-            .topbar { padding: 16px 20px; }
         }
         {% include 'sidebar_styles.html' %}
     </style>
 </head>
 <body>
 
-<div class="layout">
+{#- The feed's top bar, full width above the sidebar (_feed_topbar.html). -#}
+{%- set sidebar_toggle_in_topbar = true -%}
+{{ feed_topbar('', url_for('admin.list_articles'), back=(url_for('public.view_story', story_id=article.story_id, back=incoming_back()), 'Back to Story') if article.story_id else (feed_back_url(article_back_anchor(article)), 'Back to Feed')) }}
+<div class="layout feed-layout">
 {% include 'sidebar_nav.html' %}
 <div class="page-body">
-
-{% from 'breadcrumb.html' import back_link %}
-<div class="topbar">
-    <div class="topbar-left crumb-bar">
-        <span class="topbar-title">MuckScraper</span>
-        {% if article.story_id %}
-        {{ back_link(url_for('public.view_story', story_id=article.story_id, back=incoming_back()), 'Back to Story') }}
-        {% else %}
-        {{ back_link(feed_back_url(article_back_anchor(article)), 'Back to Feed') }}
-        {% endif %}
-    </div>
-    <div style="display:flex; align-items:center; gap:12px;">
-        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">{{ theme_toggle_label() }}</button>
-        {{ account_menu() }}
-    </div>
-</div>
 
 <div class="container">
     <div class="article-card">
