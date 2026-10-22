@@ -5,6 +5,7 @@
      {% from 'story_card_macros.html' import story_card, bias_balance, bias_line, bias_tag with context %}
    muckscraper.news uses macros.html, not this file. #}
 {% from 'icons.html' import icon %}
+{% from 'ai_actions.html' import story_summary_action, story_analysis_action with context %}
 
 {% set bias_names = {1: 'Left', 2: 'Lean Left', 3: 'Center', 4: 'Lean Right', 5: 'Right'} %}
 
@@ -77,7 +78,8 @@
 {%- if compact %}
 {#- Compact (All / Grouped Stories): the image, the headline, one meta row
     (date, counts, flags), then the bottom row: the Left/Center/Right bar for
-    a multi-article story, or the article's lean chip on its own, and the ⋯
+    a multi-article story, or the article's lean chip on its own. A rail
+    down the right side holds the summary and analysis actions and the ⋯
     menu (Philip, 2026-10-22). The headline link stretches over the whole
     card; the ⋯ button sits above it. The page's call block fills the menu's
     actions; the scrape results head the menu for signed-in readers. #}
@@ -113,29 +115,35 @@
                 {% else %}
                     {{ bias_line(story) }}
                 {% endif %}
-                {% if has_menu %}
-                <div class="card-menu">
-                    <button type="button" class="card-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" title="More actions">{{ icon('more-horizontal') }}</button>
-                    <div class="card-menu-pop" role="menu" hidden>
-                        {% if current_user.is_authenticated %}
-                        <div class="card-menu-head">
-                            <span class="card-menu-label">Scrape</span>
-                            <div class="card-menu-chips">{{ scrape_summary(story.articles) }}</div>
-                            {% if single %}
-                                {% set notes = [] %}
-                                {% if single.scrape_failure_reason %}{% set _ = notes.append(single.scrape_failure_reason[:90] ~ ('…' if single.scrape_failure_reason|length > 90 else '')) %}{% endif %}
-                                {% if single.outlet and single.outlet.bias_source == 'allsides' %}{% set _ = notes.append('Outlet bias rated by AllSides') %}{% elif single.outlet and single.outlet.bias_source == 'ai' %}{% set _ = notes.append('Outlet bias rated by AI') %}{% endif %}
-                                {% if notes %}<span class="card-menu-note">{{ notes|join(' · ') }}</span>{% endif %}
-                            {% else %}
-                            <span class="card-menu-note">{{ article_count }} articles</span>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-                        {% if actions %}<div class="card-menu-items">{{ actions }}</div>{% endif %}
-                    </div>
-                </div>
-                {% endif %}
             </div>
+        </div>
+        {#- The action rail down the right side, mirroring the image: summary,
+            analysis, then the ⋯ menu (Philip, 2026-10-22). -#}
+        <div class="card-rail">
+            {{ story_summary_action(story, can('scraper')) }}
+            {{ story_analysis_action(story, can('scraper')) }}
+            {% if has_menu %}
+            <div class="card-menu">
+                <button type="button" class="card-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" title="More actions">{{ icon('more-horizontal') }}</button>
+                <div class="card-menu-pop" role="menu" hidden>
+                    {% if current_user.is_authenticated %}
+                    <div class="card-menu-head">
+                        <span class="card-menu-label">Scrape</span>
+                        <div class="card-menu-chips">{{ scrape_summary(story.articles) }}</div>
+                        {% if single %}
+                            {% set notes = [] %}
+                            {% if single.scrape_failure_reason %}{% set _ = notes.append(single.scrape_failure_reason[:90] ~ ('…' if single.scrape_failure_reason|length > 90 else '')) %}{% endif %}
+                            {% if single.outlet and single.outlet.bias_source == 'allsides' %}{% set _ = notes.append('Outlet bias rated by AllSides') %}{% elif single.outlet and single.outlet.bias_source == 'ai' %}{% set _ = notes.append('Outlet bias rated by AI') %}{% endif %}
+                            {% if notes %}<span class="card-menu-note">{{ notes|join(' · ') }}</span>{% endif %}
+                        {% else %}
+                        <span class="card-menu-note">{{ article_count }} articles</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if actions %}<div class="card-menu-items">{{ actions }}</div>{% endif %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
