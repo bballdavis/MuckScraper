@@ -1,6 +1,7 @@
 {% from 'story_card_macros.html' import bias_tag with context %}
 {% from 'icons.html' import icon %}
 {% from '_feed_topbar.html' import feed_topbar with context %}
+{% from 'title_meta.html' import title_meta, meta_item %}
 {% from 'oped_columns.html' import oped_columns, oped_roundup with context %}
 <!DOCTYPE html>
 <html data-theme="light">
@@ -35,51 +36,52 @@
 
 
 
-        .container { max-width: var(--width-read); margin: 60px auto; padding: 0 20px; }
+        .container { max-width: var(--width-read); margin: 28px auto; padding: 0 20px; }
 
         .story-card {
             background: var(--surface);
             border-radius: 24px;
-            padding: 48px;
+            padding: 40px;
             box-shadow: var(--shadow);
             border: 1px solid var(--border);
         }
 
-        h1 { font-size: 36px; font-weight: 800; margin-bottom: 32px; letter-spacing: -1px; line-height: 1.2; }
+        h1 { font-size: 34px; font-weight: 800; margin-bottom: 12px; letter-spacing: -1px; line-height: 1.2; }
 
-        .analysis-box {
-            background: var(--summary-bg);
-            border-left: 5px solid var(--accent);
-            padding: 32px;
-            margin-bottom: 48px;
-            border-radius: 0 16px 16px 0;
-        }
-
-        .analysis-label {
+        /* Section headings sit above their callouts (Philip, 2026-10-22). */
+        .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 10px; }
+        .section-label {
             font-size: var(--fs-label);
             font-weight: 800;
             text-transform: uppercase;
             color: var(--accent-text);
             letter-spacing: 2px;
-            margin-bottom: 16px;
+        }
+        .section-head .btn-view { padding: 4px 12px; font-size: var(--fs-label); cursor: pointer; }
+
+        .analysis-box {
+            background: var(--summary-bg);
+            border-left: 4px solid var(--accent);
+            padding: 16px 20px;
+            border-radius: 0 12px 12px 0;
         }
 
-        .analysis-content p { margin-bottom: 1.2em; line-height: 1.6; }
+        .analysis-content p { margin-bottom: 0.8em; line-height: 1.6; }
+        .analysis-content p:last-child { margin-bottom: 0; }
         .analysis-content strong { color: var(--accent-text); }
 
-        .article-list { list-style: none; margin-top: 48px; }
-        .story-opinion { margin-top: 48px; }
-        .story-opinion .opinion-note { font-size: var(--fs-label); color: var(--text-faint); margin: -16px 0 20px; }
+        .article-list { list-style: none; }
+        .story-opinion .opinion-note { font-size: var(--fs-label); color: var(--text-faint); margin: 0 0 16px; }
         .article-item {
-            padding: 24px 0;
+            padding: 16px 0;
             border-top: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 8px;
         }
 
         .article-link {
-            font-size: 18px;
+            font-size: 17px;
             font-weight: 700;
             color: var(--text);
             text-decoration: none;
@@ -87,16 +89,21 @@
         }
         .article-link:hover { color: var(--accent-text); text-decoration: underline; }
 
-        .article-meta { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+        .article-meta { display: flex; align-items: baseline; gap: 10px; font-size: 12px; font-weight: 500; color: var(--text-faint); }
+        .article-outlet { font-size: 14px; font-weight: 700; color: var(--text-muted); }
+        .article-meta .bias-tag { margin-left: auto; align-self: center; }
 
         .bias-tag {
-            font-size: var(--fs-label);
-            font-weight: 800;
-            padding: 2px 8px;
-            border-radius: 6px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            padding: 0 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: white;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
         }
         .bias-none { background: #ddd; color: #4a4a4a; }
 
@@ -127,17 +134,40 @@
         }
         .btn-view:hover { background: var(--accent); color: white; }
 
+        /* Source row buttons: one size and shape; Summary in the accent,
+           the rest grey-trimmed. */
+        .article-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+        .pill {
+            height: 30px; min-width: 104px; padding: 0 12px;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            border: 1px solid var(--border); border-radius: 8px; background: transparent;
+            color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 700;
+            text-decoration: none; cursor: pointer; white-space: nowrap;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .pill .icon { font-size: 14px; }
+        .pill:hover { border-color: var(--text-faint); color: var(--text); }
+        .pill-primary { border-color: var(--accent); color: var(--accent-text); }
+        .pill-primary:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .pill-status { cursor: help; }
+        .pill-status.read-success .icon { color: #1d6f42; }
+        .pill-status.read-fallback .icon { color: #8a5a00; }
+        .pill-status.read-blocked .icon, .pill-status.read-failed .icon { color: #a33636; }
+        [data-theme="dark"] .pill-status.read-success .icon { color: #6fcf97; }
+        [data-theme="dark"] .pill-status.read-fallback .icon { color: #f2c46d; }
+        [data-theme="dark"] .pill-status.read-blocked .icon, [data-theme="dark"] .pill-status.read-failed .icon { color: #f08a8a; }
+
         .status-msg {
-            padding: 20px;
+            padding: 12px 14px;
             background: rgba(0,0,0,0.03);
-            border-radius: 12px;
+            border-radius: 10px;
             font-style: italic;
             color: var(--text-muted);
             font-size: 14px;
         }
 
         .editors-note {
-            margin-bottom: 36px;
+            margin-bottom: 8px;
             padding: 20px 24px;
             border: 1px solid var(--border);
             background: rgba(0,0,0,0.025);
@@ -185,7 +215,7 @@
         @media (max-width: 600px) {
             .container { margin: 24px auto; padding: 0 14px; }
             .article-meta { flex-wrap: wrap; gap: 8px; }
-            .story-card { padding: 24px; border-radius: 0; }
+            .story-card { padding: 20px; border-radius: 0; }
             h1 { font-size: 28px; }
         }
         {% include 'sidebar_styles.html' %}
@@ -205,15 +235,11 @@
         <div id="ai-task-status" style="display:none; margin-bottom:20px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.03); color:var(--text-muted); font-size:13px;"></div>
 		    <h1>{{ story.display_headline }}</h1>
 
-    <div style="font-size: 12px; font-weight: 600; color: var(--text-faint); margin-bottom: 32px; display: flex; align-items: center; gap: 12px;">
-        <span>{{ story.articles|length }} SOURCES</span>
-        <span style="width: 4px; height: 4px; border-radius: 50%; background: var(--border);"></span>
-        <span>PUBLISHED <span class="local-date" data-utc="{{ story.created_at.isoformat() }}Z">{{ story.created_at.strftime('%b %d, %Y') }}</span></span>
-        {% if story.last_updated %}
-            <span style="width: 4px; height: 4px; border-radius: 50%; background: var(--border);"></span>
-            <span>LAST UPDATED: <span class="local-date" data-utc="{{ story.last_updated.isoformat() }}Z">{{ story.last_updated.strftime('%b %d, %Y %H:%M') }}</span></span>
-	        {% endif %}
-	    </div>
+    {% call title_meta() %}
+        {{ meta_item('Sources', story.articles|length) }}
+        {{ meta_item('Published', when=story.created_at) }}
+        {% if story.last_updated %}{{ meta_item('Last updated', when=story.last_updated) }}{% endif %}
+    {% endcall %}
 
         {% if story.scrape_quality and story.scrape_quality.total > 0 %}
         <div class="editors-note">
@@ -237,13 +263,13 @@
         </div>
         {% endif %}
 
-	    <div class="analysis-box">
-            <div class="analysis-label" style="display: flex; justify-content: space-between; align-items: center;">
-                <span>Executive Summary</span>
-                {% if can('scraper') and ollama_online and (not story.summary or story.summary == story.title or not story.deep_report) %}
-                    <button type="button" class="btn-view" style="cursor: pointer; padding: 4px 12px; font-size: var(--fs-label);" onclick="startAiTask('story_summary', {{ story.id }}, this)">Summarize Story</button>
-                {% endif %}
-            </div>
+        <div class="section-head">
+            <h2 class="section-label">Executive Summary</h2>
+            {% if can('scraper') and ollama_online and (not story.summary or story.summary == story.title or not story.deep_report) %}
+                <button type="button" class="btn-view" onclick="startAiTask('story_summary', {{ story.id }}, this)">Summarize Story</button>
+            {% endif %}
+        </div>
+        <div class="analysis-box">
             {% if story.summary %}
                 <div class="analysis-content">
                     {% for line in story.summary.split('\n') %}
@@ -264,13 +290,13 @@
             {% endif %}
         </div>
 
+        <div class="section-head">
+            <h2 class="section-label">Multi-Source Analysis</h2>
+            {% if can('scraper') and ollama_online and story.articles|length >= 2 and not story.deep_report %}
+                <button type="button" class="btn-view" onclick="startAiTask('story_deep_report', {{ story.id }}, this)">Analyze Story</button>
+            {% endif %}
+        </div>
         <div class="analysis-box">
-            <div class="analysis-label" style="display: flex; justify-content: space-between; align-items: center;">
-                <span>Multi-Source Analysis</span>
-                {% if can('scraper') and ollama_online and story.articles|length >= 2 and not story.deep_report %}
-                    <button type="button" class="btn-view" style="cursor: pointer; padding: 4px 12px; font-size: var(--fs-label);" onclick="startAiTask('story_deep_report', {{ story.id }}, this)">Analyze Story</button>
-                {% endif %}
-            </div>
             {% if story.deep_report %}
                 <div class="analysis-content">
                     {% for line in story.deep_report.split('\n') %}
@@ -299,7 +325,7 @@
 
         {% if opinion %}
         <div class="story-opinion">
-            <h3 style="margin-bottom: 24px; text-transform: uppercase; font-size: 14px; letter-spacing: 1px;">Opinion</h3>
+            <div class="section-head"><h2 class="section-label">Opinion</h2></div>
             <p class="opinion-note">What columnists are arguing about this story. The columns are filed by each outlet's leaning and are not part of the news coverage above; ↗ opens the publisher's site. The summary and the line under each column are AI-written.</p>
             {{ oped_roundup(story) }}
             {{ oped_columns(opinion) }}
@@ -307,38 +333,36 @@
         {% endif %}
 
         <div class="article-list">
-            <h3 style="margin-bottom: 24px; text-transform: uppercase; font-size: 14px; letter-spacing: 1px;">Source Articles</h3>
-	            {% for article in story.display_articles %}
-	                <div class="article-item">
-	                    <div class="article-meta">
-                        <span>{{ article.outlet.name }}</span>
+            <div class="section-head"><h2 class="section-label">Source Articles</h2></div>
+            {#- One row per source: outlet and time, lean chip at the right; the
+                title; then same-size buttons: Summary (the article page),
+                Article (the publisher's page) and the read status, whose
+                tooltip explains it (Philip, 2026-10-22). -#}
+            {% set read_states = {
+                'success':  ('circle-check', 'Full read', 'MuckScraper read the full article before writing the summary and analysis.'),
+                'fallback': ('circle-dashed', 'Partial read', "Only the publisher's excerpt could be read, so some detail may be missing."),
+                'blocked':  ('ban', 'Blocked', 'The publisher blocked full-text reading; the summary and analysis use the headline and excerpt only.'),
+            } %}
+            {% for article in story.display_articles %}
+                <div class="article-item">
+                    <div class="article-meta">
+                        <span class="article-outlet">{{ article.outlet.name }}</span>
+                        <span class="local-date" data-utc="{{ article.date.isoformat() }}Z">{{ article.date|short_datetime }}</span>
                         {{ bias_tag(article.outlet.bias_score if article.outlet else none, unrated=false) }}
-	                        <span class="local-date" data-utc="{{ article.date.isoformat() }}Z">{{ article.date.strftime('%b %d, %Y') }}</span>
-	                    </div>
-	                    <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="article-link">{{ article.title }}</a>
-                        {% set scrape_status = article.scrape_status or 'blocked' %}
-                        <div class="scrape-note">
-                            {% if scrape_status == 'success' %}
-                                Full Read
-                            {% elif scrape_status == 'fallback' %}
-                                Partial Read
-                            {% else %}
-                                Limited By Publisher Block
-                            {% endif %}
-                        </div>
-                        {% set copy_note = copy_label(article) %}
-                        {% if copy_note %}
-                        <div class="scrape-note copy-note" title="This article is mostly the same text as another one in the story, so it is not counted as a separate source in the edition, summary or analysis.">{{ copy_note }} · not counted as a separate source</div>
-                        {% endif %}
-
-	                    <div style="display: flex; gap: 12px; margin-top: 16px; align-items: center;">
-                        <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="btn-view">{{ 'Read Summary & Text →' if current_user.is_authenticated else 'Read Summary →' }}</a>
-                        
+                    </div>
+                    <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="article-link">{{ article.title }}</a>
+                    {% set copy_note = copy_label(article) %}
+                    {% if copy_note %}
+                    <div class="scrape-note copy-note" title="This article is mostly the same text as another one in the story, so it is not counted as a separate source in the edition, summary or analysis.">{{ copy_note }} · not counted as a separate source</div>
+                    {% endif %}
+                    {% set rs = read_states.get(article.scrape_status or 'blocked', read_states['blocked']) %}
+                    <div class="article-actions">
+                        <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="pill pill-primary">{{ icon('newspaper') }} Summary</a>
+                        <a href="{{ article.url }}" target="_blank" rel="noopener" class="pill">{{ icon('external-link') }} Article</a>
+                        <span class="pill pill-status read-{{ article.scrape_status or 'blocked' }}" tabindex="0" title="{{ rs[2] }}" aria-label="{{ rs[1] }}: {{ rs[2] }}">{{ icon(rs[0]) }} {{ rs[1] }}</span>
                         {% if not article.summary and ollama_online and can('scraper') %}
-                            <button type="button" class="btn-view" style="cursor: pointer;" onclick="startAiTask('article_summary', {{ article.id }}, this)">Summarize</button>
+                            <button type="button" class="pill" onclick="startAiTask('article_summary', {{ article.id }}, this)">{{ icon('zap') }} Summarize</button>
                         {% endif %}
-
-                        <a href="{{ article.url }}" target="_blank" style="font-size: 12px; color: var(--text-faint);">View Original Article</a>
                     </div>
                 </div>
             {% endfor %}

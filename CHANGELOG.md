@@ -27,6 +27,14 @@ All notable changes to MuckScraper are documented here.
   window, with the sidebar open or collapsed.
   The story and article pages use the same bar and sidebar, with
   "← Back to Feed" (or "← Back to Story") beside the logo.
+- **Story, article and opinion pages are tighter and consistent.** The line
+  under every title reads the same way (SOURCES: 14 · PUBLISHED: … · LAST
+  UPDATED: …). Section headings (Executive Summary, Multi-Source Analysis)
+  sit above their callouts, with about half the padding. Each source on a
+  story page shows the outlet, time and lean on one line, then three
+  same-size buttons: Summary, Article (the publisher's page) and the read
+  status, which explains itself on hover. The Analysis chip is gone from
+  story cards.
 - **Live search results.** Typing in the top bar shows the best matching
   stories (thumbnail, article and outlet counts, Left/Center/Right counts and
   bar) and articles (outlet and lean) as you type, from the new

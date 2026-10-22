@@ -2,6 +2,7 @@
 {% from 'account_menu.html' import account_menu with context %}
 {% from 'icons.html' import icon, theme_toggle_label %}
 {% from 'breadcrumb.html' import back_link %}
+{% from 'title_meta.html' import title_meta, meta_item %}
 {#- One Op/Ed piece (admin.oped_piece, blueprints/admin/oped.py), laid out like
     article.html: what it argues, the news story it is linked to, its text and
     the publisher link. Signed-out visitors get no text, as on article pages. -#}
@@ -58,7 +59,7 @@
             border: 1px solid var(--border);
         }
 
-        .article-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+        .article-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
         .outlet-name { font-size: 14px; font-weight: 700; color: var(--text-muted); }
         .article-date { font-size: 14px; font-weight: 500; color: var(--text-faint); }
         .opinion-chip {
@@ -82,7 +83,7 @@
         }
         .bias-none { background-color: #ddd; color: #666; }
 
-        h1 { font-size: 36px; font-weight: 800; color: var(--text); margin-bottom: 24px; line-height: 1.2; letter-spacing: -1px; }
+        h1 { font-size: 36px; font-weight: 800; color: var(--text); margin-bottom: 12px; line-height: 1.2; letter-spacing: -1px; }
         h1 a { color: inherit; text-decoration: none; }
 
         .piece-image { width: 100%; border-radius: 16px; margin-bottom: 32px; box-shadow: var(--shadow); }
@@ -211,14 +212,14 @@
 
         <div class="article-meta">
             <span class="opinion-chip">Opinion</span>
-            <span class="outlet-name">{{ outlet_name }}</span>
-            {% if piece.date %}
-            <span class="article-date local-date" data-utc="{{ piece.date.isoformat() }}Z">{{ piece.date.strftime('%B %d, %Y') }}</span>
-            {% endif %}
-            {{ bias_tag(piece.bias_score) }}
         </div>
 
         <h1><a href="{{ piece.url }}" target="_blank" rel="noopener noreferrer">{{ piece.title }}</a></h1>
+        {% call title_meta() %}
+            {{ meta_item('Source', outlet_name) }}
+            {% if piece.date %}{{ meta_item('Published', when=piece.date) }}{% endif %}
+            {{ bias_tag(piece.bias_score) }}
+        {% endcall %}
 
         {% if piece.image_url %}
             <img class="piece-image" src="{{ piece.image_url }}" alt="">
