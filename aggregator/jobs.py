@@ -180,11 +180,12 @@ def worker_loop(app, stop_event=None, kinds=None):
     with app.app_context():
         if not kinds:
             # Registers the admin handlers (bulk actions, AI tasks), the
-            # app's NewsBox summaries and bookmark snapshots.
+            # app's NewsBox summaries, bookmark snapshots and article jobs.
             import aggregator.blueprints.admin._tasks  # noqa: F401
             import aggregator.newsbox  # noqa: F401
             import aggregator.bookmarks  # noqa: F401
             import aggregator.breaking  # noqa: F401
+            import aggregator.article_jobs  # noqa: F401
         fail_interrupted_jobs(kinds, exclude)
         listen = None
         while not stop_event.is_set():

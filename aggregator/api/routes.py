@@ -10,7 +10,7 @@ from flask import g, jsonify, request
 from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload, selectinload
 
-from aggregator import db, feed_prefs, reads, skips
+from aggregator import article_jobs, db, feed_prefs, reads, skips
 from aggregator.models import Article, Edition, EditionStory, OpinionPiece, Story, Topic
 from aggregator.opinion import published_edition_opinion_cards
 from aggregator.search import SearchUnavailableError, search_article_ids, search_story_ids
@@ -247,12 +247,25 @@ def story(story_id):
 @require_token()
 def article(article_id):
     query_args()
+    return jsonify(article_payload(load_article(article_id)))
+
+
+def load_article(article_id):
     row = Article.query.options(joinedload(Article.outlet), selectinload(Article.topics)).get(article_id)
     if row is None:
         raise ApiError(404, "not_found", "Not found.")
+    return row
+
+
+def article_payload(row):
+    """/articles/{id} for this user: read state, and which of its summary and
+    lean rating are still being written (aggregator/article_jobs.py)."""
     out = ser.article_detail(row, full_text=settings.load()["full_text"])
-    out["is_read"] = reads.get(g.user.id, "article", article_id) is not None
-    return jsonify(out)
+    out["is_read"] = reads.get(g.user.id, "article", row.id) is not None
+    waiting = article_jobs.pending(row.id)
+    out["is_summarizing"] = article_jobs.SUMMARY_JOB in waiting
+    out["is_rating_bias"] = article_jobs.BIAS_JOB in waiting
+    return out
 
 
 @api.route("/search")
