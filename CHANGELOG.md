@@ -11,8 +11,9 @@ All notable changes to MuckScraper are documented here.
   general RSS feeds every `BREAKING_POLL_MINUTES` (default 5), storing
   headlines only (new `feed_entries` table, migration `f2a7c9e4b6d1`). An
   event three or more outlets carry at once, or a feed marks BREAKING / LIVE,
-  shows in a compact purple bar at the top of Headlines; its summary icon
-  scrapes the article through the job queue and summarizes its story, and
+  shows in a compact purple bar, rounded like the cards, under the edition
+  line on Headlines; its summary icon scrapes the article through the job
+  queue and summarizes its story, and
   turns filled once the summary is written. `GET /api/v1/breaking` and
   `POST /api/v1/breaking/{id}/newsbox` give the app the same, and NewsBox
   items now report their `step` (scrape, group, summary, analysis) and
