@@ -1,5 +1,5 @@
 """Tests for per-user read state (aggregator/reads.py): the web app's
-reading-glasses buttons and Recently read, and /api/v1/me/read, which share
+reading-glasses buttons and Recently Read, and /api/v1/me/read, which share
 one store.
 
 Runs against the scratch Postgres database named by API_TEST_DATABASE_URL,
