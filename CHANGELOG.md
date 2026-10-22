@@ -7,6 +7,13 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **API keys** for the API (Settings › API), for scripts, servers and other
+  apps that can't pair with a code. Off by default behind an **API keys**
+  switch; a key has a name, a user, `read` or `read` + `summarize`, and an
+  expiry (30 days, 90 days, a year or never), and is shown once. Keys use
+  the same endpoints, rate limits and sign-out as paired phones; turning the
+  switch off stops them. `GET /me` reports `device.kind` (`device` or
+  `key`). Migration `e8c3a1f6d4b2` adds `api_devices.kind`.
 - **Breaking News** on Headlines and in the app. The scheduler reads the
   general RSS feeds every `BREAKING_POLL_MINUTES` (default 5), storing
   headlines only (new `feed_entries` table, migration `f2a7c9e4b6d1`). An
@@ -68,6 +75,13 @@ All notable changes to MuckScraper are documented here.
   environment.
 
 ### Changed
+- **The Mobile API is now just the API** (Settings › API at
+  `/admin/settings/api`; the old address redirects), with client-neutral
+  names: NewsBox origins `swiped` and `auto` are now `requested` and
+  `scheduled`, `auto_run_id` is `run_id`, and every schedule section's
+  `amount` counts stories (Headlines used pages of 20; 1 to 100 for all).
+  Migration `f9d4b2c7e1a3` renames stored origins and multiplies saved
+  Headlines amounts by 20. MuckScroller needs the matching update.
 - **Pick what each LLM provider does from its header.** Every provider in
   Settings › LLM providers has Main, Fast and Embeddings chips: filled for
   the jobs it does, click another to hand it that job (embeddings ask first).
