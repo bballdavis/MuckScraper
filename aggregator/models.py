@@ -543,3 +543,65 @@ class ConfigSetting(db.Model):
     hint         = db.Column(db.String(8), nullable=True)
     updated_at   = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_by   = db.Column(db.String(64), nullable=True)
+
+
+# Mobile API (aggregator/api/, served by aggregator/api_app.py). Scopes a
+# device token can carry; "read" covers every read endpoint and the user's own
+# preferences.
+API_SCOPES = ("read",)
+
+
+class ApiDevice(db.Model):
+    """A phone paired with the API. Only the SHA-256 of its bearer token is
+    stored; the token itself is shown once, to the device that paired."""
+    __tablename__ = "api_devices"
+
+    id           = db.Column(db.Integer, primary_key=True)
+    user_id      = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name         = db.Column(db.String(80), nullable=False)
+    token_hash   = db.Column(db.String(64), nullable=False, unique=True)
+    scopes       = db.Column(db.String(200), nullable=False, default="read", server_default="read")
+    created_at   = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at   = db.Column(db.DateTime, nullable=True)
+    last_used_at = db.Column(db.DateTime, nullable=True)
+    last_ip      = db.Column(db.String(64), nullable=True)
+    revoked_at   = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship("User", backref=db.backref("api_devices", lazy="dynamic", cascade="all, delete-orphan"))
+
+    @property
+    def scope_list(self):
+        return [s for s in (self.scopes or "").split() if s]
+
+    @property
+    def is_live(self):
+        return self.revoked_at is None and (self.expires_at is None or self.expires_at > datetime.utcnow())
+
+
+class ApiPairingCode(db.Model):
+    """A one-time code an admin creates for a user; a phone trades it for a
+    device token at POST /api/v1/devices/pair. Lives ten minutes, works once,
+    and is stored only as a hash."""
+    __tablename__ = "api_pairing_codes"
+
+    id          = db.Column(db.Integer, primary_key=True)
+    user_id     = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    code_hash   = db.Column(db.String(64), nullable=False, unique=True)
+    scopes      = db.Column(db.String(200), nullable=False, default="read", server_default="read")
+    created_by  = db.Column(db.String(64), nullable=True)
+    created_at  = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at  = db.Column(db.DateTime, nullable=False)
+    used_at     = db.Column(db.DateTime, nullable=True)
+    device_id   = db.Column(db.Integer, db.ForeignKey("api_devices.id", ondelete="SET NULL"), nullable=True)
+
+    user = db.relationship("User")
+
+
+class ApiRateCounter(db.Model):
+    """Request counts per key (a device, an IP, pairing attempts by IP) per
+    fixed window, shared by every API worker (aggregator/api/ratelimit.py)."""
+    __tablename__ = "api_rate_counters"
+
+    key          = db.Column(db.String(120), primary_key=True)
+    window_start = db.Column(db.DateTime, primary_key=True)
+    count        = db.Column(db.Integer, nullable=False, default=0, server_default="0")

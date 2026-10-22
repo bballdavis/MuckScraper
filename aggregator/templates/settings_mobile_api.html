@@ -1,0 +1,161 @@
+{#- Settings › Mobile API (admin.mobile_api_page,
+    blueprints/admin/mobile_api.py): the API's switch, content policy and
+    limits, pairing codes with a QR for the MuckScroller app, and paired
+    devices. The API itself runs in its own container (aggregator/api_app.py). -#}
+{% extends 'settings_base.html' %}
+{% block title %}Mobile API{% endblock %}
+{% block settings_key %}mobileapi{% endblock %}
+{% block settings_body %}
+<div class="page-head">
+    <h1>Mobile API</h1>
+    <p>The JSON API the MuckScroller iPhone app reads. It runs as its own <code>api</code> container (<code>docker compose --profile api up -d</code>) with no admin or web pages, so it is the only part of MuckScraper to put behind your tunnel or proxy.</p>
+</div>
+
+{% include '_flashes.html' %}
+
+<div class="stat-grid">
+    <div class="stat">
+        <span class="stat-label">API</span>
+        {%- if config.enabled %}
+        <span class="stat-value"><span class="dot ok"></span>On</span>
+        {%- else %}
+        <span class="stat-value"><span class="dot off"></span>Off</span>
+        {%- endif %}
+        <span class="stat-sub">{{ config.public_url or 'No public address set' }}</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Paired devices</span>
+        <span class="stat-value">{{ live_count }}</span>
+        <span class="stat-sub">{{ pending_codes }} pairing code{{ '' if pending_codes == 1 else 's' }} waiting</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Last request</span>
+        <span class="stat-value">{{ last_request | local_datetime if last_request else 'None yet' }}</span>
+        <span class="stat-sub">From any device</span>
+    </div>
+</div>
+
+<section class="panel" id="pair">
+    <div class="panel-head">
+        <div>
+            <h2>Pair a device</h2>
+            <p>Creates a one-time code for a user. Scan the QR code in MuckScroller, or type the code. It works once and expires after {{ pairing_minutes }} minutes; no password crosses the internet.</p>
+        </div>
+    </div>
+    {%- if pairing %}
+    <div class="pairing">
+        <div class="qr" aria-hidden="true">{{ pairing.qr }}</div>
+        <div class="pairing-text">
+            <span class="row-sub">Code for {{ pairing.username }}</span>
+            <span class="pair-code">{{ pairing.display }}</span>
+            <span class="row-sub">Expires {{ pairing.expires_at | local_datetime }}. It is shown only now.</span>
+            {%- if not pairing.server %}
+            <span class="field-warn">No public address is set below, so the QR code doesn't tell the app where your server is; enter it in the app.</span>
+            {%- endif %}
+        </div>
+    </div>
+    {%- endif %}
+    <form class="row" method="POST" action="{{ url_for('admin.create_mobile_pairing_code') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="pair-user">
+            <span class="row-label">User</span>
+            <select name="user_id" required>
+                {%- for u in users %}
+                <option value="{{ u.id }}"{% if u.id == current_user.id %} selected{% endif %}>{{ u.username }} ({{ u.role_label }})</option>
+                {%- endfor %}
+            </select>
+        </label>
+        <button type="submit" class="btn">Create pairing code</button>
+    </form>
+</section>
+
+<section class="panel" id="devices">
+    <div class="panel-head">
+        <div>
+            <h2>Devices</h2>
+            <p>Signing a device out takes effect on its next request. Disabling a user in Users signs out all of theirs.</p>
+        </div>
+        {%- if live_count %}
+        <form method="POST" action="{{ url_for('admin.revoke_all_mobile_devices') }}" onsubmit="return confirm('Sign out every paired device?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger">Sign out all</button>
+        </form>
+        {%- endif %}
+    </div>
+    {%- if devices %}
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead><tr><th scope="col">Device</th><th scope="col">User</th><th scope="col">Paired</th><th scope="col">Last used</th><th scope="col">Last IP</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody>
+            {%- for d in devices %}
+                <tr{% if not d.is_live %} class="muted"{% endif %}>
+                    <td>{{ d.name }}</td>
+                    <td>{{ d.user.username }}</td>
+                    <td>{{ d.created_at | local_datetime }}</td>
+                    <td>{{ d.last_used_at | local_datetime if d.last_used_at else '—' }}</td>
+                    <td><code>{{ d.last_ip or '—' }}</code></td>
+                    <td>
+                        {%- if d.revoked_at %}<span class="chip">Signed out</span>
+                        {%- elif not d.is_live %}<span class="chip">Expired</span>
+                        {%- elif not d.user.is_active %}<span class="chip chip-danger">User disabled</span>
+                        {%- else %}<span class="chip chip-safe">Active</span>{% endif %}
+                    </td>
+                    <td>
+                        {%- if d.is_live %}
+                        <form method="POST" action="{{ url_for('admin.revoke_mobile_device', device_id=d.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-quiet">Sign out</button>
+                        </form>
+                        {%- endif %}
+                    </td>
+                </tr>
+            {%- endfor %}
+            </tbody>
+        </table>
+    </div>
+    {%- else %}
+    <div class="row"><span class="muted">No devices yet. Create a pairing code above.</span></div>
+    {%- endif %}
+</section>
+
+<form class="panel" method="POST" action="{{ url_for('admin.save_mobile_api_settings') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="panel-head"><h2>Settings</h2></div>
+    <label class="row">
+        <span><span class="row-label">API on</span><span class="row-sub">Off answers every request with 503, except the health check</span></span>
+        <span class="switch"><input type="checkbox" name="enabled"{% if config.enabled %} checked{% endif %}><span aria-hidden="true"></span></span>
+    </label>
+    <label class="row">
+        <span><span class="row-label">Send full article text</span><span class="row-sub">Off: the app gets summaries and the publisher's link, as signed-out web visitors do. On: it also gets the scraped text.</span></span>
+        <span class="switch"><input type="checkbox" name="full_text"{% if config.full_text %} checked{% endif %}><span aria-hidden="true"></span></span>
+    </label>
+    <div class="row">
+        <span><label class="row-label" for="public_url">Public address</label><span class="row-sub">Where the phone reaches the API, e.g. https://api.example.com. Goes into the pairing QR code.</span></span>
+        <input type="url" id="public_url" name="public_url" value="{{ config.public_url }}" placeholder="https://" class="wide-input">
+    </div>
+    {%- for name, label in limit_labels.items() %}
+    <div class="row">
+        <label class="row-label" for="{{ name }}">{{ label }}</label>
+        <input type="number" id="{{ name }}" name="{{ name }}" value="{{ config[name] }}" min="1" max="100000" required class="num-input">
+    </div>
+    {%- endfor %}
+    <div class="panel-foot">
+        <button type="submit" class="btn">Save settings</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .stat-grid { margin-bottom: 16px; }
+    .pairing { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    .qr svg { display: block; border-radius: 4px; }
+    .pairing-text { display: flex; flex-direction: column; gap: 6px; }
+    .pair-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 30px; font-weight: 700; letter-spacing: 3px; }
+    .field-warn { color: var(--risk-danger-text); font-size: 13px; font-weight: 600; max-width: 420px; }
+    .pair-user { display: flex; align-items: center; gap: 12px; }
+    .wide-input { width: 320px; max-width: 100%; }
+    .num-input { width: 110px; }
+    tr.muted td { color: var(--text-muted); }
+</style>
+{% endblock %}
