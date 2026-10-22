@@ -11,11 +11,14 @@
     values are skipped). Without a call block there is no Filters button.
     The bar spans the full width above the sidebar: the page renders it
     before its `.layout feed-layout` block and sets sidebar_toggle_in_topbar.
+    On phones the search and Filters hide behind a search button beside the
+    account button and slide out below the bar; they start open when there
+    is a query. Light/Dark lives in the account menu.
     Styles: static/css/feed_header.css. Behaviour: static/js/feed_header.js. -#}
-{% from 'icons.html' import icon, theme_toggle %}
+{% from 'icons.html' import icon %}
 {% from 'account_menu.html' import account_menu with context %}
 {%- macro feed_topbar(section_title, search_action, q='', hidden={}) -%}
-<header class="feed-topbar">
+<header class="feed-topbar{% if q %} search-open{% endif %}">
     <div class="ft-left">
         {#- Shows and hides the sidebar (sidebar_script.html); the page sets
             sidebar_toggle_in_topbar so sidebar_nav.html leaves out its own tab. #}
@@ -28,7 +31,7 @@
         {%- endif %}
     </div>
 
-    <div class="ft-center">
+    <div class="ft-center" id="ft-search-area">
         <form class="ft-search" role="search" method="GET" action="{{ search_action }}"
               data-suggest-url="{{ url_for('admin.search_suggest') }}"
               data-range="{{ hidden.get('range') or '' }}">
@@ -59,7 +62,8 @@
     </div>
 
     <div class="ft-right">
-        {{ theme_toggle() }}
+        <button type="button" class="ft-search-toggle" id="ft-search-toggle" aria-controls="ft-search-area"
+                aria-expanded="{{ 'true' if q else 'false' }}" aria-label="Search" title="Search">{{ icon('search') }}</button>
         {{ account_menu() }}
     </div>
 </header>
