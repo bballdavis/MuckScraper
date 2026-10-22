@@ -241,6 +241,26 @@ class AppSetting(db.Model):
     value = db.Column(db.String)
 
 
+class Job(db.Model):
+    """A unit of background work (aggregator/jobs.py), claimed and run by the
+    worker thread in the scheduler container instead of a thread inside a
+    web request. Higher `priority` runs first, then oldest first."""
+    __tablename__ = "jobs"
+    __table_args__ = (
+        db.Index("ix_jobs_queued", "status", "priority", "id"),
+    )
+
+    id          = db.Column(db.Integer, primary_key=True)
+    kind        = db.Column(db.String(64), nullable=False)
+    payload     = db.Column(db.Text, nullable=False, default="{}", server_default="{}")
+    priority    = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    status      = db.Column(db.String(16), nullable=False, default="queued", server_default="queued")
+    created_at  = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    started_at  = db.Column(db.DateTime, nullable=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+    error       = db.Column(db.Text, nullable=True)
+
+
 class RawArticlePayload(db.Model):
     __tablename__ = "raw_article_payloads"
     __table_args__ = (
