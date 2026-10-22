@@ -4,7 +4,6 @@
 import requests
 from bs4 import BeautifulSoup
 import bleach
-import time
 import os
 import logging
 from difflib import SequenceMatcher
@@ -20,35 +19,15 @@ HEADERS_DEFAULT = {
                   "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
-HEADERS_GOOGLEBOT = {
-    "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
-}
-
 # The allowlist lives in aggregator/html_safety.py so the templates filter
 # with exactly the same rules at render time.
 from aggregator.html_safety import ALLOWED_ATTRIBUTES, ALLOWED_TAGS, sanitize_html  # noqa: E402,F401
 
-# Sites that need Playwright (heavy JS)
-PLAYWRIGHT_DOMAINS = [
-    "bloomberg.com",
-    "wsj.com",
-    "ft.com",
-    "nytimes.com",
-    "washingtonpost.com",
-    "theathletic.com",
-    "wired.com",
-]
-
-# Sites to try Googlebot user agent on
-GOOGLEBOT_DOMAINS = [
-    "axios.com",
-    "politico.com",
-    "theatlantic.com",
-    "thedailybeast.com",
-    "businessinsider.com",
-    "sfgate.com",
-    "telegraph.co.uk",
-]
+# No crawler user agent and no headless browser for paywalled sites (Regis,
+# 2026-10-21). Posing as Googlebot is how 12ft.io got past paywalls before
+# publishers had it taken down; MuckScraper reads what an ordinary browser can
+# read, and a paywalled article stays headline-only. The Playwright path for
+# NYT/WSJ/WaPo/FT/Bloomberg hadn't succeeded once in 30 days anyway.
 
 VARIANT_RETRY_403_DOMAINS = [
     "thehill.com",
@@ -521,14 +500,6 @@ def should_skip(url):
     return any(domain in url.lower() for domain in SKIP_DOMAINS)
 
 
-def needs_playwright(url):
-    return any(domain in url.lower() for domain in PLAYWRIGHT_DOMAINS)
-
-
-def use_googlebot(url):
-    return any(domain in url.lower() for domain in GOOGLEBOT_DOMAINS)
-
-
 def _fetch_html(url, headers=None, timeout=10):
     if headers is None:
         headers = HEADERS_DEFAULT
@@ -755,62 +726,6 @@ def extract_article_html_bs4(url, headers=None):
         return None
 
 
-def extract_article_html_playwright(url):
-    """
-    Scrape article using Playwright and return sanitized HTML string.
-    """
-    try:
-        from playwright.sync_api import sync_playwright
-
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.set_extra_http_headers(HEADERS_DEFAULT)
-
-            page.goto(url, timeout=15000, wait_until="domcontentloaded")
-            time.sleep(2)
-
-            page.evaluate("""
-                ['script','style','nav','header','footer','aside',
-                 'iframe','button','form']
-                .forEach(tag => document.querySelectorAll(tag)
-                .forEach(el => el.remove()))
-            """)
-
-            html = page.content()
-            browser.close()
-
-            # Try readability on the rendered HTML first
-            content = extract_with_readability(html, url)
-            if content:
-                return content
-
-            # Manual JS fallback removed 2026-09-08: `browser.close()` above
-            # already ran by this point, so page.evaluate() here would fail
-            # on a dead page -- this had been silently short-circuited to
-            # None via `if False` rather than fixed or removed. Readability
-            # above is this function's real extraction path. A BS4-based
-            # fallback mirroring the one in extract_article_html_bs4() would
-            # need to operate on `html`, not a closed page, if this ever
-            # needs its own last-resort fallback.
-            content_html = None
-
-            if content_html and len(content_html) > 200:
-                sanitized = sanitize_html(content_html)
-                logger.info(f"  [Playwright] Scraped {len(sanitized)} chars from {url[:60]}")
-                return sanitized
-
-            logger.info(f"  [Playwright] Could not extract content from {url[:60]}")
-            return None
-
-    except ImportError:
-        logger.info("  [Playwright] Not installed, skipping.")
-        return None
-    except Exception as e:
-        logger.info(f"  [Playwright] Error scraping {url[:60]}: {e}")
-        return None
-
-
 def scrape_article(url, fallback_content=None, force=False):
     """
     Main scraping entry point.
@@ -921,22 +836,9 @@ def scrape_article(url, fallback_content=None, force=False):
             logger.info(f"  [Scraper] Error for {candidate_url[:60]}: {exc}")
         return None
 
-    if use_googlebot(url):
-        logger.info(f"  [Scraper] Using Googlebot UA for {url[:60]}")
-        result = try_bs4(url, headers=HEADERS_GOOGLEBOT, method="googlebot_bs4")
-        if result and result.succeeded:
-            return result
-
     result = try_bs4(url, method="bs4")
     if result and result.succeeded:
         return result
-
-    if needs_playwright(url):
-        logger.info(f"  [Scraper] Using Playwright for {url[:60]}")
-        attempted_methods.append("playwright")
-        content = extract_article_html_playwright(url)
-        if content:
-            return finalize_content(content, "playwright")
 
     if should_try_variant_urls(url=url, http_status=http_status, failure_reason=last_failure):
         for variant_url in build_variant_urls(url, html=initial_html):

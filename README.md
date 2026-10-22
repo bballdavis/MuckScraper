@@ -77,7 +77,7 @@ Stories and articles in dense, sortable tables, filtered by time window, with Le
 - **News Data:** NewsAPI and GNews, with RSS support
 - **LLM Runtime:** Ollama by default; Gemini, Groq, or any OpenAI-compatible endpoint optional
 - **Embeddings:** `nomic-embed-text`
-- **Scraping:** BeautifulSoup, readability-lxml, Playwright
+- **Scraping:** BeautifulSoup, readability-lxml
 - **Runtime:** Docker and Docker Compose
 
 ---
