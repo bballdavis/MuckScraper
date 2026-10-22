@@ -55,3 +55,7 @@ def check_summaries(user):
 
 def check_schedule_runs(user):
     _limit(f"schedule_run:{user.id}", settings.load()["schedule_runs_per_user_per_day"], 86400)
+
+
+def check_bookmark_snapshots(user):
+    _limit(f"bookmark:{user.id}", settings.load()["bookmark_snapshots_per_user_per_day"], 86400)
