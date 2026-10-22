@@ -1,5 +1,5 @@
-"""The article page's top controls (Philip, 2026-10-22): the Original
-article link, the round summary button that goes once a summary exists, and
+"""The article page's top controls (Philip, 2026-10-22): the Source
+button, the round summary button that goes once a summary exists, and
 the lean rating, which now returns to the page and shows its result.
 
 Runs against the scratch Postgres database named by API_TEST_DATABASE_URL,
@@ -54,7 +54,7 @@ class ArticlePageTests(unittest.TestCase):
 
     def test_original_link_at_the_top_and_no_bottom_summarize(self):
         page = self._page(self.ids["plain"])
-        self.assertIn('class="source-pill" href="https://daily.example/a"', page)
+        self.assertIn('href="https://daily.example/a" target="_blank" rel="noopener" class="pill"', page)
         self.assertNotIn(">Summarize</button>", page)
         self.assertNotIn("Original source:", page)
 
