@@ -28,9 +28,13 @@ All notable changes to MuckScraper are documented here.
   stories (thumbnail, article and outlet counts, Left/Center/Right counts and
   bar) and articles (outlet and lean) as you type, from the new
   `/admin/search/suggest` endpoint. Enter still runs the full search.
-- **Compact story cards** on All and Grouped Stories: a thumbnail, the
-  headline and counts, and the date over the Left/Center/Right line on the
-  right. Every card date uses one format ("Oct 19, 9:39 PM").
+- **Compact story cards** on All and Grouped Stories: the image, the
+  headline, one line with the date and counts, and a bottom row with a
+  rounded Left/Center/Right bar that carries its own counts (a single
+  article shows its lean chip instead). A click anywhere on the card opens
+  it. Fetch more, summary and bias actions and the scrape results moved into
+  a ⋯ menu; the method/http details are gone. Every card date uses one
+  format ("Oct 19, 9:39 PM").
 - **Clearer sidebar.** The current page is filled across the menu's full
   width, and the small muted group headings (Topics, More) no longer look
   like links. Topics are text only; the story lists and More keep their
