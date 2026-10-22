@@ -164,6 +164,72 @@
 }
 .account-area a.account-signin:hover { background: var(--accent-dark); }
 
+/* The line under a page title (templates/title_meta.html). A chip placed
+   after the items (an outlet's lean) sits at the right end. */
+.title-meta {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 0;
+    font-size: 12px; color: var(--text-muted); margin-bottom: 20px;
+}
+.tm-item + .tm-item::before { content: "·"; margin: 0 10px; color: var(--text-faint); }
+.tm-label { font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-faint); }
+.title-meta > :not(.tm-item) { margin-left: auto; }
+
+/* Summary / analysis action icons (templates/ai_actions.html) and their
+   tooltips. .act is a square cell; the card rail stretches it to fill. */
+.act {
+    position: relative; width: 28px; height: 28px; flex: 0 0 auto;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border); border-radius: 7px; background: var(--surface);
+    color: var(--text-faint); font: inherit; font-size: 15px; padding: 0;
+}
+.act-done { background: var(--accent); border-color: var(--accent); color: #fff; cursor: default; }
+.act-ready { color: var(--accent-text); cursor: pointer; }
+.act-ready:hover, .act-ready:focus-visible { background: var(--accent); border-color: var(--accent); color: #fff; outline: none; }
+.act-off { color: var(--text-faint); opacity: 0.6; cursor: default; }
+.act.busy { cursor: progress; }
+.act.busy .icon { animation: act-pulse 1s ease-in-out infinite; }
+@keyframes act-pulse { 50% { opacity: 0.3; } }
+
+/* Rich tooltip: a hidden .tip child, shown on hover or keyboard focus. It
+   opens to the left by default (the card rail sits at the right edge);
+   .tip-above opens it above, centred. */
+.tip {
+    position: absolute; z-index: 30; right: calc(100% + 8px); top: 50%; transform: translateY(-50%);
+    width: max-content; max-width: 260px; padding: 8px 10px; border-radius: 8px;
+    background: var(--topbar-bg); color: #e8e8f0; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    font-size: 12px; font-weight: 400; line-height: 1.45; text-align: left; white-space: normal;
+    opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.12s;
+}
+.tip strong { display: block; color: #fff; font-weight: 700; margin-bottom: 2px; }
+:hover > .tip, :focus-visible > .tip { opacity: 1; visibility: visible; }
+.tip-above > .tip, .tip-above .tip { right: auto; left: 50%; top: auto; bottom: calc(100% + 8px); transform: translateX(-50%); }
+
+/* Floating back button (breadcrumb.html float_back): sticks beside the
+   card's top-left corner while the page scrolls; on narrow screens it sits
+   at the bottom left of the window instead. */
+.back-rail { position: sticky; top: calc(var(--ft-height, 60px) + 20px); height: 0; z-index: 20; }
+.float-back {
+    position: absolute; left: -64px; top: 0;
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface); color: var(--text-muted); border: 1px solid var(--border);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1); font-size: 20px; text-decoration: none;
+    transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.float-back:hover, .float-back:focus-visible { color: var(--accent-text); border-color: var(--accent); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14); outline: none; }
+.float-back::after {
+    content: attr(data-tip); position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
+    padding: 5px 9px; border-radius: 6px; background: var(--topbar-bg); color: #fff;
+    font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none;
+    opacity: 0; transition: opacity 0.15s;
+}
+.float-back:hover::after, .float-back:focus-visible::after { opacity: 1; }
+@media (max-width: 1280px) {
+    .back-rail { position: static; height: auto; }
+    .float-back { position: fixed; left: 16px; top: auto; bottom: 16px; }
+    .float-back::after { display: none; }
+}
+
 /* Back link in the top bar (templates/breadcrumb.html). The bar is dark in
    both themes, so one link colour serves both. */
 .crumb-bar { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
