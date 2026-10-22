@@ -94,6 +94,54 @@ def _title_already_stored(title, source_name, days=4):
     return False
 
 
+def _entries_from_feed(feed, feed_url, max_entries):
+    """(source_name, normalized article dicts) from a parsed feed. Google
+    News links are left unresolved."""
+    source_name = (
+        feed.feed.get("title", feed_url.split("/")[2])
+        if feed.feed else feed_url.split("/")[2]
+    )
+
+    google_feed = google_news.is_google_news_feed(feed_url)
+    articles = []
+    for entry in feed.entries[:max_entries]:
+        title = entry.get("title", "").strip()
+        url = entry.get("link", "").strip()
+        entry_source = source_name
+        if google_feed:
+            # A Google News search feed mixes outlets in principle and
+            # titles every entry "<headline> - <Outlet>"; the outlet is
+            # the entry's <source>, not the feed's own title.
+            entry_source = (entry.get("source") or {}).get("title") or ""
+            # Twice: some publisher titles already end "- AP News", and
+            # Google adds its own on top.
+            for _ in range(2):
+                title = google_news.strip_source_suffix(title, entry_source, same_outlet=_same_outlet)
+            if not entry_source:
+                continue
+        if not title or not url:
+            continue
+
+        # Pass description as fallback content — scraper will attempt full text first
+        content = entry.get("summary", "") or entry.get("description", "") or ""
+        if google_feed:
+            # Google's description is only a link back to news.google.com
+            # and the outlet name. Kept, it became the "fallback" text of
+            # every article the publisher blocks (AP 403, Reuters 401) and
+            # was summarized as if it were the article (2026-10-17).
+            content = ""
+
+        articles.append({
+            "title":        title,
+            "content":      content,
+            "url":          url,
+            "source_name":  entry_source,
+            "published_at": _parse_published(entry),
+            "image_url":    _extract_image(entry),
+        })
+    return source_name, articles
+
+
 def fetch_feed(feed_url, max_entries=30, fallback_url=None):
     """
     Fetch a single RSS feed.
@@ -112,50 +160,9 @@ def fetch_feed(feed_url, max_entries=30, fallback_url=None):
                 f"using fallback {fallback_url[:80]}"
             )
             return fetch_feed(fallback_url, max_entries=max_entries)
-        source_name = (
-            feed.feed.get("title", feed_url.split("/")[2])
-            if feed.feed else feed_url.split("/")[2]
-        )
+        source_name, articles = _entries_from_feed(feed, feed_url, max_entries)
 
-        google_feed = google_news.is_google_news_feed(feed_url)
-        articles = []
-        for entry in feed.entries[:max_entries]:
-            title = entry.get("title", "").strip()
-            url = entry.get("link", "").strip()
-            entry_source = source_name
-            if google_feed:
-                # A Google News search feed mixes outlets in principle and
-                # titles every entry "<headline> - <Outlet>"; the outlet is
-                # the entry's <source>, not the feed's own title.
-                entry_source = (entry.get("source") or {}).get("title") or ""
-                # Twice: some publisher titles already end "- AP News", and
-                # Google adds its own on top.
-                for _ in range(2):
-                    title = google_news.strip_source_suffix(title, entry_source, same_outlet=_same_outlet)
-                if not entry_source:
-                    continue
-            if not title or not url:
-                continue
-
-            # Pass description as fallback content — scraper will attempt full text first
-            content = entry.get("summary", "") or entry.get("description", "") or ""
-            if google_feed:
-                # Google's description is only a link back to news.google.com
-                # and the outlet name. Kept, it became the "fallback" text of
-                # every article the publisher blocks (AP 403, Reuters 401) and
-                # was summarized as if it were the article (2026-10-17).
-                content = ""
-
-            articles.append({
-                "title":        title,
-                "content":      content,
-                "url":          url,
-                "source_name":  entry_source,
-                "published_at": _parse_published(entry),
-                "image_url":    _extract_image(entry),
-            })
-
-        if google_feed:
+        if google_news.is_google_news_feed(feed_url):
             articles, stats = google_news.resolve_entries(articles, already_stored=_title_already_stored)
             source_name = articles[0]["source_name"] if articles else source_name
             logger.info(
@@ -173,6 +180,21 @@ def fetch_feed(feed_url, max_entries=30, fallback_url=None):
             logger.warning(f"  [RSS] Using fallback {fallback_url[:80]}")
             return fetch_feed(fallback_url, max_entries=max_entries)
         return None, []
+
+
+def read_feed_headlines(feed_url, max_entries=30, fallback_url=None, etag=None, modified=None):
+    """Headlines only, for the Breaking poller (news_fetcher/breaking_feed.py):
+    no Google link lookups, nothing stored or scraped. `etag`/`modified`
+    make it a conditional GET. Returns (articles, feed_url_read, etag,
+    modified); articles is None when the feed answered 304 Not Modified."""
+    feed = feedparser.parse(feed_url, etag=etag, modified=modified)
+    if feed.get("status") == 304:
+        return None, feed_url, etag, modified
+    if fallback_url and _feed_failed(feed):
+        feed_url = fallback_url
+        feed = feedparser.parse(feed_url)
+    _, articles = _entries_from_feed(feed, feed_url, max_entries)
+    return articles, feed_url, feed.get("etag"), feed.get("modified")
 
 
 RSS_MAX_ENTRIES_PER_FEED_GROQ = 10

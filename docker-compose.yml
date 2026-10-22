@@ -95,6 +95,8 @@ services:
     environment:
       <<: *app-env
       BOOKMARK_STORAGE_DIR: /data/bookmarks
+      # How often the Breaking News check reads the RSS feeds (headlines only).
+      BREAKING_POLL_MINUTES: ${BREAKING_POLL_MINUTES:-5}
     restart: unless-stopped
     volumes:
       - .:/app

@@ -9,7 +9,8 @@ notification only delays a job by POLL_SECONDS.
 
 Handlers are registered by kind (register()); aggregator/blueprints/admin/
 _tasks.py registers the admin bulk actions and AI tasks, aggregator/
-newsbox.py the app's NewsBox summaries. One worker runs one
+newsbox.py the app's NewsBox summaries, aggregator/breaking.py Breaking
+News scrapes. One worker runs one
 job at a time, highest priority first, then oldest first.
 """
 import json
@@ -183,6 +184,7 @@ def worker_loop(app, stop_event=None, kinds=None):
             import aggregator.blueprints.admin._tasks  # noqa: F401
             import aggregator.newsbox  # noqa: F401
             import aggregator.bookmarks  # noqa: F401
+            import aggregator.breaking  # noqa: F401
         fail_interrupted_jobs(kinds, exclude)
         listen = None
         while not stop_event.is_set():

@@ -24,7 +24,7 @@ from .routes import DEFAULT_PAGE_SIZE, _page, _story_load
 
 def _item_query():
     return NewsBoxItem.query.filter_by(user_id=g.user.id).options(
-        joinedload(NewsBoxItem.story).options(*_story_load()))
+        joinedload(NewsBoxItem.story).options(*_story_load()), joinedload(NewsBoxItem.feed_entry))
 
 
 def _own_item(story_id):

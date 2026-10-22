@@ -86,6 +86,8 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 | `GET /articles/{id}` | Title, outlet, leaning, summary, analysis, link, and scraped text when allowed |
 | `GET /search?q=&kind=stories\|articles&range=&limit=` | Compact hits for as-you-type search |
 | `POST /stories/{id}/summarize` `{depth, origin}` | Adds the story to the user's NewsBox: `200` ready when already summarized, `202` pending when a summary was queued. `depth` is `summary`, `analysis` (the multi-source analysis alone; the summary stands in when a story has one article) or `summary_analysis`; `origin` is `swiped` or `saved`. Needs `summarize`. |
+| `GET /breaking` | The Breaking News bar: up to three breaking RSS headlines, newest first, with `state` (`new`, `scraping`, `scraped`, `summarizing`, `summarized`, `failed`) and `story_id` once scraped |
+| `POST /breaking/{id}/newsbox` `{depth}` | Send a breaking headline to NewsBox: it is scraped if it isn't in a story yet, then summarized. `200` ready, `202` pending. Needs `summarize`; counts against the daily NewsBox limit. |
 | `GET /me/newsbox?state=&origin=&unread=&cursor=&limit=` | The user's NewsBox, newest first, with `unread_count` |
 | `PATCH /me/newsbox/{story_id}` `{is_unread}`, `DELETE` | Mark one item read or unread, or remove it |
 | `POST /me/newsbox/read` | Mark every item read |
@@ -110,6 +112,21 @@ story's summary for everyone waiting on it, at lower priority than the
 pipeline and the admin's AI tasks. An item is unread from when it turns
 ready. Scheduled items have `origin: "auto"` and share an `auto_run_id`. The
 scheduler checks every minute for schedules that are due.
+
+An unfinished item has a `step`: `scrape` → `group` → `summary` →
+`analysis`, with `progress` from 0 to 1, for the app's progress bar. A
+Breaking headline (`origin: "breaking"`) starts at `scrape` with `story`
+null and `headline` (`title`, `outlet`, `url`, `published_at`) in its
+place; once it is in a story, `story` is filled in, or the item merges into
+the user's existing item for that story. Items have their own `id`.
+
+### Breaking News
+
+The scheduler reads the general RSS feeds every `BREAKING_POLL_MINUTES`
+(default 5) and stores the headlines without scraping them. A headline is
+breaking when three or more outlets carry the same event within 90 minutes,
+or a feed marks it (BREAKING, LIVE, Developing, Live updates), and no story
+before it already covered the event; it stays in the bar for three hours.
 
 ### Bookmarks
 
