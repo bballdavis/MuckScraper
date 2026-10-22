@@ -10,7 +10,7 @@ from flask import g, jsonify, request
 from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload, selectinload
 
-from aggregator import db, feed_prefs
+from aggregator import db, feed_prefs, reads
 from aggregator.models import Article, Edition, EditionStory, OpinionPiece, Story, Topic
 from aggregator.opinion import published_edition_opinion_cards
 from aggregator.search import SearchUnavailableError, search_article_ids, search_story_ids
@@ -39,6 +39,14 @@ def _page(items, offset, limit):
     (callers fetch limit + 1 rows to tell)."""
     more = len(items) > limit
     return {"items": items[:limit], "next_cursor": encode_cursor(offset + limit) if more else None}
+
+
+def _annotate_read(cards):
+    """Set is_read on serialized story cards for this user (aggregator/reads.py)."""
+    read = reads.read_ids(g.user.id, "story", [c["id"] for c in cards])
+    for card in cards:
+        card["is_read"] = card["id"] in read
+    return cards
 
 
 def _cutoff(range_key):
@@ -135,7 +143,9 @@ def _edition_payload(edition):
     rows = (EditionStory.query.filter_by(edition_id=edition.id)
             .options(joinedload(EditionStory.story).options(*_story_load()))
             .order_by(EditionStory.rank).all())
-    return ser.edition(edition, rows)
+    out = ser.edition(edition, rows)
+    _annotate_read(out["stories"])
+    return out
 
 
 @api.route("/editions")
@@ -217,7 +227,7 @@ def stories():
         query = query.filter(Story.topics.contains(topic))
     rows = (query.options(*_story_load()).order_by(func.max(Article.date).desc(), Story.id.desc())
             .offset(offset).limit(limit + 1).all())
-    return jsonify(_page([ser.story_summary(s) for s in rows], offset, limit))
+    return jsonify(_page(_annotate_read([ser.story_summary(s) for s in rows]), offset, limit))
 
 
 @api.route("/stories/<int:story_id>")
@@ -228,7 +238,7 @@ def story(story_id):
     if row is None:
         raise ApiError(404, "not_found", "Not found.")
     pieces = OpinionPiece.query.options(joinedload(OpinionPiece.outlet)).filter_by(story_id=story_id).all()
-    return jsonify(ser.story_detail(row, pieces))
+    return jsonify(_annotate_read([ser.story_detail(row, pieces)])[0])
 
 
 @api.route("/articles/<int:article_id>")
@@ -238,7 +248,9 @@ def article(article_id):
     row = Article.query.options(joinedload(Article.outlet), selectinload(Article.topics)).get(article_id)
     if row is None:
         raise ApiError(404, "not_found", "Not found.")
-    return jsonify(ser.article_detail(row, full_text=settings.load()["full_text"]))
+    out = ser.article_detail(row, full_text=settings.load()["full_text"])
+    out["is_read"] = reads.get(g.user.id, "article", article_id) is not None
+    return jsonify(out)
 
 
 @api.route("/search")
