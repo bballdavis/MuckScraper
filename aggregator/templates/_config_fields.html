@@ -1,7 +1,9 @@
 {#- One saved-setting field (aggregator/config_store.py field_states()):
     a label, an input, the variable it overrides and where the value comes
     from. Key fields are write-only: blank keeps the saved key, and the
-    "Remove saved key" box deletes it. The surrounding <form> needs the
+    "Remove saved key" box deletes it. Other fields show the value in use
+    (saved, else the environment's, else the default); saving it unchanged
+    keeps it coming from where it did (llm_settings.save_fields_form). The surrounding <form> needs the
     class config-field-form and config_field_styles() in its page's styles. -#}
 {% macro config_field(f) -%}
     <div class="field">
@@ -10,8 +12,8 @@
         <input type="password" id="{{ f.name }}" name="{{ f.name }}" autocomplete="new-password" spellcheck="false"
                placeholder="{% if f.source == 'saved' %}Saved key ending {{ f.hint }}. Type to replace{% elif f.source == 'env' %}From environment ({{ f.env_hint }}). Type to override{% else %}Paste a key{% endif %}">
         {%- else %}
-        <input type="{{ {'url': 'url', 'int': 'number'}.get(f.kind, 'text') }}" id="{{ f.name }}" name="{{ f.name }}" value="{{ f.saved }}" spellcheck="false"{% if f.kind == 'int' %} min="1" inputmode="numeric"{% endif %}
-               placeholder="{{ f.env or f.default or ('Same as main model' if 'FAST' in f.name else 'Not set') }}">
+        <input type="{{ {'url': 'url', 'int': 'number'}.get(f.kind, 'text') }}" id="{{ f.name }}" name="{{ f.name }}" value="{{ f.saved or f.env or f.default }}" spellcheck="false"{% if f.kind == 'int' %} min="1" inputmode="numeric"{% endif %}
+               placeholder="{{ 'Same as main model' if 'FAST' in f.name else 'Not set' }}">
         {%- endif %}
         <span class="field-meta">
             <code>{{ f.name }}</code>
@@ -22,6 +24,7 @@
             <label class="clear"><input type="checkbox" name="clear_{{ f.name }}" value="1"> Remove saved key{% if f.env_hint %} (back to environment){% endif %}</label>
             {%- endif %}
             {%- elif f.source == 'env' %}<span class="chip">Environment</span>
+            {%- elif f.default and f.kind != 'secret' %}<span class="chip">Default</span>
             {%- endif %}
         </span>
     </div>

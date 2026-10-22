@@ -75,6 +75,10 @@
         }
         td { padding: 14px 20px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
         tr:last-child td { border-bottom: none; }
+        .retry-table { table-layout: fixed; }
+        .retry-table th, .retry-table td { padding-left: 12px; padding-right: 12px; }
+        .retry-table th:first-child, .retry-table td:first-child { padding-left: 20px; }
+        .retry-table .clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .tag-permanent {
             background: #b51a1a;
             color: white;
@@ -175,7 +179,12 @@
             <div class="section-subtitle">{{ retry_cache_domain_count }} deferred domains and {{ retry_cache_url_count }} deferred URLs are currently cached.</div>
         </div>
         {% if retry_cache_domains or retry_cache_urls %}
-        <table>
+        {#- Fixed columns so a long URL or reason is cut with an ellipsis (full
+            text on hover) instead of pushing Defer Until off the frame. -#}
+        <table class="retry-table">
+            <colgroup>
+                <col style="width: 70px;"><col><col style="width: 90px;"><col style="width: 76px;"><col style="width: 24%;"><col style="width: 150px;">
+            </colgroup>
             <thead>
                 <tr>
                     <th>Scope</th>
@@ -187,26 +196,18 @@
                 </tr>
             </thead>
             <tbody>
-                {% for row in retry_cache_domains %}
+                {%- for scope, rows, key in [('Domain', retry_cache_domains, 'domain'), ('URL', retry_cache_urls, 'url')] %}
+                {%- for row in rows %}
                 <tr>
-                    <td>Domain</td>
-                    <td><strong>{{ row.domain }}</strong></td>
-                    <td>{{ row.status or '—' }}</td>
+                    <td>{{ scope }}</td>
+                    <td class="clip" title="{{ row[key] }}"><strong>{{ row[key] }}</strong></td>
+                    <td class="clip">{{ row.status or '—' }}</td>
                     <td>{{ row.failure_count }}</td>
-                    <td style="color: var(--text-muted);">{{ row.failure_reason or '—' }}</td>
-                    <td style="color: var(--text-faint); white-space: nowrap;">{{ row.defer_until or '—' }}</td>
+                    <td class="clip" style="color: var(--text-muted);" title="{{ row.failure_reason or '' }}">{{ row.failure_reason or '—' }}</td>
+                    <td style="color: var(--text-faint); white-space: nowrap;" title="{{ row.defer_until or '' }}">{{ row.defer_label }}</td>
                 </tr>
-                {% endfor %}
-                {% for row in retry_cache_urls %}
-                <tr>
-                    <td>URL</td>
-                    <td style="max-width: 320px; overflow-wrap: anywhere;"><strong>{{ row.url }}</strong></td>
-                    <td>{{ row.status or '—' }}</td>
-                    <td>{{ row.failure_count }}</td>
-                    <td style="color: var(--text-muted);">{{ row.failure_reason or '—' }}</td>
-                    <td style="color: var(--text-faint); white-space: nowrap;">{{ row.defer_until or '—' }}</td>
-                </tr>
-                {% endfor %}
+                {%- endfor %}
+                {%- endfor %}
             </tbody>
         </table>
         {% else %}
