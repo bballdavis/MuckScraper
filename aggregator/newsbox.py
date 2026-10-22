@@ -28,7 +28,9 @@ JOB_KIND = "newsbox_summary"
 JOB_PRIORITY = 5
 
 ORIGINS = ("swiped", "saved", "auto")
-DEPTHS = ("summary", "summary_analysis")
+DEPTHS = ("summary", "analysis", "summary_analysis")
+# What each depth asks to have written.
+_PARTS = {"summary": {"summary"}, "analysis": {"analysis"}, "summary_analysis": {"summary", "analysis"}}
 STATES = ("pending", "in_progress", "ready", "failed")
 UNFINISHED = ("pending", "in_progress")
 
@@ -60,22 +62,35 @@ _TIME = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 
 # Queueing ---------------------------------------------------------------
 
+def _needs(story, depth):
+    """The parts `depth` asks for on this story. Analysis needs two or more
+    articles; with fewer, the summary stands in for it."""
+    parts = set(_PARTS.get(depth, _PARTS["summary"]))
+    if "analysis" in parts and len(story.articles) < 2:
+        parts = (parts - {"analysis"}) | {"summary"}
+    return parts
+
+
 def _has(story, depth):
-    """Whether the story already has everything `depth` asks for. Analysis
-    needs two or more articles; with fewer, the summary alone is complete."""
-    if not (story.summary or "").strip():
+    """Whether the story already has everything `depth` asks for."""
+    parts = _needs(story, depth)
+    if "summary" in parts and not (story.summary or "").strip():
         return False
-    if depth == "summary_analysis" and len(story.articles) >= 2 and not (story.deep_report or "").strip():
+    if "analysis" in parts and not (story.deep_report or "").strip():
         return False
     return True
 
 
+def _depth_of(parts):
+    return next(d for d in DEPTHS if _PARTS[d] == parts)
+
+
 def _deeper(a, b):
-    return "summary_analysis" if "summary_analysis" in (a, b) else "summary"
+    return _depth_of(_PARTS.get(a, _PARTS["summary"]) | _PARTS.get(b, _PARTS["summary"]))
 
 
 def _covers(have, want):
-    return have == "summary_analysis" or want == "summary"
+    return _PARTS.get(want, _PARTS["summary"]) <= _PARTS.get(have, _PARTS["summary"])
 
 
 def queue_story(user_id, story, origin, depth="summary", run_id=None):
@@ -112,7 +127,7 @@ def _job_in_flight(story_id, depth, exclude_id=None):
     """A queued or running job already covers this story at this depth: some
     other unfinished item for it asks for at least as much. One job per
     story, however many users are waiting on it."""
-    wanted = ("summary_analysis",) if depth == "summary_analysis" else DEPTHS
+    wanted = [d for d in DEPTHS if _covers(d, depth)]
     query = db.session.query(NewsBoxItem.id).filter(
         NewsBoxItem.story_id == story_id,
         NewsBoxItem.state.in_(UNFINISHED),
@@ -142,7 +157,8 @@ def run_summary_job(payload):
         from news_fetcher.summarizer import check_ollama_status, generate_deep_report, summarize_story
         if not check_ollama_status(TIER_QUALITY):
             raise RuntimeError("The summarization model is offline.")
-        if not (story.summary or "").strip():
+        parts = _needs(story, depth)
+        if "summary" in parts and not (story.summary or "").strip():
             summary = summarize_story(story)
             if not summary:
                 raise RuntimeError("No summary was written.")
