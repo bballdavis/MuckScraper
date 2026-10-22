@@ -2,7 +2,7 @@
 
 One store for the web app and /api/v1, so a story marked read on the phone
 is gone from Headlines in the browser too. Marking is idempotent: marking
-again moves the item to the top of Recently read; unmarking something that
+again moves the item to the top of Recently Read; unmarking something that
 was never read does nothing. Callers commit.
 """
 from datetime import datetime

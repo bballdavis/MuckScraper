@@ -4,7 +4,7 @@
  * - Headlines: the reading-glasses button beside each card (or in its action
  *   row on touch screens) marks the story read. The card slides out, the
  *   ones below slide up, and a toast offers Undo for five seconds.
- * - Recently read: the Mark unread button takes a row off the list the same
+ * - Recently Read: the Mark unread button takes a row off the list the same
  *   way, with the same Undo.
  * - Story and article pages: .read-toggle flips the read state in place.
  *
@@ -101,7 +101,7 @@
                 await undo();
                 await slideIn(el);
             } catch (e) {
-                showToast("Couldn't undo. Try again from Recently read.", null, null, null);
+                showToast("Couldn't undo. Try again from Recently Read.", null, null, null);
             }
         };
         pending = el ? { el, onExpire } : null;
