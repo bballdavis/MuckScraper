@@ -287,7 +287,8 @@ def _article_rows(article_ids, window, sort_key, descending, page, text_query, p
             "story_id": story.id if story else None,
             "story_title": (story.headline or story.title) if story else "",
             "story_articles": story_articles or 0,
-            "image_url": article.image_url,
+            "image_url": None if article.is_roundup else article.image_url,
+            "logo_url": outlet.logo_url if outlet else None,
         })
     return rows, pagination
 
@@ -434,6 +435,24 @@ def _story_images(story_ids):
     return images
 
 
+def _story_logos(story_ids):
+    """{story id: logo url} from each story's newest article whose outlet has
+    a logo: the thumbnail when the story has no image."""
+    if not story_ids:
+        return {}
+    rows = (
+        db.session.query(Article.story_id, Outlet.logo_url)
+        .join(Outlet, Outlet.id == Article.outlet_id)
+        .filter(Article.story_id.in_(story_ids), Outlet.logo_url.isnot(None), Outlet.logo_url != "")
+        .order_by(Article.date.desc().nullslast())
+        .all()
+    )
+    logos = {}
+    for story_id, logo_url in rows:
+        logos.setdefault(story_id, logo_url)
+    return logos
+
+
 @admin.route("/search/suggest")
 @public_or_login
 def search_suggest():
@@ -459,10 +478,12 @@ def search_suggest():
     article_rows, _ = _article_rows(article_ids, window, article_sort, True, 1, text_query, per_page=SUGGEST_ARTICLES)
 
     images = _story_images([row["id"] for row in story_rows])
+    logos = _story_logos([row["id"] for row in story_rows])
     stories = [{
         "title": row["headline"],
         "url": url_for("public.view_story", story_id=row["id"]),
         "image": images.get(row["id"]),
+        "logo": logos.get(row["id"]),
         "articles": row["articles"],
         "sources": row["sources"],
         "left": row["left"],
@@ -474,6 +495,7 @@ def search_suggest():
         "title": row["title"],
         "url": url_for("public.view_article", article_id=row["id"]),
         "image": row["image_url"],
+        "logo": row["logo_url"],
         "outlet": row["outlet_name"],
         "lean": BIAS_CHIPS[bias_bucket_for_score(row["bias"])][1],
         "lean_class": row["bias_chip"][2],

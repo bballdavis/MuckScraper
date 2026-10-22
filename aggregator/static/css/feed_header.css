@@ -169,6 +169,7 @@
     color: var(--text-faint);
     font-size: 16px;
 }
+.ft-thumb-logo { box-sizing: border-box; object-fit: contain; padding: 4px 12px; background: #fff; border: 1px solid var(--border); border-radius: 3px; }
 .ft-hit-body { flex: 1 1 auto; min-width: 0; }
 .ft-hit-top { display: flex; align-items: baseline; gap: 10px; }
 .ft-hit-title {

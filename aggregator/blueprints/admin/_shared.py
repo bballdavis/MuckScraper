@@ -134,5 +134,7 @@ def apply_scrape_result(article, result):
     article.scrape_failure_reason = result.failure_reason
     article.scrape_http_status = result.http_status
     article.scrape_audited = False
+    if not article.image_url and getattr(result, "image_url", None) and not article.is_roundup:
+        article.image_url = result.image_url
     if result.content:
         article.content = result.content
