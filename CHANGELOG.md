@@ -25,13 +25,15 @@ All notable changes to MuckScraper are documented here.
   popover. Active filters show above the list as chips you can remove.
   On wide screens the search is centred on the story column, not the
   window, with the sidebar open or collapsed.
+  The story and article pages use the same bar and sidebar, with
+  "← Back to Feed" (or "← Back to Story") beside the logo.
 - **Live search results.** Typing in the top bar shows the best matching
   stories (thumbnail, article and outlet counts, Left/Center/Right counts and
   bar) and articles (outlet and lean) as you type, from the new
   `/admin/search/suggest` endpoint. Enter still runs the full search.
 - **Compact story cards** on All and Grouped Stories: the image, the
   headline, one line with the date and counts, and a bottom row with a
-  rounded Left/Center/Right bar that carries its own counts (a single
+  Left/Center/Right bar that carries its own counts (a single
   article shows its lean chip instead). A click anywhere on the card opens
   it. Fetch more, summary and bias actions and the scrape results moved into
   a ⋯ menu; the method/http details are gone. Every card date uses one

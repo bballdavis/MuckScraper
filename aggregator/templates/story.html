@@ -1,6 +1,6 @@
 {% from 'story_card_macros.html' import bias_tag with context %}
-{% from 'account_menu.html' import account_menu with context %}
-{% from 'icons.html' import icon, theme_toggle_label %}
+{% from 'icons.html' import icon %}
+{% from '_feed_topbar.html' import feed_topbar with context %}
 {% from 'oped_columns.html' import oped_columns, oped_roundup with context %}
 <!DOCTYPE html>
 <html data-theme="light">
@@ -16,6 +16,8 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
     <title>{{ story.display_headline }} — MuckScraper</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/feed_header.css') }}">
+    <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/oped_columns.css') }}">
     <style>
         :root {
@@ -31,19 +33,7 @@
             transition: all 0.2s;
         }
 
-        .topbar {
-            background: var(--topbar-bg);
-            padding: 16px 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
 
-        .topbar a { color: #89b4fa; text-decoration: none; font-size: 14px; font-weight: 600; }
-        .topbar-title { color: var(--topbar-text); font-size: 18px; font-weight: 800; }
 
         .container { max-width: var(--width-read); margin: 60px auto; padding: 0 20px; }
 
@@ -193,7 +183,6 @@
         }
 
         @media (max-width: 600px) {
-            .topbar { padding: 14px 16px; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
             .container { margin: 24px auto; padding: 0 14px; }
             .article-meta { flex-wrap: wrap; gap: 8px; }
             .story-card { padding: 24px; border-radius: 0; }
@@ -204,24 +193,12 @@
 </head>
 <body>
 
-<div class="layout">
+{#- The feed's top bar, full width above the sidebar (_feed_topbar.html). -#}
+{%- set sidebar_toggle_in_topbar = true -%}
+{{ feed_topbar('', url_for('admin.list_articles'), back=(feed_back_url('story-%d' % story.id), 'Back to Feed')) }}
+<div class="layout feed-layout">
 {% include 'sidebar_nav.html' %}
 <div class="page-body">
-
-{% from 'breadcrumb.html' import back_link %}
-<div class="topbar">
-    <div class="topbar-left crumb-bar">
-        <span class="topbar-title">MuckScraper</span>
-        {{ back_link(feed_back_url('story-%d' % story.id), 'Back to Feed') }}
-    </div>
-    <div style="display:flex; align-items:center; gap:12px;">
-        <button id="theme-toggle" onclick="toggleTheme()"
-            style="background:none; border:1px solid #444; color:#cdd6f4;
-                   padding:6px 14px; border-radius:8px; cursor:pointer;
-                   font-size:13px; font-weight:600;">{{ theme_toggle_label() }}</button>
-        {{ account_menu() }}
-    </div>
-</div>
 
 <div class="container">
 <div class="story-card">
