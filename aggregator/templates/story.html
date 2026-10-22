@@ -165,10 +165,10 @@
            icons down the right side, as on the story cards. */
         .article-item { flex-direction: row; gap: 0; padding: 0; }
         .article-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 16px 16px 16px 0; }
-        .row-rail { flex: 0 0 30px; display: flex; flex-direction: column; border-left: 1px solid var(--border); }
+        .row-rail { flex: 0 0 39px; display: flex; flex-direction: column; border-left: 1px solid var(--border); }
         .row-rail > * { flex: 1 1 0; }
         .row-rail > * + * { border-top: 1px solid var(--border); }
-        .row-rail .act { width: 100%; height: auto; border: 0; border-radius: 0; background: transparent; font-size: 14px; }
+        .row-rail .act { width: 100%; height: auto; border: 0; border-radius: 0; background: transparent; font-size: 18px; }
         .row-rail .act-done { background: var(--accent); }
         .row-rail .act-ready:hover, .row-rail .act-ready:focus-visible { background: var(--accent); }
 
@@ -375,11 +375,11 @@
                     </div>
                     <div class="row-rail">
                         {% if article.summary %}
-                            {{ ai_action('summary', 'done', 'Summary written', 'Open the article to read it.') }}
+                            {{ ai_action('summary', 'done', 'Article summary generated', 'Open the article to read it.') }}
                         {% elif ollama_online and can('scraper') %}
-                            {{ ai_action('summary', 'ready', 'Summarize this article', 'Writes a short summary from the text MuckScraper could read. Runs in the background; the page reloads when it is done.', "startAiTask('article_summary', %d, this)" % article.id) }}
+                            {{ ai_action('summary', 'ready', 'Generate article summary', 'Writes a short summary from the text MuckScraper could read. Runs in the background; the page reloads when it is done.', "startAiTask('article_summary', %d, this)" % article.id) }}
                         {% else %}
-                            {{ ai_action('summary', 'off', 'No summary yet', 'Articles are summarized automatically when they can be read.') }}
+                            {{ ai_action('summary', 'off', 'Article summary not generated yet', 'Generated automatically once the article text can be read.') }}
                         {% endif %}
                     </div>
                 </div>
