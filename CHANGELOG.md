@@ -19,6 +19,15 @@ All notable changes to MuckScraper are documented here.
   the container is recreated (`./install.sh`, or
   `docker compose up -d meilisearch`).
 
+### Removed
+- **The scraper no longer poses as Googlebot or opens paywalled sites in a
+  headless browser.** Seven sites were fetched with Google's crawler user
+  agent, and seven paywalled ones (NYT, WSJ, Washington Post, FT, Bloomberg,
+  The Athletic, Wired) got a headless Chromium attempt. MuckScraper now reads
+  only what an ordinary browser can, and a paywalled article stays
+  headline-only. In practice little is lost: over 30 days the crawler user
+  agent fetched 81 articles and the headless browser none.
+
 ## [1.0.0] - 2026-10-20
 
 Status: stable. MuckScraper is out of beta. From here on, upgrades within
