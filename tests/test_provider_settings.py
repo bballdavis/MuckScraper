@@ -120,3 +120,63 @@ class ConfigureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LmStudioTests(unittest.TestCase):
+    """LM Studio: chat without a key, embeddings while another provider
+    writes, and a refused embedding of the wrong size."""
+
+    def tearDown(self):
+        llm_client.configure()
+
+    def _response(self, payload):
+        response = mock.Mock(status_code=200, ok=True)
+        response.json.return_value = payload
+        response.raise_for_status.return_value = None
+        return response
+
+    def test_embeddings_from_lmstudio_while_chat_uses_anthropic(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            llm_client.configure({
+                "LLM_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "k", "ANTHROPIC_MODEL": "m",
+                "EMBEDDING_PROVIDER": "lmstudio", "LMSTUDIO_HOST": "http://10.0.0.9:1234/v1",
+                "LMSTUDIO_EMBEDDING_MODEL": "text-embedding-nomic-embed-text-v1.5",
+            })
+            self.assertFalse(llm_client.uses_ollama())
+            self.assertEqual(llm_client.embedding_model_name(), "text-embedding-nomic-embed-text-v1.5")
+            with mock.patch.object(llm_client, "_sync_config"), \
+                 mock.patch.object(llm_client.requests, "post",
+                                   return_value=self._response({"data": [{"embedding": [0.1] * 768}]})) as post:
+                self.assertEqual(len(llm_client.get_embedding("hello")), 768)
+            url = post.call_args.args[0]
+            self.assertEqual(url, "http://10.0.0.9:1234/v1/embeddings")
+            self.assertEqual(post.call_args.kwargs["json"]["input"], "hello")
+            self.assertNotIn("Authorization", post.call_args.kwargs["headers"])
+
+    def test_wrong_size_embedding_is_refused(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            llm_client.configure({"EMBEDDING_PROVIDER": "lmstudio", "LMSTUDIO_EMBEDDING_MODEL": "big-model"})
+            with mock.patch.object(llm_client, "_sync_config"), \
+                 mock.patch.object(llm_client.requests, "post",
+                                   return_value=self._response({"data": [{"embedding": [0.1] * 1024}]})):
+                self.assertIsNone(llm_client.get_embedding("hello"))
+
+    def test_chat_needs_a_model_but_no_key(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            llm_client.configure({"LLM_PROVIDER": "lmstudio"})
+            self.assertEqual(llm_client.LMSTUDIO_HOST, "http://localhost:1234/v1")
+            self.assertFalse(llm_client.is_configured())
+            llm_client.configure({"LLM_PROVIDER": "lmstudio", "LMSTUDIO_MODEL": "qwen3-8b"})
+            self.assertTrue(llm_client.is_configured())
+            reply = self._response({"choices": [{"message": {"content": " OK "}}]})
+            with mock.patch.object(llm_client, "_sync_config"), \
+                 mock.patch.object(llm_client.requests, "post", return_value=reply) as post:
+                self.assertEqual(llm_client.generate_text("Say OK"), "OK")
+            self.assertTrue(post.call_args.args[0].endswith("/chat/completions"))
+            self.assertNotIn("Authorization", post.call_args.kwargs["headers"])
+
+    def test_validation(self):
+        from aggregator.config_store import validate
+        self.assertIsNone(validate("EMBEDDING_PROVIDER", "lmstudio"))
+        self.assertIsNotNone(validate("EMBEDDING_PROVIDER", "anthropic"))
+        self.assertIsNone(validate("LLM_PROVIDER", "lmstudio"))

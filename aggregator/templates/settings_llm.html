@@ -19,7 +19,7 @@
     <div class="panel-head">
         <div>
             <h2>Routing</h2>
-            <p>Which provider serves each tier. Saved choices override LLM_PROVIDER and LLM_FAST_PROVIDER; the app applies them at once and the scheduler within a minute.</p>
+            <p>Which provider serves each tier. Saved choices override LLM_PROVIDER, LLM_FAST_PROVIDER and EMBEDDING_PROVIDER; the app applies them at once and the scheduler within a minute.</p>
         </div>
     </div>
     {%- for key, label, name in [('quality', 'Main model', 'LLM_PROVIDER'), ('fast', 'Fast model', 'LLM_FAST_PROVIDER')] %}
@@ -45,11 +45,23 @@
         </span>
     </div>
     {%- endfor %}
-    <div class="row">
+    {%- set st = routing_states['EMBEDDING_PROVIDER'] %}
+    <div class="row routing-row">
         <span>
-            <span class="row-label">Embeddings</span>
-            <span class="row-sub">{{ provider_labels.get(embedding_provider, embedding_provider) }} · used for story grouping. Set with EMBEDDING_PROVIDER, since switching means re-embedding every story.</span>
+            <label class="row-label" for="route-embedding">Embeddings</label>
+            <span class="row-sub">{{ provider_labels.get(embedding_provider, embedding_provider) }} · {{ embedding_model or 'no model set' }} · used for story grouping{% if st.source == 'saved' %} · <span class="chip">Saved</span>{% endif %}</span>
         </span>
+        <span class="routing-controls">
+            <select id="route-embedding" name="EMBEDDING_PROVIDER" data-was="{{ embedding_provider }}">
+                <option value=""{% if st.source != 'saved' %} selected{% endif %}>From environment ({{ provider_labels.get(st.env or 'ollama', st.env or 'ollama') }})</option>
+                {%- for p in embedding_providers %}
+                <option value="{{ p }}"{% if st.saved == p %} selected{% endif %}>{{ provider_labels.get(p, p) }}</option>
+                {%- endfor %}
+            </select>
+        </span>
+    </div>
+    <div class="notice embed-warning" id="embed-warning" hidden>
+        <span><strong>Switching embeddings changes how stories match.</strong> Vectors from different models don't compare, so new articles stop grouping with existing stories until older ones age out. Use a model that returns 768 numbers.</span>
     </div>
     <div class="panel-foot">
         <button type="submit" class="btn">Save routing</button>
@@ -84,6 +96,7 @@
         </summary>
         <form class="provider-form config-field-form" method="POST" action="{{ url_for('admin.save_llm_provider', key=p.key) }}" autocomplete="off">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {%- if p.about %}<p class="provider-about">{{ p.about }}</p>{% endif %}
             {%- for f in p.fields %}{{ config_field(f) }}{% endfor %}
             {%- if p.facts %}
             <dl class="facts">
@@ -150,6 +163,9 @@
     .routing-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
     .routing-controls select { min-width: 200px; }
     .test-result { font-size: 13px; }
+    .embed-warning { margin: 0 16px 12px; }
+    .embed-warning[hidden] { display: none; }
+    .provider-about { font-size: 13px; color: var(--text-muted); max-width: 760px; }
     .provider-form { display: flex; flex-direction: column; gap: 12px; padding: 4px 16px 14px; }
     {{ config_field_styles() }}
     .provider-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
@@ -178,6 +194,15 @@
                 .finally(() => { button.disabled = false; });
         });
     });
+
+    // Warn before an embedding switch is saved.
+    (function () {
+        const select = document.getElementById('route-embedding');
+        const warning = document.getElementById('embed-warning');
+        if (!select) return;
+        const original = select.value;
+        select.addEventListener('change', () => { warning.hidden = select.value === original; });
+    })();
 
     // Which Ollama host answers right now (primary, or the fallback covering for it).
     (function () {

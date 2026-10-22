@@ -1,14 +1,14 @@
 # news_fetcher/llm_client.py
 #
 # Thin dispatch layer so the rest of the pipeline doesn't care whether the
-# backend is a home Ollama box, Gemini, Anthropic, or any OpenAI-compatible
-# endpoint (Groq, OpenRouter, and through OpenRouter's base URL anything else
-# speaking that API). Selected independently for text generation and embeddings via
+# backend is a home Ollama box, LM Studio, Gemini, Anthropic, or any
+# OpenAI-compatible endpoint (Groq, OpenRouter, and through OpenRouter's base
+# URL anything else speaking that API). Selected independently for text generation and embeddings via
 # LLM_PROVIDER / EMBEDDING_PROVIDER so either can be flipped back to "ollama"
 # with no code changes once Ollama is reachable again.
 #
-# Note the asymmetry: every provider here can generate text, but only Ollama
-# and Gemini can produce embeddings -- see get_embedding().
+# Note the asymmetry: every provider here can generate text, but only Ollama,
+# LM Studio and Gemini can produce embeddings -- see get_embedding().
 
 import os
 import time
@@ -105,6 +105,16 @@ OPENROUTER_HOST = os.environ.get("OPENROUTER_HOST", "https://openrouter.ai/api/v
 OPENROUTER_SITE_URL = os.environ.get("OPENROUTER_SITE_URL", "")
 OPENROUTER_APP_NAME = os.environ.get("OPENROUTER_APP_NAME", "")
 
+# LM Studio's local server (OpenAI-compatible, default port 1234). It can
+# serve chat and embeddings, so a box running it can take the embeddings while
+# a cloud provider writes the text. The key is optional: LM Studio only checks
+# one when its server has authentication turned on.
+LMSTUDIO_HOST_DEFAULT = "http://localhost:1234/v1"
+LMSTUDIO_HOST = os.environ.get("LMSTUDIO_HOST", "") or LMSTUDIO_HOST_DEFAULT
+LMSTUDIO_API_KEY = os.environ.get("LMSTUDIO_API_KEY", "")
+LMSTUDIO_MODEL = os.environ.get("LMSTUDIO_MODEL", "")
+LMSTUDIO_FAST_MODEL = os.environ.get("LMSTUDIO_FAST_MODEL", "") or LMSTUDIO_MODEL
+LMSTUDIO_EMBEDDING_MODEL = os.environ.get("LMSTUDIO_EMBEDDING_MODEL", "")
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 # No default model, for the same reason as GROQ_MODEL: a baked-in name goes
@@ -124,18 +134,24 @@ ANTHROPIC_MAX_TOKENS = int(os.environ.get("ANTHROPIC_MAX_TOKENS", "4096"))
 # also save these in the database (aggregator/config_store.py, keys encrypted);
 # a saved value wins over the environment and a cleared one falls back to it.
 # configure() rebinds the module globals, so callers keep reading
-# llm_client.OLLAMA_HOST etc. exactly as before. EMBEDDING_PROVIDER and the
-# embedding models stay environment-only: switching them means re-embedding.
+# llm_client.OLLAMA_HOST etc. exactly as before. The embedding provider and
+# models can be saved too, but switching them means re-embedding (see
+# get_embedding()), so the page warns before it does.
 OVERRIDABLE_SETTINGS = (
-    "LLM_PROVIDER", "LLM_FAST_PROVIDER",
-    "OLLAMA_HOST", "OLLAMA_FALLBACK_HOST", "OLLAMA_MODEL", "OLLAMA_FAST_MODEL",
+    "LLM_PROVIDER", "LLM_FAST_PROVIDER", "EMBEDDING_PROVIDER",
+    "OLLAMA_HOST", "OLLAMA_FALLBACK_HOST", "OLLAMA_MODEL", "OLLAMA_FAST_MODEL", "EMBEDDING_MODEL",
+    "LMSTUDIO_HOST", "LMSTUDIO_API_KEY", "LMSTUDIO_MODEL", "LMSTUDIO_FAST_MODEL", "LMSTUDIO_EMBEDDING_MODEL",
     "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "ANTHROPIC_FAST_MODEL",
     "GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_FAST_MODEL",
     "GROQ_API_KEY", "GROQ_MODEL", "GROQ_FAST_MODEL",
     "OPENROUTER_API_KEY", "OPENROUTER_MODEL", "OPENROUTER_FAST_MODEL",
 )
-CHAT_PROVIDERS = ("ollama", "anthropic", "gemini", "groq", "openrouter")
-_ENV_DEFAULTS = {"LLM_PROVIDER": "ollama", "GEMINI_MODEL": "gemini-2.5-flash-lite"}
+CHAT_PROVIDERS = ("ollama", "lmstudio", "anthropic", "gemini", "groq", "openrouter")
+EMBEDDING_PROVIDERS = ("ollama", "lmstudio", "gemini")
+_ENV_DEFAULTS = {
+    "LLM_PROVIDER": "ollama", "EMBEDDING_PROVIDER": "ollama", "EMBEDDING_MODEL": "nomic-embed-text",
+    "GEMINI_MODEL": "gemini-2.5-flash-lite", "LMSTUDIO_HOST": LMSTUDIO_HOST_DEFAULT,
+}
 
 # Saved settings (news_fetcher/saved_settings.py) last applied by configure().
 _applied_settings_version = 0
@@ -153,8 +169,9 @@ def _sync_config():
 def configure(overrides=None):
     """Rebind the provider settings from the environment plus `overrides`
     ({name: value}; a blank or missing value means "use the environment")."""
-    global LLM_PROVIDER, LLM_FAST_PROVIDER
-    global OLLAMA_HOST, OLLAMA_FALLBACK_HOST, OLLAMA_MODEL, OLLAMA_FAST_MODEL
+    global LLM_PROVIDER, LLM_FAST_PROVIDER, EMBEDDING_PROVIDER
+    global OLLAMA_HOST, OLLAMA_FALLBACK_HOST, OLLAMA_MODEL, OLLAMA_FAST_MODEL, EMBEDDING_MODEL
+    global LMSTUDIO_HOST, LMSTUDIO_API_KEY, LMSTUDIO_MODEL, LMSTUDIO_FAST_MODEL, LMSTUDIO_EMBEDDING_MODEL
     global ANTHROPIC_API_KEY, ANTHROPIC_MODEL, ANTHROPIC_FAST_MODEL
     global GEMINI_API_KEY, GEMINI_MODEL, GEMINI_FAST_MODEL, _gemini_client
     global GROQ_API_KEY, GROQ_MODEL, GROQ_FAST_MODEL
@@ -180,6 +197,13 @@ def configure(overrides=None):
     OLLAMA_FALLBACK_HOST = get("OLLAMA_FALLBACK_HOST")
     OLLAMA_MODEL = get("OLLAMA_MODEL")
     OLLAMA_FAST_MODEL = get("OLLAMA_FAST_MODEL") or OLLAMA_MODEL
+    EMBEDDING_PROVIDER = get("EMBEDDING_PROVIDER").lower() or "ollama"
+    EMBEDDING_MODEL = get("EMBEDDING_MODEL")
+    LMSTUDIO_HOST = get("LMSTUDIO_HOST")
+    LMSTUDIO_API_KEY = get("LMSTUDIO_API_KEY")
+    LMSTUDIO_MODEL = get("LMSTUDIO_MODEL")
+    LMSTUDIO_FAST_MODEL = get("LMSTUDIO_FAST_MODEL") or LMSTUDIO_MODEL
+    LMSTUDIO_EMBEDDING_MODEL = get("LMSTUDIO_EMBEDDING_MODEL")
     ANTHROPIC_API_KEY = get("ANTHROPIC_API_KEY")
     ANTHROPIC_MODEL = get("ANTHROPIC_MODEL")
     ANTHROPIC_FAST_MODEL = get("ANTHROPIC_FAST_MODEL") or ANTHROPIC_MODEL
@@ -217,14 +241,25 @@ def _openrouter_headers():
 #
 # Read through _openai_compatible_config() rather than directly, so tests can
 # monkeypatch the module-level vars the way they already do for Ollama/Gemini.
-OPENAI_COMPATIBLE_PROVIDERS = ("groq", "openrouter")
+OPENAI_COMPATIBLE_PROVIDERS = ("lmstudio", "groq", "openrouter")
 
 
 def _openai_compatible_config(provider):
+    if provider == "lmstudio":
+        return {
+            "base_url": LMSTUDIO_HOST,
+            "api_key": LMSTUDIO_API_KEY,
+            "key_required": False,
+            "model": LMSTUDIO_MODEL,
+            "fast_model": LMSTUDIO_FAST_MODEL,
+            "headers": {},
+            "label": "LM Studio",
+        }
     if provider == "groq":
         return {
             "base_url": GROQ_HOST,
             "api_key": GROQ_API_KEY,
+            "key_required": True,
             "model": GROQ_MODEL,
             "fast_model": GROQ_FAST_MODEL,
             "headers": {},
@@ -234,6 +269,7 @@ def _openai_compatible_config(provider):
         return {
             "base_url": OPENROUTER_HOST,
             "api_key": OPENROUTER_API_KEY,
+            "key_required": True,
             "model": OPENROUTER_MODEL,
             "fast_model": OPENROUTER_FAST_MODEL,
             "headers": _openrouter_headers(),
@@ -302,12 +338,12 @@ def is_configured(tier=TIER_QUALITY):
         return bool(ANTHROPIC_API_KEY and ANTHROPIC_MODEL)
     if provider in OPENAI_COMPATIBLE_PROVIDERS:
         config = _openai_compatible_config(provider)
-        # Both providers in this family require an explicit model name.
-        # Neither has a default that stays valid -- provider catalogues change
+        # Every provider in this family requires an explicit model name.
+        # None has a default that stays valid -- provider catalogues change
         # under you (Groq retired the old llama-3.1-8b-instant default) -- so
         # an unset model must read as "not configured" rather than send an
         # empty or dead model name on every call.
-        return bool(config["api_key"] and config["model"])
+        return bool((config["api_key"] or not config["key_required"]) and config["model"])
     return bool(OLLAMA_HOST and OLLAMA_MODEL)
 
 
@@ -457,7 +493,7 @@ _inference_state = {"wedged": False, "logged_skip": False}
 def uses_ollama():
     """Whether any chat tier or embeddings are served by Ollama."""
     _sync_config()
-    return "ollama" in providers_in_use() or EMBEDDING_PROVIDER != "gemini"
+    return "ollama" in providers_in_use() or EMBEDDING_PROVIDER not in ("gemini", "lmstudio")
 
 
 def probe_ollama_inference():
@@ -590,11 +626,13 @@ def _generate_text_openai_compatible(prompt, timeout, model, provider, _attempt=
     OpenAI-compatible endpoint" work without new code.
     """
     config = _openai_compatible_config(provider)
-    if not config or not config["api_key"]:
+    if not config or (config["key_required"] and not config["api_key"]):
         return None
     model = model or config["model"]
     label = config["label"]
-    headers = {"Authorization": f"Bearer {config['api_key']}", **config["headers"]}
+    headers = dict(config["headers"])
+    if config["api_key"]:
+        headers["Authorization"] = f"Bearer {config['api_key']}"
     try:
         response = requests.post(
             f"{config['base_url'].rstrip('/')}/chat/completions",
@@ -720,6 +758,8 @@ def get_embedding(text):
     _sync_config()
     if EMBEDDING_PROVIDER == "gemini":
         return _get_embedding_gemini(text)
+    if EMBEDDING_PROVIDER == "lmstudio":
+        return _get_embedding_lmstudio(text)
     if EMBEDDING_PROVIDER not in ("ollama", "") and EMBEDDING_PROVIDER not in _warned_embedding_providers:
         _warned_embedding_providers.add(EMBEDDING_PROVIDER)
         reason = _NO_EMBEDDING_PROVIDERS.get(
@@ -727,7 +767,7 @@ def get_embedding(text):
         )
         logger.warning(
             "  [llm_client] EMBEDDING_PROVIDER=%s but %s -- using Ollama for embeddings. "
-            "Set EMBEDDING_PROVIDER=ollama or gemini to silence this.",
+            "Set EMBEDDING_PROVIDER=ollama, lmstudio or gemini to silence this.",
             EMBEDDING_PROVIDER, reason,
         )
     return _get_embedding_ollama(text)
@@ -747,6 +787,52 @@ def _get_embedding_ollama(text):
         return response.json().get("embedding") or None
 
     return _ollama_request("embedding", _call)
+
+
+# Story.embedding and Article.embedding are Vector(768).
+EMBEDDING_DIMENSIONS = 768
+_warned_embedding_dimensions = set()
+
+
+def _get_embedding_lmstudio(text):
+    """LM Studio's OpenAI-style /embeddings. The model has to produce 768
+    numbers to fit the vector columns (nomic-embed-text-v1.5 does); any other
+    size is refused here, once loudly, rather than failing every insert."""
+    if not (LMSTUDIO_HOST and LMSTUDIO_EMBEDDING_MODEL):
+        return None
+    headers = {"Authorization": f"Bearer {LMSTUDIO_API_KEY}"} if LMSTUDIO_API_KEY else {}
+    try:
+        response = requests.post(
+            f"{LMSTUDIO_HOST.rstrip('/')}/embeddings",
+            headers=headers,
+            json={"model": LMSTUDIO_EMBEDDING_MODEL, "input": text},
+            timeout=15,
+        )
+        response.raise_for_status()
+        embedding = (response.json().get("data") or [{}])[0].get("embedding") or None
+    except Exception as e:
+        logger.info(f"  [llm_client] LM Studio embedding error: {e}")
+        return None
+    if embedding and len(embedding) != EMBEDDING_DIMENSIONS:
+        if LMSTUDIO_EMBEDDING_MODEL not in _warned_embedding_dimensions:
+            _warned_embedding_dimensions.add(LMSTUDIO_EMBEDDING_MODEL)
+            logger.error(
+                "  [llm_client] LM Studio model %s returns %d-dimension embeddings; "
+                "MuckScraper stores %d. Pick a %d-dimension model (e.g. nomic-embed-text-v1.5).",
+                LMSTUDIO_EMBEDDING_MODEL, len(embedding), EMBEDDING_DIMENSIONS, EMBEDDING_DIMENSIONS,
+            )
+        return None
+    return embedding
+
+
+def embedding_model_name():
+    """The model behind get_embedding(), for logs and metadata."""
+    _sync_config()
+    if EMBEDDING_PROVIDER == "gemini":
+        return GEMINI_EMBEDDING_MODEL
+    if EMBEDDING_PROVIDER == "lmstudio":
+        return LMSTUDIO_EMBEDDING_MODEL
+    return EMBEDDING_MODEL
 
 
 def _get_embedding_gemini(text):
@@ -777,16 +863,30 @@ def _get_embedding_gemini(text):
 
 
 def _check_provider_status(provider):
-    """Liveness for one named provider. Ollama is probed over the network;
-    the cloud providers have no cheap health endpoint, so a configured key is
-    the best available signal."""
+    """Liveness for one named provider. Ollama and LM Studio are probed over
+    the network; the cloud providers have no cheap health endpoint, so a
+    configured key is the best available signal."""
     if provider == "gemini":
         return bool(GEMINI_API_KEY)
     if provider == "anthropic":
         return bool(ANTHROPIC_API_KEY)
+    if provider == "lmstudio":
+        return _check_lmstudio_status()
     if provider in OPENAI_COMPATIBLE_PROVIDERS:
         return bool(_openai_compatible_config(provider)["api_key"])
     return _check_ollama_status()
+
+
+def _check_lmstudio_status():
+    """Whether LM Studio's server answers its model list."""
+    if not LMSTUDIO_HOST:
+        return False
+    headers = {"Authorization": f"Bearer {LMSTUDIO_API_KEY}"} if LMSTUDIO_API_KEY else {}
+    try:
+        response = requests.get(f"{LMSTUDIO_HOST.rstrip('/')}/models", headers=headers, timeout=_OLLAMA_PROBE_TIMEOUT)
+        return response.ok
+    except requests.RequestException:
+        return False
 
 
 def check_llm_status(tier=TIER_QUALITY):

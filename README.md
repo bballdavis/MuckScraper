@@ -353,13 +353,18 @@ starting point. Change them on these pages to suit your own beat.
 ### LLM behavior
 
 **Choosing a provider (`LLM_PROVIDER`).** Ollama is the default and the point of
-the project, but `LLM_PROVIDER` also accepts `gemini`, `anthropic`, `groq`, and
-`openrouter`.
+the project, but `LLM_PROVIDER` also accepts `lmstudio`, `gemini`, `anthropic`,
+`groq`, and `openrouter`.
 The OpenRouter path is a generic OpenAI-compatible client — set `OPENROUTER_HOST`
 to any endpoint speaking `chat/completions` (DeepSeek, OpenAI, Together, a local
 vLLM) and it works with no code change. Embeddings are a separate axis
-(`EMBEDDING_PROVIDER`) and only Ollama and Gemini can serve them; Anthropic and
-Groq have no embedding models and OpenRouter routes chat completions only.
+(`EMBEDDING_PROVIDER`) and only Ollama, LM Studio and Gemini can serve them;
+Anthropic and Groq have no embedding models and OpenRouter routes chat
+completions only. `lmstudio` talks to LM Studio's local server
+(`LMSTUDIO_HOST`, default `http://localhost:1234/v1`), so a desktop running LM
+Studio can serve the embeddings (`LMSTUDIO_EMBEDDING_MODEL`, a 768-dimension
+model such as `text-embedding-nomic-embed-text-v1.5`) while Anthropic writes the
+text. All of these can be saved in Settings › LLM providers instead.
 
 `anthropic` calls the Messages API directly with `ANTHROPIC_API_KEY`. Set
 `ANTHROPIC_MODEL` (summaries) and optionally `ANTHROPIC_FAST_MODEL` (the
