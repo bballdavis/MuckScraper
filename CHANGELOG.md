@@ -67,6 +67,11 @@ All notable changes to MuckScraper are documented here.
   environment.
 
 ### Changed
+- **Pick what each LLM provider does from its header.** Every provider in
+  Settings › LLM providers has Main, Fast and Embeddings chips: filled for
+  the jobs it does, click another to hand it that job (embeddings ask first).
+  A chip whose provider isn't set up for the job is dashed and opens its
+  fields. Expand all / Collapse all opens or folds every provider at once.
 - **Settings polish.** Settings sits in the same centred column as the
   feeds, with the section list as a card beside it, and panels use the story
   cards' corner radius. Overview runs jobs from play buttons and lists one

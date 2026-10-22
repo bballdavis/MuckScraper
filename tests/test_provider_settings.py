@@ -180,3 +180,14 @@ class LmStudioTests(unittest.TestCase):
         self.assertIsNone(validate("EMBEDDING_PROVIDER", "lmstudio"))
         self.assertIsNotNone(validate("EMBEDDING_PROVIDER", "anthropic"))
         self.assertIsNone(validate("LLM_PROVIDER", "lmstudio"))
+
+    def test_readiness_per_role(self):
+        # The role chips in Settings: LM Studio with only an embedding model
+        # can take embeddings but not a chat tier.
+        with mock.patch.dict(os.environ, {}, clear=True):
+            llm_client.configure({"LMSTUDIO_HOST": "http://10.0.0.5:1234/v1",
+                                  "LMSTUDIO_EMBEDDING_MODEL": "google/embedding-gemma-300m"})
+            with mock.patch.object(llm_client, "_sync_config"):
+                self.assertTrue(llm_client.embedding_configured("lmstudio"))
+                self.assertFalse(llm_client.provider_configured("lmstudio"))
+                self.assertFalse(llm_client.embedding_configured("anthropic"))

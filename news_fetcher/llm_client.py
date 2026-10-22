@@ -330,8 +330,12 @@ def is_configured(tier=TIER_QUALITY):
     the global provider would gate their work on a backend they never use.
     Defaults to quality so existing callers are unchanged.
     """
+    return provider_configured(provider_for_tier(tier))
+
+
+def provider_configured(provider):
+    """Whether `provider` has enough config to serve a chat tier."""
     _sync_config()
-    provider = provider_for_tier(tier)
     if provider == "gemini":
         return bool(GEMINI_API_KEY)
     if provider == "anthropic":
@@ -345,6 +349,18 @@ def is_configured(tier=TIER_QUALITY):
         # empty or dead model name on every call.
         return bool((config["api_key"] or not config["key_required"]) and config["model"])
     return bool(OLLAMA_HOST and OLLAMA_MODEL)
+
+
+def embedding_configured(provider):
+    """Whether `provider` has enough config to serve embeddings."""
+    _sync_config()
+    if provider == "gemini":
+        return bool(GEMINI_API_KEY)
+    if provider == "lmstudio":
+        return bool(LMSTUDIO_HOST and LMSTUDIO_EMBEDDING_MODEL)
+    if provider == "ollama":
+        return bool(OLLAMA_HOST or OLLAMA_FALLBACK_HOST)
+    return False
 
 
 def model_for_tier(tier=TIER_QUALITY):
