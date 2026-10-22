@@ -25,7 +25,9 @@
 
 {% block styles %}
 <style>
-    .fetch-grid { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; }
+    /* One fetch per row, top to bottom in run order, so dragging reads as
+       moving it up or down the run (Philip, 2026-10-22). */
+    .fetch-grid { list-style: none; display: flex; flex-direction: column; gap: 8px; }
     .fetch-card { display: flex; flex-direction: column; gap: 4px; padding: 9px 10px 10px 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-frame); min-width: 0; }
     .fetch-card.is-off .fetch-top .fetch-label, .fetch-card.is-off .fetch-line { opacity: 0.5; }
     .fetch-card.is-dragging { opacity: 0.4; }
@@ -35,11 +37,14 @@
     .fetch-grip:hover { color: var(--text-muted); background: var(--btn-muted-bg); }
     .fetch-grip:focus-visible { outline: 2px solid var(--accent-text); }
     .fetch-label { flex: 1 1 auto; min-width: 0; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fetch-lines { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2px 16px; }
+    .fetch-lines .fetch-line.full { grid-column: 1 / -1; }
+    @media (max-width: 600px) { .fetch-lines { grid-template-columns: minmax(0, 1fr); } }
     .fetch-line { padding-left: 24px; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .fetch-line b { font-weight: 600; color: var(--text); }
     .fetch-editor { display: none; }
-    .fetch-card.is-editing { grid-column: 1 / -1; padding: 12px 16px 14px; }
-    .fetch-card.is-editing .fetch-line, .fetch-card.is-editing .fetch-top .btn-edit { display: none; }
+    .fetch-card.is-editing { padding: 12px 16px 14px; }
+    .fetch-card.is-editing .fetch-lines, .fetch-card.is-editing .fetch-top .btn-edit { display: none; }
     .fetch-card.is-editing .fetch-editor { display: block; margin-top: 8px; }
     .fetch-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 12px; }
     .fetch-fields .add-field.wide { grid-column: span 2; }
@@ -59,7 +64,7 @@
 <div class="page-head page-head-row">
     <div>
         <h1>Scheduled fetches</h1>
-        <p>What each pipeline run pulls from NewsAPI and GNews. <a href="{{ url_for('admin.pipeline_schedule_page') }}">Run schedule</a> controls when. Drag a card to change the run order. Changes apply on the next run.</p>
+        <p>What each pipeline run pulls from NewsAPI and GNews. <a href="{{ url_for('admin.pipeline_schedule_page') }}">Run schedule</a> controls when. Drag a fetch up or down to change the run order. Changes apply on the next run.</p>
     </div>
     <button type="button" class="btn" id="fetch-add-open">{{ icon('plus') }} Add fetch</button>
 </div>
@@ -82,7 +87,7 @@
     {%- for fetch in fetches %}
     <li class="fetch-card{{ '' if fetch.is_active else ' is-off' }}" id="fetch-{{ fetch.id }}" data-id="{{ fetch.id }}">
         <div class="fetch-top">
-            <button type="button" class="fetch-grip" draggable="true" aria-label="Move {{ fetch.label }} (Alt + arrow keys)" title="Drag to reorder">{{ icon('grip') }}</button>
+            <button type="button" class="fetch-grip" draggable="true" aria-label="Move {{ fetch.label }} (Alt + up or down arrow)" title="Drag to reorder">{{ icon('grip') }}</button>
             <span class="fetch-label" title="{{ fetch.label }}">{{ fetch.label }}</span>
             <span class="chip">{{ 'Search' if fetch.mode == 'query' else 'Top' }}</span>
             <label class="switch" title="{{ 'Active' if fetch.is_active else 'Paused' }}">
@@ -90,6 +95,7 @@
             </label>
             <button type="button" class="btn btn-quiet btn-square btn-edit" aria-label="Edit {{ fetch.label }}" title="Edit">{{ icon('pencil') }}</button>
         </div>
+        <div class="fetch-lines">
         <div class="fetch-line">
             <b>NewsAPI</b>
             {%- if fetch.mode == 'query' %} {{ fetch.newsapi_query or '—' }}
@@ -99,8 +105,9 @@
         <div class="fetch-line"><b>GNews</b> {{ fetch.gnews_query or '' }}{% if fetch.gnews_query and fetch.gnews_category %} · {% endif %}{{ fetch.gnews_category or '' }}</div>
         {%- endif %}
         {%- if fetch.description %}
-        <div class="fetch-line" title="{{ fetch.description }}">{{ fetch.description }}</div>
+        <div class="fetch-line full" title="{{ fetch.description }}">{{ fetch.description }}</div>
         {%- endif %}
+        </div>
         <div class="fetch-editor">
             <form method="POST" action="{{ url_for('admin.update_scheduled_fetch', fetch_id=fetch.id) }}" data-fetch-form>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
