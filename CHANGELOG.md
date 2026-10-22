@@ -52,6 +52,10 @@ All notable changes to MuckScraper are documented here.
   on it) and removes the old Meilisearch container; `./meili_data` can then
   be deleted, and `MEILI_URL`/`MEILI_MASTER_KEY` removed from `.env`. The
   MCP `search_health` tool now checks the search indexes exist.
+- **`articles.fetched_at` is indexed.** The quality report, copy detector,
+  opinion linker, grouping review and scrape blocklist page all ask for
+  "articles fetched since X", which scanned the whole table each time
+  (46 ms to 0.3 ms on a 47,000-article test database).
 - **`docker-compose.yml`:** the app and scheduler share one environment block
   (`x-app-env`), so a new setting is added once. The scheduler waits for a
   Postgres health check instead of a fixed 15-second sleep.
