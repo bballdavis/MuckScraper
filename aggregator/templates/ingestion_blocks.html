@@ -36,9 +36,16 @@
 </section>
 
 <section class="panel">
-    <div class="panel-head">
+    <div class="panel-head rules-head">
         <h2>Rules</h2>
-        <span class="chip">{{ active }} active of {{ blocks | length }}</span>
+        {%- if blocks %}
+        <label class="rules-find">
+            <span class="visually-hidden">Search rules</span>
+            {{ icon('search') }}
+            <input type="search" id="rules-find" placeholder="Search {{ 'URLs' if is_source else 'keywords' }} and reasons" autocomplete="off">
+        </label>
+        {%- endif %}
+        <span class="chip" id="rules-count">{{ active }} active of {{ blocks | length }}</span>
     </div>
     {%- if blocks %}
     <div class="table-scroll">
@@ -79,8 +86,45 @@
         </tbody>
     </table>
     </div>
+    <div class="panel-body muted" id="rules-none" hidden>No rules match.</div>
     {%- else %}
     <div class="panel-body muted">No rules yet.</div>
     {%- endif %}
 </section>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .rules-head { flex-wrap: nowrap; }
+    .rules-find { position: relative; display: block; flex: 1 1 auto; max-width: 360px; margin-left: auto; }
+    .rules-find .icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+    .app-page .page-body .rules-find input { width: 100%; height: 30px; padding: 0 8px 0 30px; font-size: 13px; }
+    #rules-none[hidden] { display: none; }
+    @media (max-width: 600px) { .rules-head { flex-wrap: wrap; } .rules-find { order: 3; flex-basis: 100%; max-width: none; } }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Filter the rules by what's typed, matching the pattern and the reason.
+    (function () {
+        const input = document.getElementById('rules-find');
+        if (!input) return;
+        const rows = Array.from(document.querySelectorAll('.data-table tbody tr'));
+        const none = document.getElementById('rules-none');
+        const count = document.getElementById('rules-count');
+        const total = count.textContent;
+        input.addEventListener('input', () => {
+            const q = input.value.trim().toLowerCase();
+            let shown = 0;
+            rows.forEach((row) => {
+                const text = Array.from(row.querySelectorAll('input[type="text"]')).map((i) => i.value).join(' ').toLowerCase();
+                row.hidden = q && !text.includes(q);
+                if (!row.hidden) shown += 1;
+            });
+            none.hidden = shown > 0;
+            count.textContent = q ? `${shown} of ${rows.length}` : total;
+        });
+    })();
+</script>
 {% endblock %}
