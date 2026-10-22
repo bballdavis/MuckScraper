@@ -16,6 +16,7 @@ SETTINGS_SECTIONS = [
     ("General", [
         ("overview", "Overview", "admin.tools_page", None, False),
         ("users", "Users", "admin.users_page", User, False),
+        ("mobileapi", "Mobile API", "admin.mobile_api_page", None, True),
     ]),
     ("Sources", [
         ("topics", "Topics", "admin.topics_page", Topic, False),

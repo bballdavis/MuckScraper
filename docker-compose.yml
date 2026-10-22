@@ -111,6 +111,30 @@ services:
     volumes:
       - .:/app
 
+  # Optional Mobile API for the MuckScroller app (docs/API.md). Off unless
+  # started with `docker compose --profile api up -d`. Its own app
+  # (aggregator/api_app.py) registers only /api/v1, so this is the one port to
+  # put behind a tunnel or reverse proxy; the web app stays on localhost.
+  # Devices and pairing codes are managed in Settings › Mobile API.
+  api:
+    profiles: ["api"]
+    <<: *app-image
+    command: gunicorn -b 0.0.0.0:5050 -w "${API_WORKERS:-2}" --timeout 30 "aggregator.api_app:create_api_app()"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-5050}:5050"
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+      SECRET_KEY: ${SECRET_KEY}
+      DISPLAY_TIMEZONE: ${DISPLAY_TIMEZONE:-UTC}
+      # Reverse proxies or tunnels in front of the API; 0 when none.
+      API_PROXY_HOPS: ${API_PROXY_HOPS:-1}
+    restart: unless-stopped
+    volumes:
+      - .:/app:ro
+
   # Optional read-only MCP server for health checks and troubleshooting
   # (docs/MCP.md). Off unless started with `docker compose --profile mcp up -d`.
   # The checkout is mounted read-only and the database connection refuses
