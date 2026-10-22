@@ -2,7 +2,7 @@
 #
 # Minimal internal service that holds the Docker socket so the main admin
 # app never has to. Exposes exactly three things: listing this compose
-# project's containers (with start time and restart count), a bounded tail of
+# project's containers (with state, health and restart count), a bounded tail of
 # one container's logs (read-only, used by the MCP server), and restarting
 # one/all of them. Nothing else is routable here, regardless of what the
 # socket itself would otherwise allow -- this is the whole point of not
@@ -71,13 +71,22 @@ def _project_containers():
         if service == SELF_SERVICE_NAME:
             continue
         state = c.attrs.get("State", {})
+        health = state.get("Health") or {}
+        health_log = health.get("Log") or []
         result.append({
             "name": c.name,
             "service": service,
             "status": c.status,
             "started_at": state.get("StartedAt"),
+            "finished_at": state.get("FinishedAt"),
             "restart_count": c.attrs.get("RestartCount"),
-            "health": (state.get("Health") or {}).get("Status"),
+            "health": health.get("Status"),
+            "health_failing_streak": health.get("FailingStreak"),
+            "health_output": (health_log[-1].get("Output") or "").strip()[:300] if health_log else None,
+            "exit_code": state.get("ExitCode"),
+            "oom_killed": state.get("OOMKilled"),
+            "error": state.get("Error") or None,
+            "image": (c.attrs.get("Config") or {}).get("Image"),
         })
     return result
 
