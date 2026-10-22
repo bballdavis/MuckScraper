@@ -479,6 +479,10 @@ def store_articles(articles_data, topic_name, provider=None):
                 scrape_result.status = "blocked"
                 scrape_result.failure_reason = dup_reason
 
+        # A feed without an image often still links a page with an og:image.
+        if not image_url and scrape_result.image_url and not is_roundup_article(title, raw_url):
+            image_url = scrape_result.image_url
+
         if scraped_content:
             final_content = scraped_content
         else:
