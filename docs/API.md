@@ -104,7 +104,9 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 | `GET /opinion?edition=` | The edition's Opinion page: stories with their columns by leaning |
 | `GET /stories?topic=&range=&single=&cursor=&limit=` | The story feed, filtered like All Stories. Omitted filters use the user's feed defaults. |
 | `GET /stories/{id}` | Summary, deep report, opinion roundup, articles and columns by leaning |
-| `GET /articles/{id}` | Title, outlet, leaning, summary, analysis, link, and scraped text when allowed |
+| `GET /articles/{id}` | Title, outlet, leaning, summary, analysis, link, and scraped text when allowed. `is_summarizing` and `is_rating_bias` say whether its summary or lean rating is still being written. |
+| `POST /articles/{id}/summarize` | Needs the summarize scope. Queues the article's own summary (the web page's summary button): `200` when it already has one, `202` queued, `409 no_text` when MuckScraper couldn't read the article. Poll `/articles/{id}`. Counts against the daily summary limit. |
+| `POST /articles/{id}/rate-bias` | Needs the summarize scope. Queues a rating of the article's own lean from its title and opening (`202`). Once done, its `leaning` and the story's L / C / R counts use it instead of the outlet's. Counts against the daily summary limit. |
 | `GET /search?q=&kind=stories\|articles&range=&limit=` | Compact hits for as-you-type search |
 | `POST /stories/{id}/summarize` `{depth, origin}` | Adds the story to the user's NewsBox: `200` ready when already summarized, `202` pending when a summary was queued. `depth` is `summary`, `analysis` (the multi-source analysis alone; the summary stands in when a story has one article) or `summary_analysis`; `origin` is `requested` (the default) or `saved`. Needs `summarize`. |
 | `GET /breaking` | The Breaking News bar: up to three breaking RSS headlines, newest first, with `state` (`new`, `scraping`, `scraped`, `summarizing`, `summarized`, `failed`) and `story_id` once scraped |
