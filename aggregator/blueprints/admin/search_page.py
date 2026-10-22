@@ -5,8 +5,9 @@ Two tabs share one query box and one time window:
   rule as the story listings). Counts cover all of the story's articles.
 - Articles: an article matches on its own publish date.
 
-Text queries go through Meilisearch, capped at SEARCH_CANDIDATE_LIMIT hits, and
-the exact window is then applied in SQL. Without a query the tables are browsed
+Text queries go through Postgres full-text search (aggregator/search.py),
+capped at SEARCH_CANDIDATE_LIMIT hits inside the window, and the rows are then
+loaded and sorted in SQL. Without a query the tables are browsed
 straight from SQL.
 """
 import logging
@@ -64,14 +65,14 @@ STORY_SORTABLE = {"headline", "articles", "sources", "left", "center", "right", 
 ARTICLE_SORTABLE = {"title", "outlet", "date", "bias", "story", "story_articles"}
 
 
-# With a text query the rows default to Meilisearch's own ranking, best match
+# With a text query the rows default to the full-text ranking, best match
 # first. Sorting the <= 1000 candidates by date instead put strong matches
 # pages behind weak recent ones.
 RELEVANCE = "relevance"
 
 
 def _relevance_order(id_column, ranked_ids):
-    """ORDER BY position in Meilisearch's ranked id list, or None if there is
+    """ORDER BY position in the ranked id list from search, or None if there is
     no ranked list (no query, or the SQL fallback)."""
     if not ranked_ids:
         return None
@@ -364,7 +365,7 @@ def search_page():
                     text_query, limit=SEARCH_CANDIDATE_LIMIT, since=window["since"], until=window["until"]
                 )
         except SearchUnavailableError as exc:
-            logger.warning("Meilisearch unavailable for search page, using SQL match: %s", exc)
+            logger.warning("Full-text search failed for search page, using SQL match: %s", exc)
             degraded = True
             candidate_ids = None
 
@@ -437,8 +438,8 @@ def _story_images(story_ids):
 @public_or_login
 def search_suggest():
     """The best few stories and articles for `q` in the feed's time window, as
-    JSON. Same matching as the Search page (Meilisearch, or the SQL match while
-    it is down), relevance first."""
+    JSON. Same matching as the Search page (Postgres full-text search, or the
+    SQL match if that fails), relevance first."""
     text_query = request.args.get("q", "").strip()
     if len(text_query) < SUGGEST_MIN_CHARS:
         return jsonify({"q": text_query, "stories": [], "articles": [], "story_total": 0})
@@ -449,7 +450,7 @@ def search_suggest():
         story_ids = search_story_ids(text_query, limit=SEARCH_CANDIDATE_LIMIT, since=window["since"], until=window["until"])
         article_ids = search_article_ids(text_query, limit=SEARCH_CANDIDATE_LIMIT, since=window["since"], until=window["until"])
     except SearchUnavailableError as exc:
-        logger.warning("Meilisearch unavailable for search suggestions, using SQL match: %s", exc)
+        logger.warning("Full-text search failed for search suggestions, using SQL match: %s", exc)
         story_ids = article_ids = None
 
     story_sort = RELEVANCE if story_ids is not None else "updated"

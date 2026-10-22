@@ -51,8 +51,6 @@ x-app-env: &app-env
     LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
     LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
     LANGFUSE_HOST: ${LANGFUSE_HOST:-}
-    MEILI_URL: ${MEILI_URL:-http://meilisearch:7700}
-    MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-muckscraper-dev-key}
 
 services:
   postgres:
@@ -70,16 +68,6 @@ services:
       retries: 30
     restart: unless-stopped
 
-  meilisearch:
-    image: getmeili/meilisearch:v1.8
-    environment:
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-muckscraper-dev-key}
-      # Meilisearch sends anonymous usage data to its makers by default.
-      MEILI_NO_ANALYTICS: "true"
-    volumes:
-      - ./meili_data:/meili_data
-    restart: unless-stopped
-
   # Holds the Docker socket so the admin app never has to -- exposes only
   # container-list/restart over an internal-only HTTP API. See
   # docker_restart_proxy/app.py for exactly what's reachable.
@@ -95,8 +83,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      meilisearch:
-        condition: service_started
     command: python -m news_fetcher.scheduler
     environment:
       <<: *app-env
@@ -111,8 +97,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      meilisearch:
-        condition: service_started
       docker-restart-proxy:
         condition: service_started
     environment:
@@ -136,8 +120,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      meilisearch:
-        condition: service_started
       docker-restart-proxy:
         condition: service_started
     ports:
@@ -158,8 +140,6 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
-      MEILI_URL: ${MEILI_URL:-http://meilisearch:7700}
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-muckscraper-dev-key}
       DOCKER_RESTART_PROXY_URL: http://docker-restart-proxy:5001
       PYTHONDONTWRITEBYTECODE: "1"
       GIT_OPTIONAL_LOCKS: "0"
