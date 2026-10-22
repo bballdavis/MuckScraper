@@ -19,6 +19,12 @@ depends_on = None
 
 
 def upgrade():
+    # create_app() and the scheduler run db.create_all(), so on a running
+    # install the table (and its index, declared on the model) can already
+    # exist by the time this migration runs.
+    if sa.inspect(op.get_bind()).has_table("jobs"):
+        op.execute("CREATE INDEX IF NOT EXISTS ix_jobs_queued ON jobs (status, priority, id)")
+        return
     op.create_table(
         "jobs",
         sa.Column("id", sa.Integer(), primary_key=True),
