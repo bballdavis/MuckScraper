@@ -119,6 +119,22 @@ class ReadStateTests(unittest.TestCase):
         self.assertLess(page.index("Article 0"), page.index("Headline 0"))
         self.assertIn("data-mark-unread", page)
 
+    def test_recently_read_search(self):
+        first, second, _ = self.ids["stories"]
+        self.client.post(f"/read/story/{first}")
+        self.client.post(f"/read/story/{second}")
+        self.client.post(f"/read/article/{self.ids['article']}")
+        page = self.client.get("/read?q=headline 1").get_data(as_text=True)
+        self.assertIn("Headline 1", page)
+        self.assertNotIn(">Headline 0<", page)
+        self.assertNotIn("Article 0", page)
+        # Outlet names match articles.
+        page = self.client.get("/read?q=daily").get_data(as_text=True)
+        self.assertIn("Article 0", page)
+        self.assertNotIn(">Headline 1<", page)
+        page = self.client.get("/read?q=100%25").get_data(as_text=True)
+        self.assertIn("Nothing you've read matches", page)
+
     def test_story_and_article_pages_show_the_toggle(self):
         first = self.ids["stories"][0]
         page = self.client.get(f"/story/{first}").get_data(as_text=True)
