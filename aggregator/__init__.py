@@ -92,6 +92,8 @@ def create_app():
     from aggregator.blueprints.admin import admin
     from aggregator.blueprints.auth import auth
     app.register_blueprint(public)
+    from aggregator import app_links
+    app_links.register(app)
     app.register_blueprint(admin,  url_prefix='/admin')
     app.register_blueprint(auth,   url_prefix='/auth')
 
