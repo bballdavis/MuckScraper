@@ -55,18 +55,6 @@ def create_app():
     login.init_app(app)
     csrf.init_app(app)
 
-    # Static URLs carry the file's mtime (?v=...), so a deploy that changes a
-    # stylesheet or script reaches browsers at once instead of after their
-    # cached copy expires (2026-10-22: new card markup rendered against the
-    # old story_card.css).
-    @app.url_defaults
-    def _static_version(endpoint, values):
-        if endpoint == "static" and "filename" in values and "v" not in values:
-            try:
-                values["v"] = int(os.stat(os.path.join(app.static_folder, values["filename"])).st_mtime)
-            except OSError:
-                pass
-
     @login.user_loader
     def load_user(id):
         from aggregator.models import User
