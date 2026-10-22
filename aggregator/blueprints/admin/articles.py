@@ -348,7 +348,7 @@ def scrape_article_route(article_id):
 def scrape_all_missing():
     label = request.form.get("label", "")
     scrape_status = request.form.get("scrape_status", "").strip() or None
-    _start_bulk_task("scrape_all_missing", _scrape_all_missing_task)
+    _start_bulk_task("scrape_all_missing")
     return redirect_to_articles(label, scrape_status)
 
 
