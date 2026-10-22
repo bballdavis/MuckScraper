@@ -1,0 +1,61 @@
+{#- The app's page frame: the full-width top bar (_feed_topbar.html) and the
+    sidebar (sidebar_nav.html) around a page's content, so every page outside
+    the feed lists has the same chrome as Headlines and All Stories (Philip,
+    2026-10-22: no page keeps the old top bar). A page extends it:
+
+        {% extends '_app_page.html' %}
+        {% block title %}Past editions{% endblock %}
+        {% block section %}Past editions{% endblock %}   (beside the logo)
+        {% block nav %}oped{% endblock %}                (the sidebar link to light)
+        {% block styles %}<style>...</style>{% endblock %}
+        {% block body %}...{% endblock %}
+        {% block scripts %}<script>...</script>{% endblock %}
+
+    The sidebar lists the active topics itself (sidebar_topics()), so a page
+    may pass its own `topics` (the Topics settings page passes inactive ones
+    too) without changing the menu. Theme switching comes from
+    static/js/theme_toggle.js, loaded in <head> so the saved theme applies
+    before first paint. -#}
+{%- from '_feed_topbar.html' import feed_topbar with context -%}
+<!DOCTYPE html>
+<html data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_32.png') }}">
+    <link rel="icon" type="image/png" sizes="128x128" href="{{ url_for('static', filename='favicon_128.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192.png') }}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
+    <title>{% block title %}{% endblock %} — MuckScraper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/feed_header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app_page.css') }}">
+    <script src="{{ url_for('static', filename='js/theme_toggle.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
+    {% block head %}{% endblock %}
+    <style>
+        {% include 'sidebar_styles.html' %}
+    </style>
+    {% block styles %}{% endblock %}
+</head>
+<body class="app-page {% block body_class %}{% endblock %}">
+{%- set sidebar_toggle_in_topbar = true -%}
+{%- set active_nav = (self.nav()|trim) or active_nav|default(none) -%}
+{{ feed_topbar(self.section()|trim, url_for('admin.list_articles')) }}
+<div class="layout feed-layout">
+    {% with topics = sidebar_topics() %}{% include 'sidebar_nav.html' %}{% endwith %}
+    <div class="page-body">
+        {% block body %}{% endblock %}
+    </div>
+</div>
+<script>
+    {% include 'sidebar_script.html' %}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
+{#- Blocks a page fills only when it needs them. -#}
+{%- if false %}{% block section %}{% endblock %}{% block nav %}{% endblock %}{% endif %}

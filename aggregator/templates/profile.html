@@ -1,104 +1,145 @@
-<!DOCTYPE html>
-<html data-theme="light">
-<head>
-    <title>Profile — MuckScraper</title>
-{% include '_account_page_head.html' %}
-</head>
-<body>
-{% include '_account_topbar.html' %}
-
-<div class="container">
-    <h1>Your profile</h1>
-    <p class="subtitle">Your account details. Changing your email or password asks for your current password first.</p>
+{#- Profile (auth.profile): the account on the left, feed defaults on the right
+    (profile mock, 2026-10-22). Email and password changes open in place and
+    ask for the current password first. -#}
+{% extends '_app_page.html' %}
+{% block title %}Profile{% endblock %}
+{% block section %}Profile{% endblock %}
+{% block styles %}
+<style>
+    .profile { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+    .profile-side { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+    .profile-defaults { flex: 2 1 440px; min-width: 0; }
+    .who { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+    .avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800; text-transform: uppercase; flex: 0 0 auto; }
+    .who-name { font-size: 17px; font-weight: 800; }
+    .who-role { font-size: 13px; color: var(--text-muted); }
+    .account-row summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; list-style: none; cursor: default; }
+    .account-row summary::-webkit-details-marker { display: none; }
+    .account-row .value { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+    .account-row .label { font-size: 12px; color: var(--text-muted); }
+    .account-row .toggle { cursor: pointer; }
+    .account-row[open] .toggle .when-closed, .account-row:not([open]) .toggle .when-open { display: none; }
+    .account-form { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
+    .account-form label, .defaults-field label.stack { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .account-form .btn { align-self: flex-start; }
+    .account-row { display: block; padding: 10px 16px; border-top: 1px solid var(--border); }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chips label { position: relative; }
+    .chips input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+    .chips span { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 3px; border: 1px solid var(--border); font-size: 13px; font-weight: 600; color: var(--text-muted); background: var(--surface); }
+    .chips input:checked + span { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .chips input:focus-visible + span { outline: 2px solid var(--accent-text); outline-offset: 1px; }
+    .defaults-scrape { display: block; }
+    .defaults-scrape .chips { margin-top: 8px; }
+</style>
+{% endblock %}
+{% block body %}
+{%- set fd = feed_defaults %}
+<div class="app-main">
+    <div class="page-head">
+        <h1>Your profile</h1>
+    </div>
 
     {% include '_flashes.html' %}
 
-    <div class="card">
-        <dl class="facts">
-            <dt>Username</dt><dd>{{ current_user.username }}</dd>
-            <dt>Role</dt><dd>{{ current_user.role_label }}</dd>
-            <dt>Email</dt><dd>{{ current_user.email }}</dd>
-            {% if current_user.created_at %}<dt>Member since</dt><dd>{{ current_user.created_at | local_datetime('%B %d, %Y') }}</dd>{% endif %}
-            {% if current_user.last_login_at %}<dt>Last sign-in</dt><dd>{{ current_user.last_login_at | local_datetime }}</dd>{% endif %}
-        </dl>
-    </div>
+    <div class="profile">
+        <div class="profile-side">
+            <section class="panel">
+                <div class="who">
+                    <span class="avatar" aria-hidden="true">{{ current_user.username[:2] }}</span>
+                    <div>
+                        <div class="who-name">{{ current_user.username }}</div>
+                        <div class="who-role">{{ current_user.role_label }}{% if current_user.created_at %} · member since {{ current_user.created_at | local_datetime('%B %Y') }}{% endif %}</div>
+                    </div>
+                </div>
 
-    <div class="card">
-        <h2>Feed defaults</h2>
-        <p class="hint">What the site and the story lists open with. The Filters button in the feed can still change them for a visit, and its “Save as my default” updates these.</p>
-        <form method="POST">
+                <details class="account-row">
+                    <summary>
+                        <span><span class="label">Email</span><br><span class="value">{{ current_user.email }}</span></span>
+                        <span class="btn btn-quiet toggle" role="button"><span class="when-closed">Change</span><span class="when-open">Cancel</span></span>
+                    </summary>
+                    <form class="account-form" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="email">
+                        <label>New email<input type="email" name="email" value="{{ current_user.email }}" required autocomplete="email"></label>
+                        <label>Current password<input type="password" name="current_password" required autocomplete="current-password"></label>
+                        <button type="submit" class="btn">Save email</button>
+                    </form>
+                </details>
+
+                <details class="account-row">
+                    <summary>
+                        <span><span class="label">Password</span><br><span class="value">At least 8 characters</span></span>
+                        <span class="btn btn-quiet toggle" role="button"><span class="when-closed">Change</span><span class="when-open">Cancel</span></span>
+                    </summary>
+                    <form class="account-form" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="password">
+                        <label>Current password<input type="password" name="current_password" required autocomplete="current-password"></label>
+                        <label>New password<input type="password" name="new_password" required minlength="8" autocomplete="new-password"></label>
+                        <label>New password again<input type="password" name="confirm_password" required minlength="8" autocomplete="new-password"></label>
+                        <button type="submit" class="btn">Change password</button>
+                    </form>
+                </details>
+
+                {%- if current_user.last_login_at %}
+                <div class="account-row">
+                    <span class="label">Last sign-in</span><br><span class="value">{{ current_user.last_login_at | local_datetime }}</span>
+                </div>
+                {%- endif %}
+            </section>
+        </div>
+
+        <form class="panel profile-defaults" method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="feed_defaults">
-            <div class="field">
-                <label for="fd-start">Start page</label>
-                <select id="fd-start" name="start_page">
+            <div class="panel-head">
+                <div>
+                    <h2>Feed defaults</h2>
+                    <p>What the feed opens with. The Filters button can still change them for one visit, and “Save as my default” writes back here.</p>
+                </div>
+            </div>
+
+            <div class="row">
+                <span><span class="row-label">Start page</span><span class="row-sub">Where the logo and sign-in take you</span></span>
+                <span class="seg" role="radiogroup" aria-label="Start page">
                     {%- for value, label in start_pages.items() %}
-                    <option value="{{ value }}"{% if feed_defaults.start_page == value %} selected{% endif %}>{{ label }}</option>
+                    <label><input type="radio" name="start_page" value="{{ value }}"{% if fd.start_page == value %} checked{% endif %}><span>{{ label }}</span></label>
                     {%- endfor %}
-                </select>
+                </span>
             </div>
-            <div class="field">
-                <label for="fd-range">Time range</label>
-                <select id="fd-range" name="range">
+
+            <div class="row">
+                <span><span class="row-label">Time range</span><span class="row-sub">Stories with any article in this window</span></span>
+                <span class="seg" role="radiogroup" aria-label="Time range">
                     {%- for value, label in ranges.items() %}
-                    <option value="{{ value }}"{% if feed_defaults.range == value %} selected{% endif %}>{{ label }}</option>
+                    <label><input type="radio" name="range" value="{{ value }}"{% if fd.range == value %} checked{% endif %}><span>{{ label }}</span></label>
                     {%- endfor %}
-                </select>
+                </span>
             </div>
-            <div class="field">
-                <label for="fd-scrape">Scrape status</label>
-                <select id="fd-scrape" name="scrape_status">
+
+            <div class="row defaults-scrape">
+                <span class="row-label">Scrape status</span><span class="row-sub">Useful for checking scraper health; most people leave this on All</span>
+                <div class="chips" role="radiogroup" aria-label="Scrape status">
                     {%- for value in scrape_statuses %}
-                    <option value="{{ value }}"{% if feed_defaults.scrape_status == value %} selected{% endif %}>{{ 'All' if value == 'all' else value|capitalize }}</option>
+                    <label><input type="radio" name="scrape_status" value="{{ value }}"{% if fd.scrape_status == value %} checked{% endif %}><span>{{ 'All' if value == 'all' else value|capitalize }}</span></label>
                     {%- endfor %}
-                </select>
+                </div>
             </div>
-            <label class="check-field">
-                <input type="checkbox" name="hide_single" value="true"{% if feed_defaults.hide_single %} checked{% endif %}>
-                Hide single-article stories on All Stories
+
+            <label class="row" style="cursor: pointer;">
+                <span><span class="row-label">Hide single-article stories</span><span class="row-sub">On All Stories, only show stories that several outlets covered</span></span>
+                <span class="switch">
+                    <input type="checkbox" name="hide_single" value="true"{% if fd.hide_single %} checked{% endif %}>
+                    <span aria-hidden="true"></span>
+                </span>
             </label>
-            <button type="submit" class="btn btn-primary">Save defaults</button>
-        </form>
-    </div>
 
-    <div class="card">
-        <h2>Change email</h2>
-        <form method="POST">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="action" value="email">
-            <div class="field">
-                <label for="email">New email address</label>
-                <input type="email" id="email" name="email" value="{{ current_user.email }}" required autocomplete="email">
+            <div class="panel-foot">
+                <button type="reset" class="btn btn-quiet">Revert</button>
+                <button type="submit" class="btn">Save defaults</button>
             </div>
-            <div class="field">
-                <label for="email-current">Current password</label>
-                <input type="password" id="email-current" name="current_password" required autocomplete="current-password">
-            </div>
-            <button type="submit" class="btn btn-primary">Save email</button>
-        </form>
-    </div>
-
-    <div class="card">
-        <h2>Change password</h2>
-        <p class="hint">At least 8 characters.</p>
-        <form method="POST">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="action" value="password">
-            <div class="field">
-                <label for="pw-current">Current password</label>
-                <input type="password" id="pw-current" name="current_password" required autocomplete="current-password">
-            </div>
-            <div class="field">
-                <label for="pw-new">New password</label>
-                <input type="password" id="pw-new" name="new_password" required minlength="8" autocomplete="new-password">
-            </div>
-            <div class="field">
-                <label for="pw-confirm">New password again</label>
-                <input type="password" id="pw-confirm" name="confirm_password" required minlength="8" autocomplete="new-password">
-            </div>
-            <button type="submit" class="btn btn-primary">Change password</button>
         </form>
     </div>
 </div>
-</body>
-</html>
+{% endblock %}

@@ -1,30 +1,9 @@
-{% from 'icons.html' import theme_toggle %}
-{% from 'account_menu.html' import account_menu with context %}
-{% from 'icons.html' import icon, theme_toggle_label %}
-<!DOCTYPE html>
-<html data-theme="light">
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_32.png') }}">
-    <link rel="icon" type="image/png" sizes="128x128" href="{{ url_for('static', filename='favicon_128.png') }}">
-    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192.png') }}">
-    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512.png') }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
-    <title>Scrape Blocklist — MuckScraper</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+{% extends 'settings_base.html' %}
+{% from 'icons.html' import icon %}
+{% block title %}Scrape Blocklist{% endblock %}
+{% block settings_key %}scrapeblock{% endblock %}
+{% block styles %}
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
-        .topbar {
-            background: var(--topbar-bg);
-            padding: 16px 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .topbar a { color: #89b4fa; text-decoration: none; font-size: 14px; font-weight: 600; }
-        .topbar-title { color: var(--topbar-text); font-size: 18px; font-weight: 800; }
         .container { max-width: 900px; margin: 48px auto; padding: 0 20px; }
         h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
         .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 32px; }
@@ -126,26 +105,13 @@
         .unblock-btn:hover { border-color: var(--accent); color: var(--accent-text); }
         .empty { padding: 48px; text-align: center; color: var(--text-faint); font-style: italic; }
     </style>
-    <script src="{{ url_for('static', filename='js/theme_toggle.js') }}"></script>
-</head>
-<body>
-{% from 'breadcrumb.html' import back_link %}
-<div class="topbar">
-    <div class="topbar-left crumb-bar">
-        <span class="topbar-title">MuckScraper</span>
-        {{ back_link(url_for('admin.tools_page'), 'Back to Admin Tools') }}
-    </div>
-    <div class="topbar-right">
-        {{ theme_toggle() }}
-        {{ account_menu() }}
-    </div>
-</div>
-
+{% endblock %}
+{% block settings_body %}
 <div class="container">
     <h1>Scrape Blocklist</h1>
     <p class="subtitle">Domains that will not be scraped. Permanent entries are pre-configured hard paywalls. Auto-blocked entries were detected at runtime.</p>
 
-    <form method="POST" action="/audit-scrapes">
+    <form method="POST" action="{{ url_for('admin.audit_scrapes') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="audit-btn">{{ icon('zap') }} Run Scrape Audit Now</button>
     </form>
@@ -306,7 +272,7 @@
                     </td>
                     <td>
                         {% if not entry.is_permanent %}
-                        <form method="POST" action="/unblock-domain" style="display:inline;">
+                        <form method="POST" action="{{ url_for('admin.unblock_domain') }}" style="display:inline;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="domain" value="{{ entry.domain }}">
                             <button type="submit" class="unblock-btn">Unblock</button>
@@ -322,6 +288,4 @@
         {% endif %}
     </div>
 </div>
-
-</body>
-</html>
+{% endblock %}

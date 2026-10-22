@@ -1,6 +1,5 @@
-// Light/Dark for pages without their own theme script (Profile, Users,
-// the no-access page, Admin Tools and its config pages). Load it in <head>
-// so the saved theme applies before first paint. The button's Dark/Light
+// Light/Dark for pages in the app frame (templates/_app_page.html): loaded
+// in <head> so the saved theme applies before first paint. The button's Dark/Light
 // text is switched by CSS (theme_toggle_label in icons.html), so this
 // never rewrites it.
 (function () {
