@@ -1,7 +1,7 @@
 """Add bookmarks and their versioned time-capsule snapshots.
 
 Revision ID: c3f8a6d2e9b4
-Revises: b7e2d4f9a1c3
+Revises: c5f8a2d9e1b4
 Create Date: 2026-10-22
 
 The snapshot files live on disk under BOOKMARK_STORAGE_DIR; these tables
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = 'c3f8a6d2e9b4'
-down_revision = 'b7e2d4f9a1c3'
+down_revision = 'c5f8a2d9e1b4'
 branch_labels = None
 depends_on = None
 
