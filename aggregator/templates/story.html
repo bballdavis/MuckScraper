@@ -344,8 +344,9 @@
                 title; then same-size buttons, Article (our page with its
                 summary and text) and Source (the publisher's page), and an
                 icon-only read-status chip whose tooltip explains it. The
-                article's summary and analysis sit in a rail on the right, as
-                on the story cards (Philip, 2026-10-22). -#}
+                article's summary sits in a rail on the right, as on the story
+                cards; multi-source analysis belongs to the story, so it has
+                no icon here (Philip, 2026-10-22). -#}
             {% set read_states = {
                 'success':  ('circle-check', 'Full read', 'MuckScraper read the whole article, so the summary and analysis draw on its full text.'),
                 'fallback': ('circle-alert', 'Partial read', "Only the publisher's excerpt or a partial copy could be read, so some detail or quotes may be missing."),
@@ -379,11 +380,6 @@
                             {{ ai_action('summary', 'ready', 'Summarize this article', 'Writes a short summary from the text MuckScraper could read. Runs in the background; the page reloads when it is done.', "startAiTask('article_summary', %d, this)" % article.id) }}
                         {% else %}
                             {{ ai_action('summary', 'off', 'No summary yet', 'Articles are summarized automatically when they can be read.') }}
-                        {% endif %}
-                        {% if article.deep_analysis %}
-                            {{ ai_action('analysis', 'done', 'Article analysis written', 'Open the article to read it.') }}
-                        {% else %}
-                            {{ ai_action('analysis', 'off', 'No article analysis', 'The multi-source analysis runs on the whole story, above.') }}
                         {% endif %}
                     </div>
                 </div>
