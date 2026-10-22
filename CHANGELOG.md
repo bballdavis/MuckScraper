@@ -181,7 +181,8 @@ All notable changes to MuckScraper are documented here.
 ### Fixed
 - **Headlines card actions on one row.** "Coverage & Analysis" and the
   summary and analysis indicators sit on one row, all 40px tall, with icons
-  filling the height. Stylesheet and script URLs now carry the file's
+  filling the height; the story list rail's icons fill about 85% of its
+  width. Stylesheet and script URLs now carry the file's
   modified time (`?v=`), so browsers pick up new CSS after a deploy instead
   of a cached copy (the stale copy had wrapped the indicators onto rows of
   their own).
