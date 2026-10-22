@@ -1,9 +1,10 @@
-"""The Mobile API: JSON under /api/v1 for the MuckScroller app.
+"""The API: JSON under /api/v1, for the MuckScroller app and any other client.
 
 Served only by its own app (aggregator/api_app.py), which registers this
 blueprint and nothing else, so the internet-facing process has no admin,
-login or web pages to reach. Devices authenticate with bearer tokens issued
-through one-time pairing codes from Settings › Mobile API in the web app.
+login or web pages to reach. Clients authenticate with bearer tokens: a phone
+gets one through a one-time pairing code, and anything else through an API
+key, both from Settings › API in the web app.
 """
 from flask import Blueprint, request
 

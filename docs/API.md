@@ -1,7 +1,7 @@
-# Mobile API (for the MuckScroller app)
+# API
 
-An optional JSON API under `/api/v1` that the MuckScroller iPhone app reads.
-It runs as its own container with its own small Flask app
+An optional JSON API under `/api/v1`. The MuckScroller iPhone app reads it,
+and so can a script, a dashboard or any other app with an API key. It runs as its own container with its own small Flask app
 (`aggregator/api_app.py`) that registers **only** the API: no web pages, no
 admin, no login. That makes it the one part of MuckScraper you can put on the
 internet. The web app and admin stay on your network.
@@ -12,20 +12,39 @@ internet. The web app and admin stay on your network.
    `API_BIND:API_PORT`, which defaults to `127.0.0.1:5050`.
 2. Put a tunnel or reverse proxy with TLS in front of that port (Cloudflare
    Tunnel, Tailscale, Caddy). Set `API_PROXY_HOPS` to the number of proxies in
-   front of the API, so rate limits see the phone's real address (`0` if the
-   phone connects directly). Behind Cloudflare, also set
+   front of the API, so rate limits see the client's real address (`0` if the
+   client connects directly). Behind Cloudflare, also set
    `API_CLIENT_IP_HEADER=CF-Connecting-IP`: otherwise everyone reaching the
    same Cloudflare edge shares one per-address limit. Only do that when the
    API can't be reached around Cloudflare, since a direct caller could send
    the header themselves.
-3. In **Settings › Mobile API**, enter the public address
+3. In **Settings › API**, enter the public address
    (`https://api.example.com`), pick a user and press **Create pairing code**.
 4. In MuckScroller, scan the QR code or type the code. The code works once
    and expires after 10 minutes. The phone gets a device token; no password
    crosses the internet.
 
-On the same page you can sign out one device or all of them. Disabling a user
-in Settings › Users signs out all of their devices on their next request.
+### API keys
+
+For anything that can't scan a code (a script, a server, a home dashboard,
+another app), turn on **API keys** in Settings › API. They are off by
+default. Then fill in **API keys** on the same page: a name, the user the key
+acts as, whether it can queue summaries, and when it expires (30 days, 90
+days, a year or never). The key is shown once. Send it the same way a phone
+sends its token:
+
+```
+curl -H "Authorization: Bearer msk_..." https://api.example.com/api/v1/stories
+```
+
+A key is the same kind of token a paired phone gets: same endpoints, scopes,
+rate limits and sign-out. `GET /me` says which it is (`device.kind` is
+`device` or `key`). Turning API keys off stops every key on its next request
+(`401` with code `api_keys_off`) and leaves paired phones alone.
+
+On the same page you can sign out one device or key, or all of them.
+Disabling a user in Settings › Users signs out all of their devices and keys
+on their next request.
 
 ## Security
 
@@ -34,17 +53,19 @@ in Settings › Users signs out all of their devices on their next request.
   pairing, sign-out and last-used time, and the user's own feed preferences,
   NewsBox and schedule. No request runs a model: summaries are queued as jobs
   for the scheduler container.
-- **Scopes:** a device has `read`, and `summarize` for work that runs in the
-  background: sending stories to NewsBox, saving bookmarks, and editing or
-  running its schedule. New pairings get both;
+- **Scopes:** a device or key has `read`, and `summarize` for work that runs
+  in the background: sending stories to NewsBox, saving bookmarks, and
+  editing or running its schedule. New pairings get both, and a new key gets
+  `summarize` only when you tick it;
   devices paired earlier were given `summarize` by migration `b7e2d4f9a1c3`.
 - **Tokens:** a token is `msk_` followed by 32 random bytes. Only its SHA-256
-  is stored. Tokens expire after a year, and pairing again issues a new one.
+  is stored. Paired devices' tokens expire after a year, and pairing again
+  issues a new one; a key expires when you chose.
   Pairing codes are also stored hashed.
 - **Rate limits** are counted in Postgres and shared by every worker. They
   apply per device and per IP, plus a tighter limit on pairing attempts per
   IP, stories sent to NewsBox per user per day and "Run now" per user per
-  day. You can change them in Settings › Mobile API. A request over a limit
+  day. You can change them in Settings › API. A request over a limit
   gets `429` with `Retry-After`. Sending a story that is already in the
   user's NewsBox doesn't count, and a scheduled run adds at most 120 stories.
 - **Input:** every parameter is validated, and an unknown parameter is a
@@ -85,13 +106,13 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 | `GET /stories/{id}` | Summary, deep report, opinion roundup, articles and columns by leaning |
 | `GET /articles/{id}` | Title, outlet, leaning, summary, analysis, link, and scraped text when allowed |
 | `GET /search?q=&kind=stories\|articles&range=&limit=` | Compact hits for as-you-type search |
-| `POST /stories/{id}/summarize` `{depth, origin}` | Adds the story to the user's NewsBox: `200` ready when already summarized, `202` pending when a summary was queued. `depth` is `summary`, `analysis` (the multi-source analysis alone; the summary stands in when a story has one article) or `summary_analysis`; `origin` is `swiped` or `saved`. Needs `summarize`. |
+| `POST /stories/{id}/summarize` `{depth, origin}` | Adds the story to the user's NewsBox: `200` ready when already summarized, `202` pending when a summary was queued. `depth` is `summary`, `analysis` (the multi-source analysis alone; the summary stands in when a story has one article) or `summary_analysis`; `origin` is `requested` (the default) or `saved`. Needs `summarize`. |
 | `GET /breaking` | The Breaking News bar: up to three breaking RSS headlines, newest first, with `state` (`new`, `scraping`, `scraped`, `summarizing`, `summarized`, `failed`) and `story_id` once scraped |
 | `POST /breaking/{id}/newsbox` `{depth}` | Send a breaking headline to NewsBox: it is scraped if it isn't in a story yet, then summarized. `200` ready, `202` pending. Needs `summarize`; counts against the daily NewsBox limit. |
 | `GET /me/newsbox?state=&origin=&unread=&cursor=&limit=` | The user's NewsBox, newest first, with `unread_count` |
 | `PATCH /me/newsbox/{story_id}` `{is_unread}`, `DELETE` | Mark one item read or unread, or remove it |
 | `POST /me/newsbox/read` | Mark every item read |
-| `GET`/`PUT /me/schedules` | Scheduled summaries: run times in the user's `timezone`, sections (Headlines in pages of 20, a topic by its top N), depth and rules. `PUT` needs `summarize`. |
+| `GET`/`PUT /me/schedules` | Scheduled summaries: run times in the user's `timezone`, sections (each with an `amount` of stories, 1 to 100: the top N of the latest edition for Headlines, the N most-covered in the last day for a topic), depth and rules. `PUT` needs `summarize`. |
 | `POST /me/schedules/run` | Run the schedule once now. Needs `summarize`. |
 | `GET /me/bookmarks` | Saved stories with their latest version, plus `used_bytes` and `quota_bytes` (null when unlimited) |
 | `POST /me/bookmarks` `{story_id}` | Save a story: `202` while a new time-capsule version is written. It also goes to NewsBox as saved. Needs `summarize`. |
@@ -110,7 +131,8 @@ NewsBox items go `pending` → `in_progress` → `ready`, or `failed` with an
 `error`. A story already summarized is `ready` at once. One job writes a
 story's summary for everyone waiting on it, at lower priority than the
 pipeline and the admin's AI tasks. An item is unread from when it turns
-ready. Scheduled items have `origin: "auto"` and share an `auto_run_id`. The
+ready. An item's `origin` is `requested`, `saved` (from a bookmark),
+`scheduled` or `breaking`. Scheduled items share a `run_id`. The
 scheduler checks every minute for schedules that are due.
 
 An unfinished item has a `step`: `scrape` → `group` → `summary` →
@@ -149,8 +171,8 @@ The scheduler writes the text and pictures. The capture container, which is
 the only one with a browser, adds the pages. Both fetch only public http(s)
 addresses (`aggregator/safe_fetch.py`), and every redirect and every request
 the page makes is checked. Files live in the `bookmark_data` volume, which
-the API mounts read-only. Each user has a storage limit (Settings › Mobile
-API › Bookmark storage: a default, per-user overrides, blank for unlimited).
+the API mounts read-only. Each user has a storage limit (Settings › API ›
+Bookmark storage: a default, per-user overrides, blank for unlimited).
 A version that would go over the limit stops with status `over_quota`.
 
 ## Not yet

@@ -1,4 +1,4 @@
-"""Mobile API settings, set on Settings › Mobile API in the web app and read
+"""API settings, set on Settings › API in the web app and read
 by the API process. One JSON AppSetting, reread at most every RELOAD_SECONDS
 so a change (turning the API off, a new limit) applies without a restart."""
 import json
@@ -6,6 +6,7 @@ import time
 
 from aggregator.models import AppSetting
 
+# Kept from when this was the "Mobile API", so saved settings carry over.
 KEY = "mobile_api_v1"
 RELOAD_SECONDS = 15
 
@@ -16,6 +17,10 @@ DEFAULTS = {
     # default, like the web app for signed-out visitors: summaries and the
     # publisher's link only.
     "full_text": False,
+    # API keys (Settings › API) for scripts, servers and other apps. Off by
+    # default: only phones paired with a code get in. Off also stops keys
+    # already made from working until it is turned back on.
+    "api_keys": False,
     # The address the phone uses, put into the pairing QR code.
     "public_url": "",
     # Sized for fast scrolling with prefetch: a feed page plus the story
@@ -47,7 +52,7 @@ _cache = {"at": 0.0, "value": None}
 def clean(raw):
     raw = raw if isinstance(raw, dict) else {}
     out = dict(DEFAULTS)
-    for name in ("enabled", "full_text"):
+    for name in ("enabled", "full_text", "api_keys"):
         if isinstance(raw.get(name), bool):
             out[name] = raw[name]
     if isinstance(raw.get("public_url"), str):

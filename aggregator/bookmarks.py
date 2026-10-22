@@ -16,7 +16,7 @@ A version is a directory on disk, BOOKMARK_STORAGE_DIR/<user>/<bookmark>/v<n>/:
 Two jobs fill it: "bookmark_snapshot" (the scheduler's worker: text and
 pictures) and then "bookmark_capture" (the capture container's worker:
 pages, in aggregator/capture.py). Every byte counts against the user's
-storage cap from Settings › Mobile API; a version that would go over it
+storage cap from Settings › API; a version that would go over it
 stops and says so.
 """
 import hashlib

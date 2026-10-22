@@ -1,9 +1,10 @@
-"""Device tokens and pairing codes.
+"""Device tokens, pairing codes and API keys.
 
 A token is "msk_" plus 32 random bytes (url-safe base64). The database holds
 only its SHA-256, compared with hmac.compare_digest. A pairing code is ten
 characters from an unambiguous alphabet, also stored hashed, valid for
-PAIRING_TTL and usable once.
+PAIRING_TTL and usable once. An API key is the same token, created by an
+admin in Settings instead of traded for a code.
 """
 import hashlib
 import hmac
@@ -51,6 +52,21 @@ def create_pairing_code(user, scopes, created_by):
     )
     db.session.add(row)
     return code, row
+
+
+def create_api_key(user, name, scopes, ttl=None):
+    """(plaintext token, ApiDevice) for a key made in Settings: the same kind
+    of token a paired device gets, for a script, a server or another app.
+    `ttl` is a timedelta, or None for a key that never expires. Caller
+    commits."""
+    token = new_token()
+    now = datetime.utcnow()
+    key = ApiDevice(
+        user_id=user.id, name=name.strip()[:80], kind="key", token_hash=_hash(token), scopes=" ".join(scopes),
+        created_at=now, expires_at=now + ttl if ttl else None,
+    )
+    db.session.add(key)
+    return token, key
 
 
 def redeem_pairing_code(code, device_name, ip):
@@ -115,6 +131,11 @@ def require_token(scope="read"):
             if device is None:
                 raise ApiError(401, "unauthorized", "A valid device token is required.",
                                {"WWW-Authenticate": 'Bearer realm="muckscraper"'})
+            if device.kind == "key":
+                from .settings import load
+                if not load()["api_keys"]:
+                    raise ApiError(401, "api_keys_off", "API keys are turned off on this server.",
+                                   {"WWW-Authenticate": 'Bearer realm="muckscraper"'})
             if scope not in device.scope_list:
                 raise ApiError(403, "forbidden", "This device can't do that.")
             g.device = device
