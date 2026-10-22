@@ -1,0 +1,61 @@
+{#- The feed's top bar (Headlines, All Stories, Grouped Stories): the logo and
+    the section name on the left, search in the middle with live results, and
+    the Filters button beside it when the page passes popover content:
+
+        {% from '_feed_topbar.html' import feed_topbar with context %}
+        {% call feed_topbar('International News', url_for(...), q, hidden, filter_count) %}
+            ...popover content...
+        {% endcall %}
+
+    `hidden` is a dict of the query parameters the search form keeps (None
+    values are skipped). Without a call block there is no Filters button.
+    Styles: static/css/feed_header.css. Behaviour: static/js/feed_header.js. -#}
+{% from 'icons.html' import icon, theme_toggle %}
+{% from 'account_menu.html' import account_menu with context %}
+{%- macro feed_topbar(section_title, search_action, q='', hidden={}, filter_count=0) -%}
+<header class="feed-topbar">
+    <div class="ft-left">
+        <a class="ft-logo" href="{{ url_for('public.index') }}">MuckScraper</a>
+        {%- if section_title %}
+        <span class="ft-sep" aria-hidden="true">/</span>
+        <span class="ft-section">{{ section_title }}</span>
+        {%- endif %}
+    </div>
+
+    <div class="ft-center">
+        <form class="ft-search" role="search" method="GET" action="{{ search_action }}"
+              data-suggest-url="{{ url_for('admin.search_suggest') }}"
+              data-range="{{ hidden.get('range') or '' }}">
+            {%- for name, value in hidden.items() if value is not none %}
+            <input type="hidden" name="{{ name }}" value="{{ value }}">
+            {%- endfor %}
+            <label class="visually-hidden" for="feed-search">Search stories, articles and outlets</label>
+            <span class="ft-search-icon">{{ icon('search') }}</span>
+            <input id="feed-search" type="search" name="q" value="{{ q or '' }}"
+                   placeholder="Search stories, articles, outlets" autocomplete="off" spellcheck="false"
+                   role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="feed-suggest">
+            <kbd class="ft-kbd" aria-hidden="true">/</kbd>
+            <div class="ft-suggest" id="feed-suggest" role="listbox" aria-label="Search results" hidden></div>
+        </form>
+
+        {%- if caller is defined %}
+        <div class="ft-filters">
+            <button type="button" class="ft-filter-btn" id="feed-filter-btn" aria-haspopup="dialog"
+                    aria-expanded="false" aria-controls="feed-filters"
+                    aria-label="Filters{% if filter_count %}, {{ filter_count }} active{% endif %}" title="Filters">
+                {{ icon('sliders') }}
+                {%- if filter_count %}<span class="ft-badge" aria-hidden="true">{{ filter_count }}</span>{% endif %}
+            </button>
+            <div class="ft-popover" id="feed-filters" role="dialog" aria-label="Feed filters" hidden>
+                {{ caller() }}
+            </div>
+        </div>
+        {%- endif %}
+    </div>
+
+    <div class="ft-right">
+        {{ theme_toggle() }}
+        {{ account_menu() }}
+    </div>
+</header>
+{%- endmacro -%}

@@ -57,51 +57,71 @@
 
 .sidebar-content::-webkit-scrollbar { display: none; }
 
-.sidebar h2 {
-    font-size: var(--fs-label);
+/* Groups: the story lists, Topics, More (sidebar_nav.html). A heading is a
+   small muted label with room above it and never highlights, so it can't be
+   mistaken for a link; links are inset rounded rows (Philip, 2026-10-22). */
+.nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 12px;
+}
+.nav-group + .nav-group {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nav-heading {
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1.2px;
-    color: var(--sidebar-accent-text);
-    padding: 0 24px 12px 24px;
-    margin-bottom: 8px;
+    color: var(--sidebar-muted);
+    opacity: 0.75;
+    padding: 0 12px 6px;
     white-space: nowrap;
-    transition: opacity 0.2s;
 }
 
-.topic-block {
+.nav-link {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 2px 16px 2px 0;
-    border-left: 4px solid transparent;
-    white-space: nowrap;
-    overflow: hidden;
-    transition: all 0.2s;
-}
-
-.topic-block.active {
-    border-left: 4px solid var(--accent);
-    background: var(--sidebar-active-bg);
-}
-
-.topic-block a {
-    flex: 1;
-    padding: 10px 12px 10px 20px;
+    gap: 12px;
+    min-height: 38px;
+    padding: 0 12px;
+    border-radius: 8px;
     color: var(--sidebar-text);
     text-decoration: none;
     font-size: 14px;
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: background 0.15s, color 0.15s;
 }
-
-.topic-block.active a { color: var(--sidebar-accent-text); }
-.topic-block:hover { background: rgba(255, 255, 255, 0.05); }
-
-.sidebar-divider {
-    border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    margin: 8px 24px;
+.nav-link .icon { width: 17px; height: 17px; flex-shrink: 0; opacity: 0.85; }
+.nav-link:hover { background: rgba(255, 255, 255, 0.07); color: var(--sidebar-hover); }
+.nav-link:focus-visible { outline: 2px solid var(--sidebar-accent-text); outline-offset: -2px; }
+.nav-link.active {
+    background: var(--sidebar-active-bg);
+    color: var(--sidebar-hover);
+    font-weight: 700;
+    box-shadow: inset 3px 0 0 var(--sidebar-accent-text);
 }
+.nav-link.active .icon { opacity: 1; }
+
+/* Topics are a flat list under their heading: a dot instead of an icon,
+   slightly shorter rows. */
+.nav-topic { min-height: 34px; }
+.topic-dot {
+    width: 6px;
+    height: 6px;
+    margin: 0 5px 0 6px;
+    border-radius: 50%;
+    background: var(--sidebar-muted);
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+.nav-topic.active .topic-dot { background: var(--sidebar-accent-text); opacity: 1; }
 
 .sidebar-footer {
     margin-top: auto;
