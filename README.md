@@ -259,9 +259,9 @@ MuckScraper can be extended with personal workflow hooks, such as n8n webhooks f
 
 An optional, read-only [MCP](https://modelcontextprotocol.io) server lets an AI assistant (Claude, or a local agent on your own Ollama) check on the install: whether a run is in progress, how the last run went, whether Ollama is asleep or broken, what is in an edition, and the documented fix for a symptom. It cannot change anything. Set `MCP_TOKEN` in `.env` and start it with `docker compose --profile mcp up -d --build mcp docker-restart-proxy`. See [docs/MCP.md](docs/MCP.md) for the tools, setup and client examples.
 
-### Mobile API (optional)
+### API (optional)
 
-A JSON API for the MuckScroller iPhone app runs as its own container with only `/api/v1` routes, so it can sit behind a tunnel while the web app and admin stay on your network. Start it with `docker compose --profile api up -d api` and pair phones with one-time codes in Settings › Mobile API. See [docs/API.md](docs/API.md).
+A JSON API runs as its own container with only `/api/v1` routes, so it can sit behind a tunnel while the web app and admin stay on your network. The MuckScroller iPhone app uses it, and so can anything else. Start it with `docker compose --profile api up -d api`, then pair phones with one-time codes, or turn on API keys for scripts and other apps, in Settings › API. See [docs/API.md](docs/API.md).
 
 ---
 

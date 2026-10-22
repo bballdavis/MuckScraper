@@ -4,7 +4,7 @@ NewsBox, and edit or run the user's scheduled summaries (aggregator/newsbox.py).
 Nothing here runs a model in the request. A summary is queued as a job for
 the scheduler container's worker; the response says whether the story is
 ready or pending. Queueing needs the "summarize" scope and counts against
-the per-user daily limits in Settings › Mobile API.
+the per-user daily limits in Settings › API.
 """
 from datetime import datetime
 
@@ -39,13 +39,13 @@ def _own_item(story_id):
 def summarize_story(story_id):
     """Send a story to the user's NewsBox: 200 when it is already summarized
     (ready to read), 202 when a summary has been queued (pending)."""
-    body = json_body(depth=enum(*newsbox.DEPTHS), origin=enum("swiped", "saved"))
+    body = json_body(depth=enum(*newsbox.DEPTHS), origin=enum("requested", "saved"))
     story = Story.query.options(*_story_load()).get(story_id)
     if story is None:
         raise ApiError(404, "not_found", "Not found.")
     if NewsBoxItem.query.filter_by(user_id=g.user.id, story_id=story_id).first() is None:
         check_summaries(g.user)
-    item, _ = newsbox.queue_story(g.user.id, story, body["origin"] or "swiped", body["depth"] or "summary")
+    item, _ = newsbox.queue_story(g.user.id, story, body["origin"] or "requested", body["depth"] or "summary")
     db.session.commit()
     return jsonify(ser.newsbox_item(item)), 200 if item.state == "ready" else 202
 

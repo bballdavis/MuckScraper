@@ -27,7 +27,9 @@ JOB_KIND = "newsbox_summary"
 # Below the pipeline and the admin AI tasks (priority 10), above bulk actions.
 JOB_PRIORITY = 5
 
-ORIGINS = ("swiped", "saved", "auto", "breaking")
+# How an item got into NewsBox: a client asked for it, a bookmark saved it,
+# the user's schedule picked it, or it came from the Breaking News bar.
+ORIGINS = ("requested", "saved", "scheduled", "breaking")
 # What an unfinished item is waiting on, in order. A Breaking headline sent
 # from the app starts at "scrape" (aggregator/breaking.py); a story starts
 # at "summary" or "analysis".
@@ -39,9 +41,9 @@ STATES = ("pending", "in_progress", "ready", "failed")
 UNFINISHED = ("pending", "in_progress")
 
 HEADLINES = "Headlines"
-HEADLINES_PAGE = 20
-MAX_HEADLINE_PAGES = 5
-MAX_SECTION_TOP = 20
+# Every section's `amount` is a number of stories: the top N of the latest
+# edition for Headlines, the N most-covered in the last day for a topic.
+MAX_SECTION_STORIES = 100
 MAX_RUN_TIMES = 6
 MAX_SECTIONS = 30
 # The most stories one scheduled run adds, whatever the sections ask for.
@@ -349,9 +351,8 @@ def clean_schedule(raw):
         if not isinstance(name, str) or not 1 <= len(name.strip()) <= 80 or name in names:
             raise ScheduleError("Each section needs its own name of 1 to 80 characters.")
         names.add(name)
-        high = MAX_HEADLINE_PAGES if name == HEADLINES else MAX_SECTION_TOP
         out["sections"].append({"section": name, "is_enabled": _flag(rule, "is_enabled", True),
-                                "amount": _whole(rule.get("amount", 1), 1, high, f"{name} amount")})
+                                "amount": _whole(rule.get("amount", 1), 1, MAX_SECTION_STORIES, f"{name} amount")})
     return out
 
 
@@ -415,8 +416,8 @@ def _candidates(rule, now):
         if edition is None:
             return [], 0
         rows = (EditionStory.query.filter_by(edition_id=edition.id).order_by(EditionStory.rank)
-                .limit(rule["amount"] * HEADLINES_PAGE * 2).all())
-        return [r.story for r in rows if r.story is not None], rule["amount"] * HEADLINES_PAGE
+                .limit(rule["amount"] * 2).all())
+        return [r.story for r in rows if r.story is not None], rule["amount"]
     topic = Topic.query.filter(func.lower(Topic.name) == rule["section"].lower()).first()
     if topic is None:
         return [], 0
@@ -457,7 +458,7 @@ def run_schedule(user_id, settings, now=None):
     run_id = f"run-{user_id}-{now:%Y%m%d%H%M%S}"
     stories = pick_stories(user_id, settings, now)
     for story in stories:
-        queue_story(user_id, story, "auto", settings["depth"], run_id=run_id)
+        queue_story(user_id, story, "scheduled", settings["depth"], run_id=run_id)
     db.session.commit()
     return run_id, len(stories)
 
