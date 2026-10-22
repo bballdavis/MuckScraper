@@ -1,6 +1,19 @@
 {# One back link per page, upper left of the top bar (Regis, 2026-10-06).
    "Back to Feed" uses feed_back_url(): the list the reader came from, else Headlines.
    Import with: {% from 'breadcrumb.html' import back_link %} #}
+{% from 'icons.html' import icon %}
 {% macro back_link(href, label) -%}
 <a class="crumb" href="{{ href }}">&larr; {{ label }}</a>
+{%- endmacro %}
+
+{#- The floating back button beside the story and article cards (Philip,
+    2026-10-22): it returns to the previous page when the reader came from
+    this site, else follows `href` (the feed or the story, named by `label`
+    for screen readers); the tooltip says "Back to previous page". Must be the first child of the page's .container.
+    Styles: theme.css .back-rail. -#}
+{% macro float_back(href, label) -%}
+<div class="back-rail">
+    <a class="float-back" href="{{ href }}" aria-label="{{ label }}" data-tip="Back to previous page"
+       onclick="if (document.referrer.indexOf(location.origin + '/') === 0 &amp;&amp; history.length > 1) { history.back(); return false; }">{{ icon('arrow-left') }}</a>
+</div>
 {%- endmacro %}
