@@ -129,6 +129,9 @@ class Article(db.Model):
     __table_args__ = (
         db.Index("ix_articles_url",        "url"),
         db.Index("ix_articles_date",       "date"),
+        # Every run's "what came in recently" queries (quality report, copy
+        # detector, opinion linker, scrape blocklist) filter on fetched_at.
+        db.Index("ix_articles_fetched_at", "fetched_at"),
         db.Index("ix_articles_outlet_id",  "outlet_id"),
         db.Index("ix_articles_story_id",   "story_id"),
         db.Index("ix_articles_bias_score", "bias_score"),
