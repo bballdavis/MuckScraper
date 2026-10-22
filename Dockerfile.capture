@@ -1,0 +1,18 @@
+# The capture container (aggregator/capture.py): the app's code plus a
+# headless Chromium, for PDFs and screenshots of saved articles' pages. Kept
+# apart from the main image so the app, scheduler and API stay browser-free.
+FROM mcr.microsoft.com/playwright/python:v1.48.0-jammy
+
+WORKDIR /app
+
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt playwright==1.48.0
+
+COPY aggregator ./aggregator
+COPY news_fetcher ./news_fetcher
+
+# The image's browsers run as the unprivileged pwuser.
+RUN mkdir -p /data/bookmarks && chown -R pwuser /data/bookmarks
+USER pwuser
+
+CMD ["python", "-m", "aggregator.capture"]

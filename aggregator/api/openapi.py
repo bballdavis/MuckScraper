@@ -91,7 +91,24 @@ SCHEMAS = {
                     "description": "Pages of 20 for Headlines (1-5), top N for a topic"})},
         depth={"type": "string", "enum": ["summary", "summary_analysis"]}, skip_already_summarized=_B,
         minimum_sources=_NI, notify_when_done=_B, next_run_at=_NDT, last_run_at=_NDT),
+    "BookmarkVersion": _obj(
+        ["version", "status", "captures", "size_bytes", "asset_count", "created_at", "finished_at", "error"],
+        version=_I, status={"type": "string", "enum": ["pending", "building", "ready", "failed", "over_quota"]},
+        captures={"type": "string", "enum": ["pending", "running", "done", "partial", "unavailable", "failed", "over_quota"]},
+        size_bytes=_I, asset_count=_I, created_at=_DT, finished_at=_NDT, error=_NS),
+    "TimeCapsule": {"type": "object", "description": (
+        "One saved version (format muckscraper-time-capsule v1): story (StoryDetail plus image), articles "
+        "(ArticleDetail with full content_html, bias scores and image), opinion (columns with their text), "
+        "captures (page PDF and screenshot per article), and assets (each saved file: source_url, content_type, "
+        "bytes, kind). Every file is referenced as assets/<name>."),
+        "required": ["format", "format_version", "version", "captured_at", "story", "articles", "opinion",
+                     "captures", "assets"]},
 }
+SCHEMAS["Bookmark"] = _obj(
+    ["id", "story_id", "title", "story", "saved_at", "latest", "version_count", "size_bytes"],
+    id=_I, story_id=_NI, title=_S, story={"oneOf": [_ref("StorySummary"), {"type": "null"}]}, saved_at=_DT,
+    latest={"oneOf": [_ref("BookmarkVersion"), {"type": "null"}]}, version_count=_I, size_bytes=_I,
+    versions={"type": "array", "items": _ref("BookmarkVersion")})
 SCHEMAS["Edition"] = {"allOf": [_ref("EditionBrief"), _obj(["stories"], stories={"type": "array", "items": _ref("StorySummary")})]}
 SCHEMAS["StoryDetail"] = {"allOf": [_ref("StorySummary"), _obj(
     ["title", "topics", "created_at", "summary", "deep_report", "opinion_roundup", "articles", "copies_hidden", "opinion"],
@@ -200,6 +217,30 @@ PATHS = {
                 "requestBody": {"required": True, "content": {"application/json": {"schema": _ref("Schedule")}}},
                 "responses": {"200": _json(_ref("Schedule")), **_ERRORS}},
     },
+    "/me/bookmarks": {
+        **_get("bookmarks", _json(_obj(["items", "used_bytes", "quota_bytes"], items={"type": "array", "items": _ref("Bookmark")},
+                                       used_bytes=_I, quota_bytes=_NI))),
+        "post": {"operationId": "saveBookmark", "description": "Needs the summarize scope. Saves a new version.",
+                 "requestBody": {"required": True, "content": {"application/json": {"schema": _obj(["story_id"], story_id=_I)}}},
+                 "responses": {"202": _json(_ref("Bookmark"), "Version being written"), **_ERRORS, **_NOT_FOUND}},
+    },
+    "/me/bookmarks/{bookmark_id}": {
+        **_get("bookmark", _json(_ref("Bookmark")), [_path_id("bookmark_id")], _NOT_FOUND),
+        "delete": {"operationId": "deleteBookmark", "parameters": [_path_id("bookmark_id")],
+                   "responses": {"204": {"description": "Deleted with its files"}, **_ERRORS, **_NOT_FOUND}},
+    },
+    "/me/bookmarks/{bookmark_id}/versions": {"post": {
+        "operationId": "captureAgain", "description": "Needs the summarize scope.", "parameters": [_path_id("bookmark_id")],
+        "responses": {"202": _json(_ref("Bookmark"), "Version being written"), **_ERRORS, **_NOT_FOUND}}},
+    "/me/bookmarks/{bookmark_id}/versions/{version}": _get(
+        "bookmarkVersion", _json(_ref("TimeCapsule")), [_path_id("bookmark_id"), _path_id("version")], _NOT_FOUND),
+    "/me/bookmarks/{bookmark_id}/versions/{version}/assets/{name}": _get(
+        "bookmarkAsset", {"description": "The file", "content": {"application/octet-stream": {}}},
+        [_path_id("bookmark_id"), _path_id("version"), {"name": "name", "in": "path", "required": True, "schema": _S}],
+        _NOT_FOUND),
+    "/me/bookmarks/{bookmark_id}/export": _get(
+        "exportBookmark", {"description": "Every ready version as a zip", "content": {"application/zip": {}}},
+        [_path_id("bookmark_id")], _NOT_FOUND),
     "/me/schedules/run": {"post": {
         "operationId": "runSchedule", "description": "Needs the summarize scope. Runs the schedule once, now.",
         "responses": {"202": _json(_obj(["run_id", "added"], run_id=_S, added=_I), "Run queued"), **_ERRORS}}},

@@ -29,9 +29,17 @@ DEFAULTS = {
     "summaries_per_user_per_day": 100,
     # "Run now" on the app's Scheduled page, per user per day.
     "schedule_runs_per_user_per_day": 10,
+    # Bookmark snapshots (saves and "capture again") per user per day.
+    "bookmark_snapshots_per_user_per_day": 30,
+    # Bookmark storage per user, in MB (aggregator/bookmarks.py). None is
+    # unlimited. Overrides map a user id to MB, 0 meaning unlimited.
+    "bookmark_quota_mb": None,
+    "bookmark_quota_overrides": {},
 }
 LIMIT_FIELDS = ("per_device_per_minute", "per_ip_per_minute", "pair_per_ip_per_hour",
-                "summaries_per_user_per_day", "schedule_runs_per_user_per_day")
+                "summaries_per_user_per_day", "schedule_runs_per_user_per_day",
+                "bookmark_snapshots_per_user_per_day")
+MAX_QUOTA_MB = 1_000_000
 
 _cache = {"at": 0.0, "value": None}
 
@@ -48,6 +56,15 @@ def clean(raw):
         value = raw.get(name)
         if isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= 100000:
             out[name] = value
+    quota = raw.get("bookmark_quota_mb")
+    if isinstance(quota, int) and not isinstance(quota, bool) and 1 <= quota <= MAX_QUOTA_MB:
+        out["bookmark_quota_mb"] = quota
+    overrides = raw.get("bookmark_quota_overrides")
+    if isinstance(overrides, dict):
+        out["bookmark_quota_overrides"] = {
+            str(user_id): mb for user_id, mb in overrides.items()
+            if str(user_id).isdigit() and isinstance(mb, int) and not isinstance(mb, bool) and 0 <= mb <= MAX_QUOTA_MB
+        }
     return out
 
 
