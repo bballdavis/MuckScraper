@@ -760,7 +760,7 @@ class ReadItem(db.Model):
     """A story or an article one user marked read (aggregator/reads.py):
     from the reading-glasses button on Headlines, the story and article
     pages, or a swipe in the app (/api/v1/me/read). Read stories drop out of
-    that user's Headlines; Recently read lists both kinds, newest first.
+    that user's Headlines; Recently Read lists both kinds, newest first.
     Exactly one of story_id and article_id is set."""
     __tablename__ = "read_items"
     __table_args__ = (

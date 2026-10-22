@@ -11,8 +11,11 @@
     this site, else follows `href` (the feed or the story, named by `label`
     for screen readers); the tooltip says "Back to previous page". Must be the first child of the page's .container.
     Styles: theme.css .back-rail. -#}
-{% macro float_back(href, label) -%}
+{#- `below` is markup for another round button under the back button, such
+    as the story and article pages' read toggle (read_toggle.html). -#}
+{% macro float_back(href, label, below='') -%}
 <div class="back-rail">
+    {{ below }}
     <a class="float-back" href="{{ href }}" aria-label="{{ label }}" data-tip="Back to previous page"
        onclick="if (document.referrer.indexOf(location.origin + '/') === 0 &amp;&amp; history.length > 1) { history.back(); return false; }">{{ icon('arrow-left') }}</a>
 </div>

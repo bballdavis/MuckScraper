@@ -55,7 +55,7 @@ def headlines_feed():
     """
     per_page = 10
     page = max(1, request.args.get("page", 1, type=int) or 1)
-    # Stories the reader marked read drop out (reads.py); Recently read
+    # Stories the reader marked read drop out (reads.py); Recently Read
     # lists them.
     read_story_ids = reads.read_ids(current_user.id, "story") if current_user.is_authenticated else set()
 

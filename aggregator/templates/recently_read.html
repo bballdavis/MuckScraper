@@ -5,14 +5,14 @@
 {#- Everything the reader marked read (aggregator/reads.py), stories and
     articles together, newest first. Mark unread takes a row off with Undo
     (static/js/reads.js); a story comes back to Headlines. -#}
-{% block title %}Recently read{% endblock %}
-{% block section %}Recently read{% endblock %}
+{% block title %}Recently Read{% endblock %}
+{% block section %}Recently Read{% endblock %}
 {% block nav %}read{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/reads.css') }}">{% endblock %}
 {% block body %}
 <div class="app-main narrow">
     <div class="page-head">
-        <h1>Recently read</h1>
+        <h1>Recently Read</h1>
         <p>Stories and articles you marked read, newest first. Read stories are hidden from Headlines; mark one unread to bring it back. The MuckScroller app shares this list.</p>
     </div>
 
