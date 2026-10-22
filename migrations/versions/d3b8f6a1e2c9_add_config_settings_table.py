@@ -2,7 +2,7 @@
 Settings, overriding the environment.
 
 Revision ID: d3b8f6a1e2c9
-Revises: c7f2a9e4d6b8
+Revises: a8d3e6f1c2b7
 Create Date: 2026-10-22
 
 API keys are stored only Fernet-encrypted (aggregator/secret_box.py), in
@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = 'd3b8f6a1e2c9'
-down_revision = 'c7f2a9e4d6b8'
+down_revision = 'a8d3e6f1c2b7'
 branch_labels = None
 depends_on = None
 
