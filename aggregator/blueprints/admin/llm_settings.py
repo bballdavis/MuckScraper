@@ -34,6 +34,13 @@ PROVIDER_LABELS = {
 # Which tier each kind of pipeline work uses. Mirrors the generate_text()
 # call sites: the high-volume label/yes-no calls are fast, anything a reader
 # sees as prose is main (see the TIER_* comments in llm_client.py).
+# What each role chip does, shown as its tooltip.
+ROLE_HINTS = {
+    "main": "Main model: summaries, deep reports, headlines",
+    "fast": "Fast model: topic labels, story grouping checks, bias scoring",
+    "embeddings": "Embeddings: the vectors story grouping matches on",
+}
+
 TASK_ROUTES = [
     ("Article and story summaries", "quality"),
     ("Deep reports and article analysis", "quality"),
@@ -68,6 +75,18 @@ def _provider_rows(states):
         if name == embedding:
             roles.append("Embeddings")
         return roles
+
+    def role_toggles(name):
+        """The Main / Fast / Embeddings chips on a provider's header: which
+        it holds, and whether it has the config to take the others."""
+        toggles = [
+            {"key": "main", "label": "Main", "active": name == quality, "ready": llm.provider_configured(name)},
+            {"key": "fast", "label": "Fast", "active": name == fast, "ready": llm.provider_configured(name)},
+        ]
+        if name in llm.EMBEDDING_PROVIDERS:
+            toggles.append({"key": "embeddings", "label": "Embeddings", "active": name == embedding,
+                            "ready": llm.embedding_configured(name)})
+        return toggles
 
     rows = []
 
@@ -122,7 +141,7 @@ def _provider_rows(states):
         "configured": bool(llm.LMSTUDIO_HOST and (llm.LMSTUDIO_MODEL or llm.LMSTUDIO_EMBEDDING_MODEL)),
         "facts": [],
         "env": "LMSTUDIO_HOST, LMSTUDIO_MODEL, LMSTUDIO_EMBEDDING_MODEL",
-        "about": "A local LM Studio server (Developer › Start server). It can take the embeddings while another provider writes the text. The embedding model must return 768 numbers, e.g. text-embedding-nomic-embed-text-v1.5.",
+        "about": "A local LM Studio server (Developer › Start server). It can take the embeddings while another provider writes the text. The embedding model must return 768 numbers, e.g. google/embedding-gemma-300m or text-embedding-nomic-embed-text-v1.5.",
     })
     for key in llm.OPENAI_COMPATIBLE_PROVIDERS:
         if key == "lmstudio":
@@ -143,6 +162,7 @@ def _provider_rows(states):
         })
 
     for row in rows:
+        row["toggles"] = role_toggles(row["key"])
         row["fields"] = [
             {"name": name, "label": label, "kind": kind, **states[name]}
             for name, label, kind in config_store.PROVIDER_FIELDS[row["key"]]
@@ -192,6 +212,7 @@ def llm_providers_page():
         embedding_model=llm.embedding_model_name(),
         key_source=secret_box.key_source(),
         provider_labels=PROVIDER_LABELS,
+        role_hints=ROLE_HINTS,
         tiers=tiers,
         routes=routes,
         embedding_provider=llm.EMBEDDING_PROVIDER,
@@ -252,6 +273,33 @@ def save_llm_routing():
     if _save_all(values):
         flash("Routing saved. The scheduler picks it up within a minute.", "success")
     return redirect(url_for("admin.llm_providers_page"))
+
+
+@admin.route("/settings/llm/assign", methods=["POST"])
+@role_required(ROLE_ADMIN)
+def assign_llm_role():
+    """One role chip on a provider's header: make that provider the main,
+    fast or embeddings provider. Picking the main provider for Fast saves
+    "main", so the fast tier follows the main one again."""
+    from news_fetcher import llm_client as llm
+
+    role = request.form.get("role", "")
+    provider = request.form.get("provider", "").strip().lower()
+    if role == "embeddings":
+        values = {"EMBEDDING_PROVIDER": (provider, "embedding_provider")}
+    elif role == "fast":
+        values = {"LLM_FAST_PROVIDER": ("main" if provider == llm.LLM_PROVIDER else provider, "provider")}
+    elif role == "main":
+        values = {"LLM_PROVIDER": (provider, "provider")}
+    else:
+        flash("Unknown role.", "error")
+        return redirect(url_for("admin.llm_providers_page"))
+    if not provider:
+        flash("Pick a provider.", "error")
+    elif _save_all(values):
+        label = {"main": "main model", "fast": "fast model", "embeddings": "embeddings"}[role]
+        flash(f"{PROVIDER_LABELS.get(provider, provider)} now serves the {label}. The scheduler picks it up within a minute.", "success")
+    return redirect(url_for("admin.llm_providers_page") + f"#provider-{provider}")
 
 
 def save_fields_form(fields):
