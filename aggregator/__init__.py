@@ -95,6 +95,11 @@ def create_app():
     app.register_blueprint(admin,  url_prefix='/admin')
     app.register_blueprint(auth,   url_prefix='/auth')
 
+    # Provider keys and models saved in Settings › LLM providers override
+    # the environment in this process (app, scheduler and scripts alike).
+    from aggregator import config_store
+    config_store.install()
+
     return app
 
 
