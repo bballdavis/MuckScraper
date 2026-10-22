@@ -132,7 +132,7 @@ def article_detail(article, full_text=False):
     out.update({
         "topics": [t.name for t in article.topics],
         "analysis": _paragraphs(article.deep_analysis),
-        # Scraped text only when Settings › Mobile API allows it.
+        # Scraped text only when Settings › API allows it.
         "content_html": sanitize_html(article.content) if full_text and article.content else None,
     })
     return out
@@ -231,6 +231,7 @@ def device(d):
     return {
         "id": d.id,
         "name": d.name,
+        "kind": d.kind or "device",
         "scopes": d.scope_list,
         "created_at": iso(d.created_at),
         "expires_at": iso(d.expires_at),
@@ -279,7 +280,7 @@ def newsbox_item(item):
         "step": item.step if unfinished else None,
         "progress": STEP_PROGRESS.get(item.step) if unfinished else None,
         "is_unread": bool(item.is_unread),
-        "auto_run_id": item.run_id,
+        "run_id": item.run_id,
         "added_at": iso(item.added_at),
         "ready_at": iso(item.ready_at),
         "error": item.error if item.state == "failed" else None,

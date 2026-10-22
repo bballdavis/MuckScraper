@@ -1,4 +1,4 @@
-"""The Mobile API's own Flask app: only the /api/v1 blueprint, for the `api`
+"""The API's own Flask app: only the /api/v1 blueprint, for the `api`
 container (docker compose --profile api). It never registers the web
 pages, admin or login, so exposing it to the internet exposes nothing else.
 
