@@ -7,6 +7,16 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **Mobile API** for the MuckScroller iPhone app (docs/API.md): JSON under
+  `/api/v1` served by its own app and container (`docker compose --profile
+  api up -d api`), which has no web, admin or login routes. Devices pair with
+  one-time codes (QR) from the new **Settings › Mobile API** page and get
+  hashed, revocable bearer tokens. Read endpoints for editions, stories,
+  articles, opinion, topics and search, plus the user's feed preferences;
+  Postgres-backed rate limits, strict parameter validation, whitelisted
+  serializers, security headers, ETags and an OpenAPI spec. Scraped article
+  text is off unless allowed on the settings page. New tables in migration
+  `e4c9a2f7b3d1`.
 - **Anthropic as an LLM provider.** `LLM_PROVIDER=anthropic` (or
   `LLM_FAST_PROVIDER=anthropic`) sends generation to Anthropic's Messages API,
   configured with `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, optional
