@@ -4,6 +4,7 @@
     write-only: the page only ever shows a saved key's last four characters. -#}
 {% extends 'settings_base.html' %}
 {% from '_config_fields.html' import config_field, config_field_styles %}
+{% from 'icons.html' import icon %}
 {% block title %}LLM providers{% endblock %}
 {% block settings_key %}llm{% endblock %}
 {% block settings_body %}
@@ -79,6 +80,7 @@
     <details class="row provider" id="provider-{{ p.key }}"{% if p.roles %} open{% endif %}>
         <summary>
             <span class="provider-name">
+                <span class="provider-chevron">{{ icon('chevron-down') }}</span>
                 <span class="row-label">{{ p.name }}</span>
                 {%- if p.is_new %}<span class="chip chip-new">NEW</span>{% endif %}
                 {%- for role in p.roles %}<span class="chip">{{ role }}</span>{% endfor %}
@@ -106,7 +108,7 @@
             </dl>
             {%- endif %}
             <div class="provider-actions">
-                <span class="muted">Leave a field blank to use the environment value shown.</span>
+                <span class="muted">Clear a field to go back to the environment value.</span>
                 <button type="submit" class="btn">Save {{ p.name }}</button>
             </div>
         </form>
@@ -150,7 +152,14 @@
 {% block styles %}
 <style>
     details.provider { display: block; padding: 0; }
-    details.provider summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 10px 16px; cursor: pointer; list-style: none; }
+    /* Each provider is a collapsible section: a chevron that turns when it
+       opens, and an open section's header stays tinted above its fields. */
+    details.provider summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 10px 16px; cursor: pointer; list-style: none; user-select: none; }
+    details.provider[open] > summary { background: var(--btn-muted-bg); border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    details.provider summary:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -2px; }
+    .provider-chevron { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-muted); transition: transform 0.15s; transform: rotate(-90deg); }
+    .provider-chevron .icon { width: 14px; height: 14px; }
+    details.provider[open] .provider-chevron { transform: rotate(0deg); color: var(--accent-text); }
     details.provider summary::-webkit-details-marker { display: none; }
     details.provider summary:hover { background: var(--btn-muted-bg); }
     .provider-name { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

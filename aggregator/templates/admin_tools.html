@@ -102,10 +102,10 @@
             <div class="container-facts">
                 <span class="chip {{ {'ok': 'chip-safe', 'warn': 'chip-broad', 'bad': 'chip-danger'}[c.level] }}">{{ c.state }}</span>
                 {%- if c.since %}<span class="container-fact">{{ c.since }}</span>{% endif %}
-                <span class="container-fact{% if c.restart_count %} is-warn{% endif %}">{{ c.restart_count or 0 }} restart{{ '' if c.restart_count == 1 else 's' }}</span>
                 {%- if c.oom_killed %}<span class="chip chip-danger" title="The kernel killed it for running out of memory">Out of memory</span>{% endif %}
                 {%- if c.health_failing_streak %}<span class="container-fact is-bad">{{ c.health_failing_streak }} failed check{{ '' if c.health_failing_streak == 1 else 's' }}</span>{% endif %}
             </div>
+            <span class="container-restarts{% if c.restart_count %} is-warn{% endif %}">{{ c.restart_count or 0 }} restart{{ '' if c.restart_count == 1 else 's' }}</span>
             <form method="POST" action="{{ url_for('admin.restart_container', name=c.service) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-quiet btn-square" aria-label="Restart {{ c.service }}" title="Restart {{ c.service }}">{{ icon('rotate-cw') }}</button>

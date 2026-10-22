@@ -179,16 +179,17 @@
 /* Overview › Containers: one per row, the restart button at the right edge,
    in line with Restart all in the panel head. */
 .container-list { list-style: none; }
-.container-row { display: grid; grid-template-columns: 8px minmax(110px, 180px) 1fr auto; align-items: center; gap: 4px 14px; padding: 9px 16px; border-top: 1px solid var(--border); font-size: 14px; }
+.container-row { display: grid; grid-template-columns: 8px minmax(110px, 180px) 1fr auto auto; align-items: center; gap: 4px 14px; padding: 9px 16px; border-top: 1px solid var(--border); font-size: 14px; }
 .container-row:first-child { border-top: 0; }
 .container-row form { display: flex; }
 .container-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 13px; color: var(--text-muted); }
-.container-fact.is-warn { color: var(--risk-broad-text); }
+.container-fact.is-warn, .container-restarts.is-warn { color: var(--risk-broad-text); }
+.container-restarts { font-size: 13px; color: var(--text-muted); white-space: nowrap; text-align: right; }
 .container-fact.is-bad { color: var(--risk-danger-text); }
 .container-note { grid-column: 2 / -1; font-size: 12px; color: var(--risk-danger-text); white-space: pre-wrap; word-break: break-word; }
 @media (max-width: 600px) {
-    .container-row { grid-template-columns: 8px 1fr auto; }
-    .container-facts { grid-column: 2 / 3; grid-row: 2; }
+    .container-row { grid-template-columns: 8px 1fr auto auto; }
+    .container-facts { grid-column: 2 / -1; grid-row: 2; }
 }
 
 /* Phones: the jobs list keeps name and button; impact moves under the name. */
