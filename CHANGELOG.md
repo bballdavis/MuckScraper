@@ -34,14 +34,24 @@ All notable changes to MuckScraper are documented here.
 - **Clearer sidebar.** Links are full-width rows with icons and a clear
   active state, grouped under small muted headings (Topics, More) that no
   longer look like links.
-
-### Changed
 - **One slim image for the app, scheduler and MCP server.** The three
   Dockerfiles are now one, without Playwright, Chromium and the ~25 X11/GTK
   libraries it needed: nothing has driven a headless browser since 1.0.1.
   Images are several hundred MB smaller and builds much faster. Pillow,
   python-dotenv and pytest (never imported by the app) are gone from
   `requirements.txt`.
+- **Search runs in Postgres; Meilisearch is gone.** Stories and articles get a
+  generated `search_vector` column with a GIN index, plus `pg_trgm` indexes on
+  titles and headlines. Search is always current (no sync step after a run,
+  no Reindex Search button, no 80-minute rebuild), the time window is exact
+  rather than approximate, the last word of a query matches as a prefix
+  ("ukra" finds Ukraine) and misspelled titles still match. Quoted phrases,
+  `OR` and `-word` work as on a web search engine. One container, one data
+  copy and the `MEILI_*` settings fewer. **Upgrading:** `./install.sh` runs
+  the migration (a minute or two on a large database, with the app waiting
+  on it) and removes the old Meilisearch container; `./meili_data` can then
+  be deleted, and `MEILI_URL`/`MEILI_MASTER_KEY` removed from `.env`. The
+  MCP `search_health` tool now checks the search indexes exist.
 - **`docker-compose.yml`:** the app and scheduler share one environment block
   (`x-app-env`), so a new setting is added once. The scheduler waits for a
   Postgres health check instead of a fixed 15-second sleep.
