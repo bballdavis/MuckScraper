@@ -184,6 +184,13 @@ All notable changes to MuckScraper are documented here.
   segmented choices, chips and a switch.
 
 ### Fixed
+- **Headlines card actions on one row.** "Coverage & Analysis" and the
+  summary and analysis indicators sit on one row, all 40px tall, with icons
+  filling about half the height; the story list rail's icons fill about half its
+  width. Stylesheet and script URLs now carry the file's
+  modified time (`?v=`), so browsers pick up new CSS after a deploy instead
+  of a cached copy (the stale copy had wrapped the indicators onto rows of
+  their own).
 - **Scrape blocklist:** "Run Scrape Audit Now" and "Unblock" posted to
   `/audit-scrapes` and `/unblock-domain` instead of their `/admin/...`
   routes, so both returned 404.
