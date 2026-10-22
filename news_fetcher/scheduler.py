@@ -921,6 +921,18 @@ def run_all_fetches(run_full_pipeline=True):
             logging.error(f"Error fetching Op/Ed RSS feeds: {e}")
             run_metrics["oped_rss"] = {"status": "error", "reason": str(e)}
 
+        # Cards with no article image fall back to another article's
+        # image, then the outlet's logo (news_fetcher/outlet_logos.py). Every
+        # run, not only full ones, so new outlets get a logo within the hour.
+        logging.info("--- Filling missing card images ---")
+        try:
+            run_metrics["steps"]["card_images"] = refresh_card_images()
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error filling missing card images: {e}")
+            run_metrics["status"] = "partial_error"
+            run_metrics["steps"]["card_images"] = {"status": "error", "reason": str(e)}
+
         if run_full_pipeline:
             # Run Bias Checker ONCE after all fetches
             logging.info("--- Retrying unrated outlets (Bias Checker) ---")
@@ -1014,17 +1026,6 @@ def run_all_fetches(run_full_pipeline=True):
                 logging.error(f"Error marking copied articles: {e}")
                 run_metrics["status"] = "partial_error"
                 run_metrics["steps"]["article_copies"] = {"status": "error", "reason": str(e)}
-
-            # Cards with no article image fall back to another article's
-            # image, then the outlet's logo (news_fetcher/outlet_logos.py).
-            logging.info("--- Filling missing card images ---")
-            try:
-                run_metrics["steps"]["card_images"] = refresh_card_images()
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error filling missing card images: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["steps"]["card_images"] = {"status": "error", "reason": str(e)}
 
             logging.info("--- Generating headlines ---")
             try:
