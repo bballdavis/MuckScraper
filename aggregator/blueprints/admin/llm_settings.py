@@ -256,12 +256,18 @@ def save_llm_routing():
 
 def save_fields_form(fields):
     """Save a form of config_field()s (templates/_config_fields.html).
-    Non-key fields are saved as typed (blank goes back to the environment).
-    A key field left blank keeps the saved key; its Remove checkbox deletes
-    it. Returns True when everything saved."""
+    Non-key fields are saved as typed (blank goes back to the environment);
+    one that wasn't saved and still shows its environment or default value
+    is left alone, so it keeps following the environment. A key field left
+    blank keeps the saved key; its Remove checkbox deletes it. Returns True
+    when everything saved."""
+    states = config_store.field_states()
     values = {}
     for name, _, kind in fields:
         value = request.form.get(name, "").strip()
+        state = states.get(name, {})
+        if kind != "secret" and state.get("source") != "saved" and value in (state.get("env"), state.get("default")):
+            continue
         if kind == "secret":
             if request.form.get(f"clear_{name}"):
                 value = ""
