@@ -1,0 +1,58 @@
+{% extends '_app_page.html' %}
+{% from 'icons.html' import icon %}
+{% from 'story_card_macros.html' import bias_tag with context %}
+{% from 'pagination.html' import pager %}
+{#- Everything the reader marked read (aggregator/reads.py), stories and
+    articles together, newest first. Mark unread takes a row off with Undo
+    (static/js/reads.js); a story comes back to Headlines. -#}
+{% block title %}Recently read{% endblock %}
+{% block section %}Recently read{% endblock %}
+{% block nav %}read{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/reads.css') }}">{% endblock %}
+{% block body %}
+<div class="app-main narrow">
+    <div class="page-head">
+        <h1>Recently read</h1>
+        <p>Stories and articles you marked read, newest first. Read stories are hidden from Headlines; mark one unread to bring it back. The MuckScroller app shares this list.</p>
+    </div>
+
+    <div class="panel">
+        {% if items %}
+        <ul class="rr-list">
+            {% for item in items %}
+            {%- set kind = 'story' if item.story_id else 'article' %}
+            {%- set target = item.story if item.story_id else item.article %}
+            <li class="rr-row" data-kind="{{ kind }}" data-id="{{ item.story_id or item.article_id }}">
+                <div class="rr-main">
+                    {% if kind == 'story' %}
+                    <a class="rr-title" href="{{ url_for('public.view_story', story_id=target.id) }}">{{ target.display_headline }}</a>
+                    {% else %}
+                    <a class="rr-title" href="{{ url_for('public.view_article', article_id=target.id) }}">{{ target.title }}</a>
+                    {% endif %}
+                    <div class="rr-meta">
+                        <span class="chip">{{ 'Story' if kind == 'story' else 'Article' }}</span>
+                        {% if kind == 'story' %}
+                        {%- set n = target.articles|length %}
+                        <span>{{ n }} article{{ 's' if n != 1 else '' }}</span>
+                        {% elif target.outlet %}
+                        <span>{{ target.outlet.name }}</span>
+                        {{ bias_tag(target.outlet.bias_score, unrated=false) }}
+                        {% endif %}
+                        <span>Read <span class="local-date" data-utc="{{ item.read_at.isoformat() }}Z">{{ item.read_at|short_datetime }}</span></span>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-quiet btn-square rr-unmark" data-mark-unread aria-label="Mark unread">{{ icon('undo') }}<span class="tip" role="tooltip"><strong>Mark unread</strong>{% if kind == 'story' %} Brings it back to Headlines.{% else %} Takes it off this list.{% endif %}</span></button>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="rr-empty">Nothing marked read yet. On Headlines, point at a story and use the reading glasses beside it.</div>
+        {% endif %}
+    </div>
+    {{ pager(page, total_pages) }}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
+<script src="{{ url_for('static', filename='js/reads.js') }}" data-read-url="{{ url_for('reading.toggle_read', kind='KIND', item_id=0) }}"></script>
+{% endblock %}

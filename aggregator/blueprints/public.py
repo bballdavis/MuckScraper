@@ -3,7 +3,7 @@ from collections import OrderedDict
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify
 from flask_login import current_user
-from aggregator import breaking, feed_prefs
+from aggregator import breaking, feed_prefs, reads
 from aggregator.models import FeedEntry
 from aggregator.permissions import ROLE_SCRAPER, public_or_login, public_read_enabled, role_required
 from aggregator.models import Article, Story, Topic, RawArticlePayload, Edition, EditionStory
@@ -55,6 +55,9 @@ def headlines_feed():
     """
     per_page = 10
     page = max(1, request.args.get("page", 1, type=int) or 1)
+    # Stories the reader marked read drop out (reads.py); Recently read
+    # lists them.
+    read_story_ids = reads.read_ids(current_user.id, "story") if current_user.is_authenticated else set()
 
     newest_edition = Edition.query.filter_by(published=True).order_by(Edition.created_at.desc()).first()
     latest_edition = newest_edition
@@ -64,6 +67,8 @@ def headlines_feed():
 
     if latest_edition:
         all_edition_stories = latest_edition.edition_stories.order_by(EditionStory.rank).all()
+        hidden_read = sum(1 for es in all_edition_stories if es.story_id in read_story_ids)
+        all_edition_stories = [es for es in all_edition_stories if es.story_id not in read_story_ids]
         total_stories = len(all_edition_stories)
         page = min(page, max(1, (total_stories + per_page - 1) // per_page))
         start = (page - 1) * per_page
@@ -78,6 +83,8 @@ def headlines_feed():
             Story.created_at >= cutoff,
             Story.headline_score > 0
         ).order_by(Story.headline_score.desc()).limit(20).all()
+        hidden_read = sum(1 for s in all_stories if s.id in read_story_ids)
+        all_stories = [s for s in all_stories if s.id not in read_story_ids]
         total_stories = len(all_stories)
         page = min(page, max(1, (total_stories + per_page - 1) // per_page))
         start = (page - 1) * per_page
@@ -95,6 +102,7 @@ def headlines_feed():
         # The Breaking News bar shows on the current edition only.
         **({} if is_past_edition else _breaking_context()),
         stories=stories,
+        hidden_read=hidden_read,
         edition_label=edition_label,
         edition=latest_edition,
         is_past_edition=is_past_edition,
@@ -229,6 +237,7 @@ def view_story(story_id):
         story=story,
         opinion=opinion_for_story(story.id),
         ollama_online=ollama_online,
+        read_item=reads.get(current_user.id, "story", story.id) if current_user.is_authenticated else None,
         topics=Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all(),
     )
 
@@ -243,6 +252,7 @@ def view_article(article_id):
         "article.html",
         article=article,
         ollama_online=ollama_online,
+        read_item=reads.get(current_user.id, "article", article.id) if current_user.is_authenticated else None,
         topics=Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all(),
     )
 

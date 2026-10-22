@@ -325,3 +325,15 @@ def bookmark(b, versions=False):
     if versions:
         out["versions"] = [bookmark_version(s) for s in snaps]
     return out
+
+
+def read_item(row):
+    """One entry in the user's read list (aggregator/reads.py)."""
+    kind = "story" if row.story_id else "article"
+    return {
+        "kind": kind,
+        "id": row.story_id or row.article_id,
+        "read_at": iso(row.read_at),
+        "story": story_summary(row.story) if row.story is not None else None,
+        "article": article_card(row.article) if row.article is not None else None,
+    }
