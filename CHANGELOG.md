@@ -33,7 +33,8 @@ All notable changes to MuckScraper are documented here.
   right. Every card date uses one format ("Oct 19, 9:39 PM").
 - **Clearer sidebar.** The current page is filled across the menu's full
   width, and the small muted group headings (Topics, More) no longer look
-  like links. On the feed pages the top bar runs the full width above the
+  like links. Topics are text only; the story lists and More keep their
+  icons. On the feed pages the top bar runs the full width above the
   sidebar, with the menu button beside the MuckScraper name.
 
 ### Fixed

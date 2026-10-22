@@ -83,6 +83,7 @@
 .nav-link {
     display: flex;
     align-items: center;
+    gap: 12px;
     min-height: 40px;
     padding: 0 24px;
     color: var(--sidebar-text);
@@ -96,6 +97,7 @@
 .nav-link:hover { background: rgba(255, 255, 255, 0.06); color: var(--sidebar-hover); }
 .nav-link:focus-visible { outline: 2px solid var(--sidebar-accent-text); outline-offset: -2px; }
 .nav-link.active { background: var(--sidebar-active-bg); color: var(--sidebar-hover); font-weight: 700; }
+.nav-link .icon { width: 17px; height: 17px; flex-shrink: 0; opacity: 0.85; }
 .nav-topic { min-height: 36px; }
 
 .sidebar-footer {
