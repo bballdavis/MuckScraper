@@ -9,14 +9,12 @@
 
     `hidden` is a dict of the query parameters the search form keeps (None
     values are skipped). Without a call block there is no Filters button.
-    `back` is an optional (href, label) pair: the story and article pages
-    show "← Back to Feed" in place of a section name.
     The bar spans the full width above the sidebar: the page renders it
     before its `.layout feed-layout` block and sets sidebar_toggle_in_topbar.
     Styles: static/css/feed_header.css. Behaviour: static/js/feed_header.js. -#}
 {% from 'icons.html' import icon, theme_toggle %}
 {% from 'account_menu.html' import account_menu with context %}
-{%- macro feed_topbar(section_title, search_action, q='', hidden={}, back=none) -%}
+{%- macro feed_topbar(section_title, search_action, q='', hidden={}) -%}
 <header class="feed-topbar">
     <div class="ft-left">
         {#- Shows and hides the sidebar (sidebar_script.html); the page sets
@@ -24,12 +22,7 @@
         <button type="button" class="ft-menu" id="sidebar-toggle" onclick="toggleSidebar()"
                 aria-label="Show or hide the menu" aria-controls="sidebar" aria-expanded="true">{{ icon('menu') }}</button>
         <a class="ft-logo" href="{{ url_for('public.index') }}">MuckScraper</a>
-        {%- if back %}
-        <span class="ft-sep" aria-hidden="true">/</span>
-        {#- "Back to Feed" reads "← Feed" on narrow phones (feed_header.css). #}
-        {%- set back_words = back[1].split(' ') %}
-        <a class="ft-section ft-back" href="{{ back[0] }}">&larr; <span class="ft-back-lead">{{ back_words[:-1]|join(' ') }} </span>{{ back_words[-1] }}</a>
-        {%- elif section_title %}
+        {%- if section_title %}
         <span class="ft-sep" aria-hidden="true">/</span>
         <span class="ft-section">{{ section_title }}</span>
         {%- endif %}
