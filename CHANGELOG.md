@@ -39,6 +39,41 @@ All notable changes to MuckScraper are documented here.
   like links. Topics are text only; the story lists and More keep their
   icons. On the feed pages the top bar runs the full width above the
   sidebar, with the menu button beside the MuckScraper name.
+- **One slim image for the app, scheduler and MCP server.** The three
+  Dockerfiles are now one, without Playwright, Chromium and the ~25 X11/GTK
+  libraries it needed: nothing has driven a headless browser since 1.0.1.
+  Images are several hundred MB smaller and builds much faster. Pillow,
+  python-dotenv and pytest (never imported by the app) are gone from
+  `requirements.txt`.
+- **Search runs in Postgres; Meilisearch is gone.** Stories and articles get a
+  generated `search_vector` column with a GIN index, plus `pg_trgm` indexes on
+  titles and headlines. Search is always current (no sync step after a run,
+  no Reindex Search button, no 80-minute rebuild), the time window is exact
+  rather than approximate, the last word of a query matches as a prefix
+  ("ukra" finds Ukraine) and misspelled titles still match. Quoted phrases,
+  `OR` and `-word` work as on a web search engine. One container, one data
+  copy and the `MEILI_*` settings fewer. **Upgrading:** `./install.sh` runs
+  the migration (a minute or two on a large database, with the app waiting
+  on it) and removes the old Meilisearch container; `./meili_data` can then
+  be deleted, and `MEILI_URL`/`MEILI_MASTER_KEY` removed from `.env`. The
+  MCP `search_health` tool now checks the search indexes exist.
+- **`articles.fetched_at` is indexed.** The quality report, copy detector,
+  opinion linker, grouping review and scrape blocklist page all ask for
+  "articles fetched since X", which scanned the whole table each time
+  (46 ms to 0.3 ms on a 47,000-article test database).
+- **Admin bulk actions and AI tasks run in the scheduler container.** Catch
+  up, Force Resummarize, Reclassify, Audit Scrapes, Scrape Missing and the
+  per-story/article summary and analysis buttons used to run in a thread
+  inside a gunicorn worker, which died with the worker on any restart or
+  timeout. They are now queued in a new `jobs` table (Postgres, no Redis) and
+  run one at a time by a worker thread in the scheduler, which a `NOTIFY`
+  wakes at once; single-story/article tasks go ahead of bulk ones. Their
+  status boxes work as before and say "Queued" until the worker picks them
+  up, so the scheduler container must be running. A job cut off by a
+  scheduler restart is marked failed, not left "running" for hours.
+- **`docker-compose.yml`:** the app and scheduler share one environment block
+  (`x-app-env`), so a new setting is added once. The scheduler waits for a
+  Postgres health check instead of a fixed 15-second sleep.
 
 ### Fixed
 - **`docker-compose.yml` now passes the OpenRouter settings and

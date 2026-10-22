@@ -26,8 +26,8 @@ if [ ! -f .env ]; then
     first_run=true
 fi
 
-# Auto-generate SECRET_KEY and MEILI_MASTER_KEY if they're still the sample
-# placeholders — these are purely mechanical, unlike API keys or the admin
+# Auto-generate SECRET_KEY if it's still the sample
+# placeholder — these are purely mechanical, unlike API keys or the admin
 # password, which need a human to actually decide.
 random_hex() {
     if command -v openssl >/dev/null 2>&1; then
@@ -41,15 +41,10 @@ if grep -Eq '^SECRET_KEY=(replace_with_a_generated_secret_key|generate_with_pyth
     sed -i.bak "s/^SECRET_KEY=.*/SECRET_KEY=$(random_hex)/" .env && rm -f .env.bak
     ok "SECRET_KEY set"
 fi
-if grep -Eq '^MEILI_MASTER_KEY=(replace_with_a_generated_meilisearch_key|replace_with_a_real_meilisearch_key)' .env; then
-    info "Generating a Meilisearch master key"
-    sed -i.bak "s/^MEILI_MASTER_KEY=.*/MEILI_MASTER_KEY=$(random_hex)/" .env && rm -f .env.bak
-    ok "MEILI_MASTER_KEY set"
-fi
 
 if [ "$first_run" = true ]; then
     warn "Now edit .env with your Ollama host and models and an admin password"
-    warn "(news API keys are optional; SECRET_KEY and MEILI_MASTER_KEY are already set),"
+    warn "(news API keys are optional; SECRET_KEY is already set),"
     warn "then re-run ./install.sh to continue."
     exit 0
 fi
@@ -75,15 +70,32 @@ if [ "$placeholders_left" = true ]; then
     esac
 fi
 
-info "Building and starting postgres, meilisearch, and app..."
-docker compose up -d --build postgres meilisearch app
+info "Building and starting postgres and app..."
+docker compose up -d --build postgres app
 
 info "Setting up the database (pgvector extension + tables) and admin user..."
 info "(retries automatically while Postgres finishes starting up)"
 docker compose exec app python bootstrap_admin.py
 
-# --build: the scheduler image carries its own copy of the code and packages,
-# so without it an upgrade leaves the scheduler running the old version.
+# Search moved into Postgres (2026-10-22). An install from before then still
+# has a Meilisearch container this compose file no longer defines; stop and
+# remove just that one (not --remove-orphans, which would also take down
+# services started from other compose files in this project).
+project_name=$(docker compose config 2>/dev/null | sed -n 's/^name: //p' | head -n 1)
+if [ -n "$project_name" ]; then
+    old_meili=$(docker ps -aq \
+        --filter "label=com.docker.compose.project=${project_name}" \
+        --filter "label=com.docker.compose.service=meilisearch")
+    if [ -n "$old_meili" ]; then
+        info "Removing the old Meilisearch container (search now runs in Postgres)..."
+        docker rm -f $old_meili >/dev/null
+        ok "Meilisearch container removed. ./meili_data is no longer used and can be deleted."
+    fi
+fi
+
+# --build: the image carries its own copy of the packages, so without it an
+# upgrade leaves the scheduler on old dependencies. (Same image as the app, so
+# this is a cache hit when the app was just rebuilt.)
 info "Building and starting the scheduler..."
 docker compose up -d --build scheduler
 

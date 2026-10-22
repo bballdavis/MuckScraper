@@ -23,7 +23,6 @@ from datetime import datetime, timedelta, timezone
 import logging
 import sys
 import os
-import time
 import requests
 import json
 from zoneinfo import ZoneInfo
@@ -692,33 +691,6 @@ def _notify_n8n():
         logging.warning(f"  [n8n] Webhook failed ({e}) — continuing normally")
 
 
-def _update_search_index(since):
-    """Push this run's new/changed stories and articles into Meilisearch.
-
-    Runs after every fetch, full or fetch-only, so search never drifts: the
-    index had silently gone two months stale (2026-07-24 -> 09-30) when it was
-    only rebuilt by hand. Incremental upserts, so search keeps answering
-    throughout; a failure here never fails the run.
-    """
-    from aggregator.search import meili_enabled, index_changed_since
-
-    if not meili_enabled():
-        return {"status": "skipped", "reason": "meili_not_configured"}
-    started = time.monotonic()
-    try:
-        counts = index_changed_since(since)
-    except Exception as e:
-        logging.warning("  [Search] Index update failed: %s", e)
-        return {"status": "error", "reason": str(e)}
-    seconds = round(time.monotonic() - started, 1)
-    logging.info(
-        "  [Search] Indexed %s stories, %s articles; removed %s/%s stale (%.1fs)",
-        counts["story_documents"], counts["article_documents"],
-        counts["stories_deleted"], counts["articles_deleted"], seconds,
-    )
-    return {"status": "ok", "seconds": seconds, **counts}
-
-
 def _refresh_inference_health(ollama_state, label):
     """Probe real Ollama inference and set llm_client's wedged flag.
 
@@ -1142,10 +1114,6 @@ def run_all_fetches(run_full_pipeline=True):
             run_metrics["steps"]["daily_horoscope"] = {"status": "skipped", "reason": "fetch_only_run"}
             run_metrics["steps"]["static_export"] = {"status": "skipped", "reason": "fetch_only_run"}
 
-        run_metrics["steps"]["search_index"] = _update_search_index(
-            datetime.fromisoformat(run_metrics["started_at"])
-        )
-
         set_last_fetch_time()
         run_metrics["finished_at"] = datetime.utcnow().isoformat()
         ollama_state["up_at_end"] = _check_ollama_status_for_report(ollama_state, "run_end")
@@ -1182,6 +1150,14 @@ if __name__ == "__main__":
 
     with app.app_context():
         db.create_all()
+
+    # Admin bulk actions and AI tasks queued from the web app run here, in
+    # their own thread, so they start even while the startup run below is busy.
+    from aggregator.jobs import prune_finished, start_worker_thread
+    start_worker_thread(app)
+
+    with app.app_context():
+        prune_finished()
         # Only fetch on startup if enough time has passed
         if should_fetch_now():
             run_all_fetches(
