@@ -62,6 +62,26 @@ class ScheduleTests(unittest.TestCase):
                 clean_schedule(junk)
 
 
+class SafeFetchTests(unittest.TestCase):
+    def test_private_and_odd_urls_are_refused(self):
+        from aggregator.safe_fetch import BlockedURL, check_url
+        for url in ("http://127.0.0.1/x", "http://169.254.169.254/latest/meta-data", "http://10.1.2.3/",
+                    "http://[::1]/", "http://[::ffff:127.0.0.1]/", "ftp://example.com/", "file:///etc/passwd",
+                    "http://user:pw@example.com/", "http://example.com:8080/", "http://localhost/"):
+            with self.assertRaises(BlockedURL, msg=url):
+                check_url(url)
+
+    def test_public_host_is_allowed(self):
+        from aggregator.safe_fetch import check_url
+        with mock.patch("socket.getaddrinfo", return_value=[(2, 1, 6, "", ("93.184.216.34", 0))]):
+            self.assertEqual(check_url("https://example.com/a.jpg").hostname, "example.com")
+        with mock.patch("socket.getaddrinfo", return_value=[(2, 1, 6, "", ("93.184.216.34", 0)),
+                                                            (2, 1, 6, "", ("192.168.1.7", 0))]):
+            from aggregator.safe_fetch import BlockedURL
+            with self.assertRaises(BlockedURL):
+                check_url("https://rebind.example/")
+
+
 class ParamTests(unittest.TestCase):
     def test_cursor_round_trip_and_rejects_junk(self):
         from aggregator.api.errors import ApiError
@@ -436,6 +456,167 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertEqual(NewsBoxItem.query.filter_by(user_id=self.ids["reader"], origin="auto").count(), 1)
         self.assertGreater(SummarySchedule.query.get(self.ids["reader"]).next_run_at, datetime.utcnow())
         self.assertEqual(newsbox.run_due_schedules(), 0)
+
+    def _bookmark_env(self):
+        import tempfile
+        from aggregator import db
+        from aggregator.models import Article, Bookmark, Job
+        Bookmark.query.delete()
+        Job.query.delete()
+        a1 = Article.query.get(self.ids["a1"])
+        a1.content = '<p>Full scraped text</p><img src="https://left.example/inline.png"><img src="http://10.0.0.5/x.png">'
+        db.session.commit()
+        self.addCleanup(self._restore_a1)
+        storage = tempfile.mkdtemp()
+        patcher = mock.patch.dict(os.environ, {"BOOKMARK_STORAGE_DIR": storage})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        def fake_fetch(url, max_bytes, accept_prefix=None, timeout=15):
+            from aggregator.safe_fetch import BlockedURL
+            if "10.0.0.5" in url:
+                raise BlockedURL("private")
+            return b"\x89PNG fake " + url.encode(), "image/png", url
+        fetch_patch = mock.patch("aggregator.bookmarks.fetch", side_effect=fake_fetch)
+        fetch_patch.start()
+        self.addCleanup(fetch_patch.stop)
+        return storage
+
+    def _restore_a1(self):
+        from aggregator import db
+        from aggregator.models import Article
+        # Cleanups run after tearDown has popped the test's app context.
+        with self.app.app_context():
+            Article.query.get(self.ids["a1"]).content = "<p>Full scraped text</p><script>x()</script>"
+            db.session.commit()
+
+    def _run_jobs(self, kinds=None):
+        from aggregator import jobs
+        import aggregator.bookmarks  # noqa: F401  registers the handlers
+        while jobs.run_next_job(kinds=kinds, exclude=None if kinds else jobs.BROWSER_KINDS):
+            pass
+
+    def test_bookmark_keeps_a_time_capsule(self):
+        import io
+        import zipfile
+        storage = self._bookmark_env()
+        token = self._pair(scopes=("read", "summarize"))
+        r = self._send("POST", "/api/v1/me/bookmarks", token, json={"story_id": self.ids["story"]})
+        self.assertEqual(r.status_code, 202, r.get_json())
+        bookmark_id = r.get_json()["id"]
+        self._run_jobs()
+        listing = self._get("/api/v1/me/bookmarks", token).get_json()
+        self.assertIsNone(listing["quota_bytes"])
+        latest = listing["items"][0]["latest"]
+        self.assertEqual((latest["status"], latest["captures"]), ("ready", "unavailable"))
+        self.assertGreater(listing["used_bytes"], 0)
+
+        capsule = self._get(f"/api/v1/me/bookmarks/{bookmark_id}/versions/1", token).get_json()
+        self.assertEqual(capsule["format"], "muckscraper-time-capsule")
+        self.assertEqual(capsule["story"]["headline"], "Senate passes budget")
+        self.assertEqual(capsule["story"]["summary"][0], "The big picture: The Senate passed it.")
+        self.assertTrue(capsule["story"]["deep_report"])
+        self.assertEqual(capsule["opinion"][0]["stance"], "Too much spending")
+        left = next(a for a in capsule["articles"] if a["id"] == self.ids["a1"])
+        self.assertIn("Full scraped text", left["content_html"])
+        self.assertIn('src="assets/', left["content_html"])
+        self.assertNotIn("10.0.0.5", left["content_html"])
+        self.assertTrue(left["image"].startswith("assets/"))
+        self.assertEqual(left["outlet_bias_score"], 1.5)
+        self.assertEqual(capsule["pictures_skipped"], 1)
+        name = left["image"].split("/", 1)[1]
+        asset = self._get(f"/api/v1/me/bookmarks/{bookmark_id}/versions/1/assets/{name}", token)
+        self.assertEqual(asset.status_code, 200)
+        self.assertTrue(asset.data.startswith(b"\x89PNG"))
+        for bad_name in ("..%2F..%2Fetc%2Fpasswd", "snapshot.json", "abc.svg"):
+            self.assertEqual(self._get(f"/api/v1/me/bookmarks/{bookmark_id}/versions/1/assets/{bad_name}", token).status_code, 404)
+
+        again = self._send("POST", f"/api/v1/me/bookmarks/{bookmark_id}/versions", token)
+        self.assertEqual(again.status_code, 202)
+        self._run_jobs()
+        self.assertEqual(self._get(f"/api/v1/me/bookmarks/{bookmark_id}", token).get_json()["version_count"], 2)
+        export = self._get(f"/api/v1/me/bookmarks/{bookmark_id}/export", token)
+        names = zipfile.ZipFile(io.BytesIO(export.data)).namelist()
+        self.assertIn("v1/snapshot.json", names)
+        self.assertIn("v2/snapshot.json", names)
+
+        # Saving also sends the story to NewsBox.
+        box = self._get("/api/v1/me/newsbox?origin=saved", token).get_json()["items"]
+        self.assertEqual(box[0]["story"]["id"], self.ids["story"])
+
+        self.assertEqual(self._send("DELETE", f"/api/v1/me/bookmarks/{bookmark_id}", token).status_code, 204)
+        self._run_jobs()
+        self.assertEqual(os.listdir(storage), [str(self.ids["reader"])])
+        self.assertEqual(os.listdir(os.path.join(storage, str(self.ids["reader"]))), [])
+
+    def test_other_users_bookmarks_are_invisible(self):
+        from aggregator import db
+        from aggregator.models import Bookmark
+        self._bookmark_env()
+        mine = Bookmark(user_id=self.ids["off"], story_id=self.ids["story"], title="Not yours")
+        db.session.add(mine)
+        db.session.commit()
+        token = self._pair()
+        self.assertEqual(self._get(f"/api/v1/me/bookmarks/{mine.id}", token).status_code, 404)
+        self.assertEqual(self._get("/api/v1/me/bookmarks", token).get_json()["items"], [])
+
+    def test_bookmark_over_the_storage_limit_stops(self):
+        from aggregator import db
+        from aggregator.api import settings
+        self._bookmark_env()
+        token = self._pair(scopes=("read", "summarize"))
+        settings.save({"bookmark_quota_overrides": {str(self.ids["reader"]): 0}, "bookmark_quota_mb": 1})
+        db.session.commit()
+        try:
+            # The override of 0 means unlimited for this user, whatever the default.
+            self.assertIsNone(self._get("/api/v1/me/bookmarks", token).get_json()["quota_bytes"])
+            settings.save({**settings.load(fresh=True), "bookmark_quota_overrides": {}})
+            db.session.commit()
+            with mock.patch("aggregator.bookmarks.quota_bytes", return_value=100):
+                self._send("POST", "/api/v1/me/bookmarks", token, json={"story_id": self.ids["story"]})
+                self._run_jobs()
+            latest = self._get("/api/v1/me/bookmarks", token).get_json()["items"][0]["latest"]
+            self.assertEqual(latest["status"], "over_quota")
+            self.assertEqual(latest["size_bytes"], 0)
+        finally:
+            settings.save({**settings.load(fresh=True), "bookmark_quota_mb": None, "bookmark_quota_overrides": {}})
+            db.session.commit()
+
+    def test_capture_adds_pages_to_the_version(self):
+        from aggregator import bookmarks, capture, db
+        from aggregator.models import BookmarkSnapshot
+        self._bookmark_env()
+        token = self._pair(scopes=("read", "summarize"))
+        with mock.patch("aggregator.bookmarks.capture_available", return_value=True):
+            r = self._send("POST", "/api/v1/me/bookmarks", token, json={"story_id": self.ids["story"]})
+            self._run_jobs()
+        bookmark_id = r.get_json()["id"]
+        self.assertEqual(self._get("/api/v1/me/bookmarks", token).get_json()["items"][0]["latest"]["captures"], "pending")
+
+        class FakeBrowser:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        def fake_capture(browser, url):
+            if "right.example" in url:
+                raise RuntimeError("Timeout")
+            return b"%PDF-1.7 fake", b"\xff\xd8 fake jpeg"
+        with mock.patch.object(capture, "capture_page", side_effect=fake_capture):
+            from aggregator import jobs
+            jobs.register(bookmarks.CAPTURE_JOB, lambda p: capture.run_capture(p, FakeBrowser), bookmarks.fail_capture)
+            self._run_jobs(kinds=(bookmarks.CAPTURE_JOB,))
+        snapshot = BookmarkSnapshot.query.filter_by(version=1).order_by(BookmarkSnapshot.id.desc()).first()
+        db.session.refresh(snapshot)
+        self.assertEqual(snapshot.captures, "partial")
+        capsule = self._get(f"/api/v1/me/bookmarks/{bookmark_id}/versions/1", token).get_json()
+        done = [c for c in capsule["captures"] if c["pdf"]]
+        self.assertEqual(len(done), 1)
+        pdf = self._get(f"/api/v1/me/bookmarks/{bookmark_id}/versions/1/{done[0]['pdf']}", token)
+        self.assertEqual(pdf.status_code, 200)
+        self.assertEqual(pdf.mimetype, "application/pdf")
 
     def test_unknown_paths_are_json_404(self):
         r = self.client.get("/admin/tools")

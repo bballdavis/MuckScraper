@@ -657,3 +657,52 @@ class SummarySchedule(db.Model):
     updated_at  = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = db.relationship("User", backref=db.backref("summary_schedule", uselist=False, cascade="all, delete-orphan"))
+
+
+class Bookmark(db.Model):
+    """A story a user saved in the app, kept as a time capsule: versioned
+    snapshots (BookmarkSnapshot) of the story, its summaries, analysis,
+    coverage, columns, full text, images and page captures, written to
+    files under BOOKMARK_STORAGE_DIR (aggregator/bookmarks.py). The story
+    link is SET NULL on delete, so a bookmark outlives regrouping; `title`
+    keeps its name."""
+    __tablename__ = "bookmarks"
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "story_id", name="uq_bookmark_user_story"),
+    )
+
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    story_id   = db.Column(db.Integer, db.ForeignKey("stories.id", ondelete="SET NULL"), nullable=True)
+    title      = db.Column(db.String(500), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    story = db.relationship("Story")
+    user = db.relationship("User", backref=db.backref("bookmarks", lazy="dynamic", cascade="all, delete-orphan"))
+    snapshots = db.relationship("BookmarkSnapshot", back_populates="bookmark", cascade="all, delete-orphan",
+                                order_by="BookmarkSnapshot.version")
+
+
+class BookmarkSnapshot(db.Model):
+    """One version of a bookmark's time capsule. `status` is the text and
+    images (pending -> building -> ready, or failed / over_quota);
+    `captures` is the page PDFs and screenshots, done separately by the
+    capture container (pending -> done, or partial / unavailable / failed /
+    over_quota). `size_bytes` counts against the user's storage cap."""
+    __tablename__ = "bookmark_snapshots"
+    __table_args__ = (
+        db.UniqueConstraint("bookmark_id", "version", name="uq_bookmark_snapshot_version"),
+    )
+
+    id          = db.Column(db.Integer, primary_key=True)
+    bookmark_id = db.Column(db.Integer, db.ForeignKey("bookmarks.id", ondelete="CASCADE"), nullable=False, index=True)
+    version     = db.Column(db.Integer, nullable=False)
+    status      = db.Column(db.String(16), nullable=False, default="pending", server_default="pending")
+    captures    = db.Column(db.String(16), nullable=False, default="pending", server_default="pending")
+    size_bytes  = db.Column(db.BigInteger, nullable=False, default=0, server_default="0")
+    asset_count = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    error       = db.Column(db.String(300), nullable=True)
+    created_at  = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    finished_at = db.Column(db.DateTime, nullable=True)
+
+    bookmark = db.relationship("Bookmark", back_populates="snapshots")
