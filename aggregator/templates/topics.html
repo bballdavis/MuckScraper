@@ -1,109 +1,61 @@
 {% extends 'settings_base.html' %}
+{% from 'icons.html' import icon %}
 {% block title %}Topics{% endblock %}
 {% block settings_key %}topics{% endblock %}
-{% block styles %}
-    <style>
-        .container { max-width: 900px; margin: 48px auto; padding: 0 20px; }
-        h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
-        .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 32px; }
-        .card {
-            background: var(--surface);
-            border-radius: 16px;
-            border: 1px solid var(--border);
-            overflow: hidden;
-            box-shadow: var(--shadow);
-        }
-        .card + .card { margin-top: 24px; }
-        .section-title { font-size: 16px; font-weight: 800; margin-bottom: 12px; }
-        table { width: 100%; border-collapse: collapse; }
-        th {
-            text-align: left;
-            padding: 14px 20px; font-size: var(--fs-label);
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-muted);
-            border-bottom: 1px solid var(--border);
-            background: rgba(0,0,0,0.02);
-        }
-        td { padding: 10px 20px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-        tr:last-child td { border-bottom: none; }
-        tr.inactive { opacity: 0.5; }
-        input[type="text"], input[type="number"] {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text);
-            padding: 6px 8px;
-            font-size: 13px;
-        }
-        input[type="text"].name-input { width: 220px; }
-        input[type="text"].icon-input { width: 60px; }
-        input[type="number"].sort-input { width: 64px; }
-        .save-btn, .add-btn {
-            background: var(--accent);
-            color: white;
-            border: none;
-            padding: 6px 14px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-        .add-form {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            padding: 20px;
-        }
-        .empty { padding: 48px; text-align: center; color: var(--text-faint); font-style: italic; }
-    </style>
-{% endblock %}
 {% block settings_body %}
-<div class="container">
+<div class="page-head">
     <h1>Topics</h1>
-    <p class="subtitle">Topics used for classification and the sidebar filter. Inactive topics are hidden from the classifier and nav, but historical tags on existing articles/stories are kept.</p>
-
-    <div class="card">
-        {% if topics %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Icon</th>
-                    <th>Order</th>
-                    <th>Active</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for topic in topics %}
-                <tr class="{{ 'inactive' if not topic.is_active else '' }}">
-                    <form method="POST" action="{{ url_for('admin.update_topic', topic_id=topic.id) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <td>{{ topic.name }}</td>
-                        <td><input type="text" class="icon-input" name="icon" maxlength="4" value="{{ topic.icon or '' }}"></td>
-                        <td><input type="number" class="sort-input" name="sort_order" value="{{ topic.sort_order if topic.sort_order is not none else '' }}"></td>
-                        <td><input type="checkbox" name="is_active" {{ 'checked' if topic.is_active else '' }}></td>
-                        <td><button type="submit" class="save-btn">Save</button></td>
-                    </form>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="empty">No topics yet.</div>
-        {% endif %}
-    </div>
-
-    <div class="card">
-        <form method="POST" action="{{ url_for('admin.add_topic') }}" class="add-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="text" class="name-input" name="name" placeholder="New topic name" required>
-            <input type="text" class="icon-input" name="icon" placeholder="Icon" maxlength="4">
-            <input type="number" class="sort-input" name="sort_order" placeholder="Order">
-            <button type="submit" class="add-btn">+ Add Topic</button>
-        </form>
-    </div>
+    <p>Topics used for classification and the sidebar filter. Inactive topics are hidden from the classifier and nav, but historical tags on existing articles and stories are kept.</p>
 </div>
+
+<section class="panel">
+    <form method="POST" action="{{ url_for('admin.add_topic') }}" class="add-bar">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="add-field grow"><span>New topic</span><input type="text" name="name" placeholder="Topic name" required></label>
+        <label class="add-field"><span>Icon</span><input type="text" name="icon" maxlength="4" class="w-icon"></label>
+        <label class="add-field"><span>Order</span><input type="number" name="sort_order" class="w-order"></label>
+        <button type="submit" class="btn">{{ icon('plus') }} Add topic</button>
+    </form>
+</section>
+
+<section class="panel">
+    {%- if topics %}
+    <div class="table-scroll">
+    <table class="data-table stack-sm">
+        <thead>
+            <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Icon</th>
+                <th scope="col">Order</th>
+                <th scope="col">Active</th>
+                <th scope="col"><span class="visually-hidden">Save</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {%- for topic in topics %}
+            {%- set f = 'topic-' ~ topic.id %}
+            <tr id="{{ f }}" class="{{ 'is-off' if not topic.is_active else '' }}">
+                <td class="row-label cell-main">{{ topic.name }}</td>
+                <td><input type="text" form="{{ f }}-form" class="w-icon" name="icon" maxlength="4" value="{{ topic.icon or '' }}" aria-label="Icon for {{ topic.name }}"></td>
+                <td><input type="number" form="{{ f }}-form" class="w-order" name="sort_order" value="{{ topic.sort_order if topic.sort_order is not none else '' }}" aria-label="Order for {{ topic.name }}"></td>
+                <td>
+                    <label class="switch" title="{{ 'Active' if topic.is_active else 'Inactive' }}">
+                        <input type="checkbox" form="{{ f }}-form" name="is_active" {{ 'checked' if topic.is_active else '' }} onchange="this.form.requestSubmit()" aria-label="{{ topic.name }} active"><span></span>
+                    </label>
+                </td>
+                <td class="num">
+                    <form id="{{ f }}-form" method="POST" action="{{ url_for('admin.update_topic', topic_id=topic.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-quiet btn-square" aria-label="Save {{ topic.name }}" title="Save">{{ icon('save') }}</button>
+                    </form>
+                </td>
+            </tr>
+            {%- endfor %}
+        </tbody>
+    </table>
+    </div>
+    {%- else %}
+    <div class="panel-body muted">No topics yet.</div>
+    {%- endif %}
+</section>
 {% endblock %}
