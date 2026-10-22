@@ -36,6 +36,14 @@ PROVIDER_FIELDS = {
         ("OLLAMA_FALLBACK_HOST", "Fallback host", "url"),
         ("OLLAMA_MODEL", "Main model", "model"),
         ("OLLAMA_FAST_MODEL", "Fast model", "model"),
+        ("EMBEDDING_MODEL", "Embedding model", "model"),
+    ],
+    "lmstudio": [
+        ("LMSTUDIO_HOST", "Server URL", "url"),
+        ("LMSTUDIO_API_KEY", "API key", "secret"),
+        ("LMSTUDIO_MODEL", "Main model", "model"),
+        ("LMSTUDIO_FAST_MODEL", "Fast model", "model"),
+        ("LMSTUDIO_EMBEDDING_MODEL", "Embedding model", "model"),
     ],
     "anthropic": [
         ("ANTHROPIC_API_KEY", "API key", "secret"),
@@ -59,6 +67,8 @@ PROVIDER_FIELDS = {
     ],
 }
 ROUTING_FIELDS = ("LLM_PROVIDER", "LLM_FAST_PROVIDER")
+# Saved with the routing form but checked against the embedding providers.
+EMBEDDING_FIELDS = ("EMBEDDING_PROVIDER",)
 
 # News source APIs (Settings › Source API keys), same shape as PROVIDER_FIELDS.
 SOURCE_FIELDS = {
@@ -72,11 +82,12 @@ SOURCE_FIELDS = {
 
 # Defaults the code applies when neither a saved value nor the environment
 # sets one, shown as the field's placeholder.
-DEFAULTS = {"NYT_API_DAILY_LIMIT": "450"}
+DEFAULTS = {"NYT_API_DAILY_LIMIT": "450", "LMSTUDIO_HOST": "http://localhost:1234/v1",
+            "EMBEDDING_MODEL": "nomic-embed-text"}
 
 _FIELD_GROUPS = list(PROVIDER_FIELDS.values()) + list(SOURCE_FIELDS.values())
 SECRET_NAMES = {name for fields in _FIELD_GROUPS for name, _, kind in fields if kind == "secret"}
-ALL_NAMES = set(ROUTING_FIELDS) | {name for fields in _FIELD_GROUPS for name, _, _ in fields}
+ALL_NAMES = set(ROUTING_FIELDS) | set(EMBEDDING_FIELDS) | {name for fields in _FIELD_GROUPS for name, _, _ in fields}
 
 _MODEL_RE = re.compile(r"^[A-Za-z0-9._:/@+-]{1,200}$")
 _URL_RE = re.compile(r"^https?://[^\s/$.?#][^\s]{0,250}$")
@@ -86,7 +97,10 @@ def validate(name, value, kind=None):
     """An error message for `value`, or None. Blank always passes (it clears)."""
     if not value:
         return None
-    kind = kind or ("provider" if name in ROUTING_FIELDS else None)
+    kind = kind or ("provider" if name in ROUTING_FIELDS else "embedding_provider" if name in EMBEDDING_FIELDS else None)
+    if kind == "embedding_provider":
+        from news_fetcher.llm_client import EMBEDDING_PROVIDERS
+        return None if value in EMBEDDING_PROVIDERS else "Unknown embedding provider."
     if kind == "provider":
         from news_fetcher.llm_client import CHAT_PROVIDERS
         if name == "LLM_FAST_PROVIDER" and value == "main":

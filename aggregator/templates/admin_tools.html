@@ -1,6 +1,7 @@
 {#- Settings › Overview (admin.tools_page): system health, the containers and
     the one-off jobs. Configuration lives in the other settings sections. -#}
 {% extends 'settings_base.html' %}
+{% from 'icons.html' import icon %}
 {% block title %}Settings{% endblock %}
 {% block settings_key %}overview{% endblock %}
 {% block settings_body %}
@@ -85,27 +86,36 @@
         {%- if containers %}
         <form method="POST" action="{{ url_for('admin.restart_all_containers') }}" onsubmit="return confirm('Restart every container? This briefly stops the whole app, including this page.');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-danger">Restart all</button>
+            <button type="submit" class="btn btn-danger btn-square" aria-label="Restart all containers" title="Restart all containers">{{ icon('rotate-cw') }}</button>
         </form>
         {%- endif %}
     </div>
     {%- if containers %}
-    <div class="container-chips">
-        {%- for service in container_service_order %}
-        {%- set c = containers | selectattr('service', 'equalto', service) | first %}
-        {%- if c %}
-        <div class="container-chip" title="{{ c.status }}">
-            <span class="dot {{ 'ok' if c.status == 'running' else 'bad' }}"></span>{{ service }}
-            <form method="POST" action="{{ url_for('admin.restart_container', name=service) }}">
+    <ul class="container-list">
+        {%- for c in containers %}
+        <li class="container-row">
+            <span class="dot {{ c.level }}" aria-hidden="true"></span>
+            <div class="container-name">
+                <span class="row-label">{{ c.service }}</span>
+                <span class="row-sub" title="{{ c.name }}">{{ c.image_short or c.name }}</span>
+            </div>
+            <div class="container-facts">
+                <span class="chip {{ {'ok': 'chip-safe', 'warn': 'chip-broad', 'bad': 'chip-danger'}[c.level] }}">{{ c.state }}</span>
+                {%- if c.since %}<span class="container-fact">{{ c.since }}</span>{% endif %}
+                <span class="container-fact{% if c.restart_count %} is-warn{% endif %}">{{ c.restart_count or 0 }} restart{{ '' if c.restart_count == 1 else 's' }}</span>
+                {%- if c.oom_killed %}<span class="chip chip-danger" title="The kernel killed it for running out of memory">Out of memory</span>{% endif %}
+                {%- if c.health_failing_streak %}<span class="container-fact is-bad">{{ c.health_failing_streak }} failed check{{ '' if c.health_failing_streak == 1 else 's' }}</span>{% endif %}
+            </div>
+            <form method="POST" action="{{ url_for('admin.restart_container', name=c.service) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-icon" aria-label="Restart {{ service }}" title="Restart {{ service }}">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>
-                </button>
+                <button type="submit" class="btn btn-quiet btn-square" aria-label="Restart {{ c.service }}" title="Restart {{ c.service }}">{{ icon('rotate-cw') }}</button>
             </form>
-        </div>
-        {%- endif %}
+            {%- if c.level != 'ok' and (c.health_output or c.error) %}
+            <code class="container-note">{{ c.error or c.health_output }}</code>
+            {%- endif %}
+        </li>
         {%- endfor %}
-    </div>
+    </ul>
     {%- else %}
     <div class="panel-body muted">Could not reach the container restart service.</div>
     {%- endif %}
@@ -148,10 +158,10 @@
                         <form method="POST" action="{{ url_for(job.post) }}"{% if job.confirm %} onsubmit="return confirm({{ job.confirm|tojson|forceescape }});"{% endif %}>
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="next" value="{{ url_for('admin.tools_page') }}">
-                            <button type="submit" class="btn {{ btn }}"{% if job.bulk %} id="job-btn-{{ job.bulk }}"{% endif %}>{{ job.button }}{% if job.confirm %}…{% endif %}</button>
+                            <button type="submit" class="btn {{ btn }} btn-square" aria-label="{{ job.button }}: {{ job.name }}" title="{{ job.button }}{% if job.confirm %}…{% endif %}"{% if job.bulk %} id="job-btn-{{ job.bulk }}"{% endif %}>{{ icon('play') }}</button>
                         </form>
                         {%- else %}
-                        <button type="button" class="btn {{ btn }}" data-script="{{ job.script }}" data-confirm="{{ job.confirm }}">{{ job.button }}…</button>
+                        <button type="button" class="btn {{ btn }} btn-square" aria-label="{{ job.button }}: {{ job.name }}" title="{{ job.button }}…" data-script="{{ job.script }}" data-confirm="{{ job.confirm }}">{{ icon('play') }}</button>
                         {%- endif %}
                     </td>
                 </tr>

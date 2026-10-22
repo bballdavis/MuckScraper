@@ -21,7 +21,6 @@ langfuse = Langfuse(
     host=os.environ.get("LANGFUSE_HOST", "http://localhost:3000")
 )
 
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "nomic-embed-text")
 
 SIMILARITY_THRESHOLD = 0.92
 LOWER_THRESHOLD = 0.68
@@ -154,7 +153,7 @@ TITLE_TOKEN_REPLACEMENTS = {
 def get_embedding(text):
     langfuse_context.update_current_observation(
         input=text,
-        metadata={"model": EMBEDDING_MODEL, "provider": llm_client.EMBEDDING_PROVIDER}
+        metadata={"model": llm_client.embedding_model_name(), "provider": llm_client.EMBEDDING_PROVIDER}
     )
     embedding = llm_client.get_embedding(text)
     if embedding:

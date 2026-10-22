@@ -1,219 +1,239 @@
 {% extends 'settings_base.html' %}
+{% from 'icons.html' import icon %}
 {% block title %}Scheduled Fetches{% endblock %}
 {% block settings_key %}fetches{% endblock %}
-{% block styles %}
-    <style>
-        .container { max-width: 1100px; margin: 48px auto; padding: 0 20px; }
-        h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
-        .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 32px; }
-        .card {
-            background: var(--surface);
-            border-radius: 16px;
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-            padding: 20px;
-        }
-        .card + .card { margin-top: 24px; }
-        .card-title { font-size: 15px; font-weight: 800; margin-bottom: 4px; }
-        .card-copy { color: var(--text-muted); font-size: 13px; margin-bottom: 18px; }
-        .fetch-row { border-bottom: 1px solid var(--border); padding: 18px 0; }
-        .fetch-row:first-of-type { padding-top: 0; }
-        .fetch-row:last-of-type { border-bottom: none; padding-bottom: 0; }
-        .fetch-row.disabled { opacity: 0.55; }
-        .field-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-            gap: 12px 16px;
-            align-items: end;
-        }
-        label.field { display: flex; flex-direction: column; gap: 5px; }
-        label.field > span {
-            font-size: var(--fs-label);
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-muted);
-        }
-        input[type="text"], input[type="number"], select {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text);
-            padding: 7px 9px;
-            font-size: 13px;
-            font-family: inherit;
-            width: 100%;
-        }
-        .row-actions {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            margin-top: 12px;
-            flex-wrap: wrap;
-        }
-        .check-label { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-        .save-btn, .add-btn { background: var(--accent); }
-        .save-btn, .add-btn, .delete-btn {
-            color: white;
-            border: none;
-            padding: 7px 15px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-        .delete-btn { background: #b51a1a; }
-        .hint {
-            font-size: 12px;
-            color: var(--text-faint);
-            margin-top: 14px;
-            line-height: 1.6;
-        }
-        .hint code {
-            background: rgba(0,0,0,0.05);
-            padding: 1px 5px;
-            border-radius: 4px;
-            font-size: var(--fs-label);
-        }
-        [data-theme="dark"] .hint code { background: rgba(255,255,255,0.08); }
-        .empty { padding: 24px; text-align: center; color: var(--text-faint); font-style: italic; }
-    </style>
-{% endblock %}
-{% block settings_body %}
-<div class="container">
-    <h1>Scheduled Fetches</h1>
-    <p class="subtitle">
-        What each pipeline run pulls from the NewsAPI and GNews providers. This is
-        <em>what</em> gets fetched — <a href="{{ url_for('admin.pipeline_schedule_page') }}">Pipeline Schedule</a>
-        controls <em>when</em>. Changes apply on the next run; no restart needed.
-    </p>
 
-    <div class="card">
-        {% if fetches %}
-        {% for fetch in fetches %}
-        <div class="fetch-row {{ 'disabled' if not fetch.is_active else '' }}">
-            <form method="POST" action="{{ url_for('admin.update_scheduled_fetch', fetch_id=fetch.id) }}">
+{#- The editor's fields, for a new fetch (f is none) or an existing one. -#}
+{% macro fetch_fields(f, modes) %}
+<div class="fetch-fields">
+    <label class="add-field"><span>Label</span><input type="text" name="label" value="{{ f.label if f else '' }}" placeholder="e.g. Technology" required></label>
+    <label class="add-field"><span>Mode</span>
+        <select name="mode" data-mode-select>
+            {%- for mode in modes %}
+            <option value="{{ mode }}"{% if f and f.mode == mode %} selected{% endif %}>{{ 'Search (/everything)' if mode == 'query' else 'Top headlines' }}</option>
+            {%- endfor %}
+        </select>
+    </label>
+    <label class="add-field wide"><span>Description</span><input type="text" name="description" value="{{ (f.description or '') if f else '' }}" placeholder="Shown on the Fetch page"></label>
+    <label class="add-field wide" data-mode="query"><span>NewsAPI query</span><input type="text" name="newsapi_query" value="{{ (f.newsapi_query or '') if f else '' }}" placeholder="e.g. (AI OR &quot;machine learning&quot;) AND regulation"></label>
+    <label class="add-field" data-mode="top"><span>Country</span><input type="text" name="newsapi_country" value="{{ (f.newsapi_country or '') if f else '' }}" placeholder="e.g. us"></label>
+    <label class="add-field" data-mode="top"><span>NewsAPI category</span><input type="text" name="newsapi_category" value="{{ (f.newsapi_category or '') if f else '' }}" placeholder="e.g. business"></label>
+    <label class="add-field"><span>GNews query</span><input type="text" name="gnews_query" value="{{ (f.gnews_query or '') if f else '' }}"></label>
+    <label class="add-field"><span>GNews category</span><input type="text" name="gnews_category" value="{{ (f.gnews_category or '') if f else '' }}"></label>
+</div>
+{% endmacro %}
+
+{% block styles %}
+<style>
+    .fetch-grid { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; }
+    .fetch-card { display: flex; flex-direction: column; gap: 4px; padding: 9px 10px 10px 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-frame); min-width: 0; }
+    .fetch-card.is-off .fetch-top .fetch-label, .fetch-card.is-off .fetch-line { opacity: 0.5; }
+    .fetch-card.is-dragging { opacity: 0.4; }
+    .fetch-card.is-drop-target { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .fetch-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .fetch-grip { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 26px; padding: 0; border: 0; background: none; color: var(--text-faint); cursor: grab; border-radius: 3px; flex: 0 0 auto; }
+    .fetch-grip:hover { color: var(--text-muted); background: var(--btn-muted-bg); }
+    .fetch-grip:focus-visible { outline: 2px solid var(--accent-text); }
+    .fetch-label { flex: 1 1 auto; min-width: 0; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fetch-line { padding-left: 24px; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fetch-line b { font-weight: 600; color: var(--text); }
+    .fetch-editor { display: none; }
+    .fetch-card.is-editing { grid-column: 1 / -1; padding: 12px 16px 14px; }
+    .fetch-card.is-editing .fetch-line, .fetch-card.is-editing .fetch-top .btn-edit { display: none; }
+    .fetch-card.is-editing .fetch-editor { display: block; margin-top: 8px; }
+    .fetch-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 12px; }
+    .fetch-fields .add-field.wide { grid-column: span 2; }
+    .fetch-fields input, .fetch-fields select { width: 100%; }
+    .app-page .page-body .fetch-fields input, .app-page .page-body .fetch-fields select { height: 34px; }
+    .fetch-fields [hidden] { display: none; }
+    .editor-actions { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+    .editor-actions .spacer { flex: 1 1 auto; }
+    .fetch-add[hidden] { display: none; }
+    .fetch-add form { padding: 12px 16px 14px; }
+    .fetch-hint { margin-top: 14px; font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+    @media (max-width: 600px) { .fetch-fields .add-field.wide { grid-column: auto; } }
+</style>
+{% endblock %}
+
+{% block settings_body %}
+<div class="page-head page-head-row">
+    <div>
+        <h1>Scheduled fetches</h1>
+        <p>What each pipeline run pulls from NewsAPI and GNews. <a href="{{ url_for('admin.pipeline_schedule_page') }}">Run schedule</a> controls when. Drag a card to change the run order. Changes apply on the next run.</p>
+    </div>
+    <button type="button" class="btn" id="fetch-add-open">{{ icon('plus') }} Add fetch</button>
+</div>
+
+<section class="panel fetch-add" id="fetch-add" hidden>
+    <div class="panel-head"><h2>Add a fetch</h2><p>It joins the end of the run order and starts active.</p></div>
+    <form method="POST" action="{{ url_for('admin.add_scheduled_fetch') }}" data-fetch-form>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ fetch_fields(none, modes) }}
+        <div class="editor-actions">
+            <span class="spacer"></span>
+            <button type="button" class="btn btn-quiet" id="fetch-add-cancel">Cancel</button>
+            <button type="submit" class="btn">{{ icon('plus') }} Add fetch</button>
+        </div>
+    </form>
+</section>
+
+{%- if fetches %}
+<ul class="fetch-grid" id="fetch-grid" style="margin-top: 16px;">
+    {%- for fetch in fetches %}
+    <li class="fetch-card{{ '' if fetch.is_active else ' is-off' }}" id="fetch-{{ fetch.id }}" data-id="{{ fetch.id }}">
+        <div class="fetch-top">
+            <button type="button" class="fetch-grip" draggable="true" aria-label="Move {{ fetch.label }} (Alt + arrow keys)" title="Drag to reorder">{{ icon('grip') }}</button>
+            <span class="fetch-label" title="{{ fetch.label }}">{{ fetch.label }}</span>
+            <span class="chip">{{ 'Search' if fetch.mode == 'query' else 'Top' }}</span>
+            <label class="switch" title="{{ 'Active' if fetch.is_active else 'Paused' }}">
+                <input type="checkbox" data-active-url="{{ url_for('admin.set_scheduled_fetch_active', fetch_id=fetch.id) }}" {{ 'checked' if fetch.is_active else '' }} aria-label="{{ fetch.label }} active"><span></span>
+            </label>
+            <button type="button" class="btn btn-quiet btn-square btn-edit" aria-label="Edit {{ fetch.label }}" title="Edit">{{ icon('pencil') }}</button>
+        </div>
+        <div class="fetch-line">
+            <b>NewsAPI</b>
+            {%- if fetch.mode == 'query' %} {{ fetch.newsapi_query or '—' }}
+            {%- else %} top · {{ fetch.newsapi_country or 'any country' }}{% if fetch.newsapi_category %} · {{ fetch.newsapi_category }}{% endif %}{% endif %}
+        </div>
+        {%- if fetch.gnews_query or fetch.gnews_category %}
+        <div class="fetch-line"><b>GNews</b> {{ fetch.gnews_query or '' }}{% if fetch.gnews_query and fetch.gnews_category %} · {% endif %}{{ fetch.gnews_category or '' }}</div>
+        {%- endif %}
+        {%- if fetch.description %}
+        <div class="fetch-line" title="{{ fetch.description }}">{{ fetch.description }}</div>
+        {%- endif %}
+        <div class="fetch-editor">
+            <form method="POST" action="{{ url_for('admin.update_scheduled_fetch', fetch_id=fetch.id) }}" data-fetch-form>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="field-grid">
-                    <label class="field">
-                        <span>Label</span>
-                        <input type="text" name="label" value="{{ fetch.label }}" required>
-                    </label>
-                    <label class="field">
-                        <span>Description</span>
-                        <input type="text" name="description" value="{{ fetch.description or '' }}" placeholder="shown on the Fetch page">
-                    </label>
-                    <label class="field">
-                        <span>Mode</span>
-                        <select name="mode">
-                            {% for mode in modes %}
-                            <option value="{{ mode }}" {{ 'selected' if fetch.mode == mode else '' }}>
-                                {{ 'Search (/everything)' if mode == 'query' else 'Top headlines' }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span>NewsAPI query</span>
-                        <input type="text" name="newsapi_query" value="{{ fetch.newsapi_query or '' }}" placeholder="search mode only">
-                    </label>
-                    <label class="field">
-                        <span>Country</span>
-                        <input type="text" name="newsapi_country" value="{{ fetch.newsapi_country or '' }}" placeholder="top mode only, e.g. us">
-                    </label>
-                    <label class="field">
-                        <span>NewsAPI category</span>
-                        <input type="text" name="newsapi_category" value="{{ fetch.newsapi_category or '' }}" placeholder="top mode only">
-                    </label>
-                    <label class="field">
-                        <span>GNews query</span>
-                        <input type="text" name="gnews_query" value="{{ fetch.gnews_query or '' }}">
-                    </label>
-                    <label class="field">
-                        <span>GNews category</span>
-                        <input type="text" name="gnews_category" value="{{ fetch.gnews_category or '' }}">
-                    </label>
-                    <label class="field" style="max-width: 90px;">
-                        <span>Order</span>
-                        <input type="number" name="sort_order" value="{{ fetch.sort_order }}">
-                    </label>
-                </div>
-                <div class="row-actions">
-                    <label class="check-label">
-                        <input type="checkbox" name="is_active" {{ 'checked' if fetch.is_active else '' }}>
-                        Active
-                    </label>
-                    <button type="submit" class="save-btn">Save</button>
+                {{ fetch_fields(fetch, modes) }}
+                <div class="editor-actions">
+                    <button type="submit" form="fetch-delete-{{ fetch.id }}" class="btn btn-danger btn-square" aria-label="Delete {{ fetch.label }}" title="Delete">{{ icon('trash') }}</button>
+                    <span class="spacer"></span>
+                    <button type="button" class="btn btn-quiet btn-square btn-cancel" aria-label="Close without saving" title="Close">{{ icon('x') }}</button>
+                    <button type="submit" class="btn btn-square" aria-label="Save {{ fetch.label }}" title="Save">{{ icon('save') }}</button>
                 </div>
             </form>
-            <div class="row-actions">
-                <form method="POST" action="{{ url_for('admin.delete_scheduled_fetch', fetch_id=fetch.id) }}" onsubmit="return confirm('Delete the &quot;{{ fetch.label }}&quot; fetch?');">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="delete-btn">Delete</button>
-                </form>
-            </div>
+            <form id="fetch-delete-{{ fetch.id }}" method="POST" action="{{ url_for('admin.delete_scheduled_fetch', fetch_id=fetch.id) }}" onsubmit="return confirm({{ ('Delete the “' ~ fetch.label ~ '” fetch?')|tojson|forceescape }});">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            </form>
         </div>
-        {% endfor %}
-        {% else %}
-        <div class="empty">No scheduled fetches configured — runs will only ingest RSS feeds.</div>
-        {% endif %}
+    </li>
+    {%- endfor %}
+</ul>
+{%- else %}
+<section class="panel" style="margin-top: 16px;"><div class="panel-body muted">No scheduled fetches yet, so runs only ingest RSS feeds.</div></section>
+{%- endif %}
 
-        <div class="hint">
-            <strong>Search</strong> mode queries NewsAPI's <code>/everything</code> endpoint with the query terms.
-            <strong>Top headlines</strong> mode queries <code>/top-headlines</code> with the country and category instead;
-            the unused fields are cleared on save. GNews is queried alongside NewsAPI using its own
-            query/category values, because the two providers don't share a category vocabulary.
-            Labels must be unique — they key each fetch's per-run metrics. Active fetches also appear as one-click presets on the <a href="{{ url_for('admin.fetch_page') }}">Fetch</a> page.
-        </div>
-    </div>
+<p class="fetch-hint">
+    <strong>Search</strong> queries NewsAPI's <code>/everything</code> with the query. <strong>Top headlines</strong> queries
+    <code>/top-headlines</code> with the country and category; the unused fields are cleared on save. GNews runs alongside
+    with its own query and category, since the two providers don't share categories. Labels must be unique (they key each
+    fetch's run metrics). Active fetches also appear as presets on the <a href="{{ url_for('admin.fetch_page') }}">Fetch</a> page.
+</p>
+{% endblock %}
 
-    <div class="card">
-        <div class="card-title">Add a fetch</div>
-        <div class="card-copy">New fetches are appended to the end of the run order and start active.</div>
-        <form method="POST" action="{{ url_for('admin.add_scheduled_fetch') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="field-grid">
-                <label class="field">
-                    <span>Label</span>
-                    <input type="text" name="label" placeholder="e.g. Technology" required>
-                </label>
-                <label class="field">
-                    <span>Description</span>
-                    <input type="text" name="description" placeholder="shown on the Fetch page">
-                </label>
-                <label class="field">
-                    <span>Mode</span>
-                    <select name="mode">
-                        {% for mode in modes %}
-                        <option value="{{ mode }}">{{ 'Search (/everything)' if mode == 'query' else 'Top headlines' }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-                <label class="field">
-                    <span>NewsAPI query</span>
-                    <input type="text" name="newsapi_query" placeholder="search mode only">
-                </label>
-                <label class="field">
-                    <span>Country</span>
-                    <input type="text" name="newsapi_country" placeholder="top mode only, e.g. us">
-                </label>
-                <label class="field">
-                    <span>NewsAPI category</span>
-                    <input type="text" name="newsapi_category" placeholder="top mode only">
-                </label>
-                <label class="field">
-                    <span>GNews query</span>
-                    <input type="text" name="gnews_query">
-                </label>
-                <label class="field">
-                    <span>GNews category</span>
-                    <input type="text" name="gnews_category">
-                </label>
-            </div>
-            <div class="row-actions">
-                <button type="submit" class="add-btn">+ Add Fetch</button>
-            </div>
-        </form>
-    </div>
-</div>
+{% block scripts %}
+<script>
+(function () {
+    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+    const post = (url, body) => fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+        body: JSON.stringify(body),
+    }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+
+    // Mode picks which NewsAPI fields apply.
+    document.querySelectorAll('[data-fetch-form]').forEach((form) => {
+        const select = form.querySelector('[data-mode-select]');
+        const sync = () => form.querySelectorAll('[data-mode]').forEach((el) => { el.hidden = el.dataset.mode !== select.value; });
+        select.addEventListener('change', sync);
+        sync();
+    });
+
+    // Add: a panel that opens from the page head.
+    const addPanel = document.getElementById('fetch-add');
+    document.getElementById('fetch-add-open').addEventListener('click', () => {
+        addPanel.hidden = false;
+        addPanel.querySelector('input[name="label"]').focus();
+    });
+    document.getElementById('fetch-add-cancel').addEventListener('click', () => { addPanel.hidden = true; });
+
+    // Edit opens the card full width; close puts it back.
+    document.querySelectorAll('.fetch-card').forEach((card) => {
+        card.querySelector('.btn-edit').addEventListener('click', () => {
+            card.classList.add('is-editing');
+            card.querySelector('.fetch-editor input[name="label"]').focus();
+        });
+        card.querySelector('.btn-cancel').addEventListener('click', () => {
+            card.querySelector('.fetch-editor form').reset();
+            card.classList.remove('is-editing');
+        });
+    });
+
+    // The switch saves straight away.
+    document.querySelectorAll('[data-active-url]').forEach((input) => {
+        input.addEventListener('change', () => {
+            const card = input.closest('.fetch-card');
+            post(input.dataset.activeUrl, { active: input.checked })
+                .then((data) => {
+                    card.classList.toggle('is-off', !data.active);
+                    input.closest('.switch').title = data.active ? 'Active' : 'Paused';
+                })
+                .catch(() => { input.checked = !input.checked; alert('Could not save. Reload and try again.'); });
+        });
+    });
+
+    // Run order: drag a card by its handle, or Alt + arrow keys on the handle.
+    const grid = document.getElementById('fetch-grid');
+    if (!grid) return;
+    const saveOrder = () => post('{{ url_for("admin.reorder_scheduled_fetches") }}', {
+        ids: Array.from(grid.children).map((li) => Number(li.dataset.id)),
+    }).catch(() => alert('Could not save the new order. Reload and try again.'));
+
+    let dragged = null;
+    grid.querySelectorAll('.fetch-grip').forEach((grip) => {
+        const card = grip.closest('.fetch-card');
+        grip.addEventListener('dragstart', (e) => {
+            dragged = card;
+            card.classList.add('is-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', card.dataset.id);
+            e.dataTransfer.setDragImage(card, 20, 20);
+        });
+        grip.addEventListener('dragend', () => {
+            card.classList.remove('is-dragging');
+            grid.querySelectorAll('.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'));
+            dragged = null;
+        });
+        grip.addEventListener('keydown', (e) => {
+            if (!e.altKey) return;
+            const back = e.key === 'ArrowUp' || e.key === 'ArrowLeft';
+            const fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight';
+            if (!back && !fwd) return;
+            e.preventDefault();
+            const sibling = back ? card.previousElementSibling : card.nextElementSibling;
+            if (!sibling) return;
+            grid.insertBefore(card, back ? sibling : sibling.nextElementSibling);
+            grip.focus();
+            saveOrder();
+        });
+    });
+    grid.addEventListener('dragover', (e) => {
+        if (!dragged) return;
+        const target = e.target.closest('.fetch-card');
+        if (!target || target === dragged) return;
+        e.preventDefault();
+        grid.querySelectorAll('.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'));
+        target.classList.add('is-drop-target');
+    });
+    grid.addEventListener('drop', (e) => {
+        const target = e.target.closest('.fetch-card');
+        if (!dragged || !target || target === dragged) return;
+        e.preventDefault();
+        const cards = Array.from(grid.children);
+        const after = cards.indexOf(dragged) < cards.indexOf(target);
+        grid.insertBefore(dragged, after ? target.nextElementSibling : target);
+        saveOrder();
+    });
+})();
+</script>
 {% endblock %}

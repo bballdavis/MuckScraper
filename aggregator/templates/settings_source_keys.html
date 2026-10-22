@@ -3,6 +3,7 @@
     use, saved encrypted like the LLM provider keys. -#}
 {% extends 'settings_base.html' %}
 {% from '_config_fields.html' import config_field, config_field_styles %}
+{% from 'icons.html' import icon %}
 {% block title %}Source API keys{% endblock %}
 {% block settings_key %}sourcekeys{% endblock %}
 {% block settings_body %}
@@ -14,23 +15,24 @@
 {% include '_flashes.html' %}
 
 <section class="panel">
-    <div class="panel-head"><h2>News sources</h2></div>
     {%- for s in sources %}
     <form class="source config-field-form" id="source-{{ s.key }}" method="POST" action="{{ url_for('admin.save_source_keys', key=s.key) }}" autocomplete="off">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="source-head">
-            <span class="row-label">{{ s.name }}</span>
-            {%- if s.configured %}
-            <span class="source-status"><span class="dot ok"></span>Key set</span>
-            {%- else %}
-            <span class="source-status muted"><span class="dot off"></span>No key</span>
-            {%- endif %}
+        <div class="source-info">
+            <div class="source-head">
+                <span class="row-label">{{ s.name }}</span>
+                {%- if s.configured %}
+                <span class="chip chip-safe">Key set</span>
+                {%- else %}
+                <span class="chip">No key</span>
+                {%- endif %}
+            </div>
+            <p class="source-about">{{ s.about }} <a href="{{ s.signup }}" target="_blank" rel="noopener noreferrer">Get a key</a></p>
         </div>
-        <p class="source-about">{{ s.about }} <a href="{{ s.signup }}" target="_blank" rel="noopener noreferrer">Get a key</a></p>
-        {%- for f in s.fields %}{{ config_field(f) }}{% endfor %}
-        <div class="source-actions">
-            <button type="submit" class="btn">Save {{ s.name }}</button>
+        <div class="source-fields">
+            {%- for f in s.fields %}{{ config_field(f) }}{% endfor %}
         </div>
+        <button type="submit" class="btn btn-square" aria-label="Save {{ s.name }}" title="Save {{ s.name }}">{{ icon('save') }}</button>
     </form>
     {%- endfor %}
 </section>
@@ -38,13 +40,18 @@
 
 {% block styles %}
 <style>
-    .source { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
+    .source { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr) auto; align-items: start; gap: 8px 18px; padding: 12px 16px; }
     .source + .source { border-top: 1px solid var(--border); }
-    .source-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-    .source-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
-    .source-about { margin: -4px 0 0; font-size: 13px; color: var(--text-muted); max-width: 720px; }
-    .source-about a { color: var(--accent-text); }
-    .source-actions { display: flex; justify-content: flex-end; }
+    .source-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .source-about { margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--text-muted); }
+    .source-fields { display: flex; flex-direction: column; gap: 8px; }
+    .config-field-form.source .field { grid-template-columns: 120px minmax(0, 1fr); gap: 2px 12px; }
+    .app-page .page-body .source .field input { height: 30px; }
+    @media (max-width: 760px) {
+        .source { grid-template-columns: minmax(0, 1fr) auto; }
+        .source-fields { grid-column: 1 / -1; grid-row: 2; }
+    }
+    @media (max-width: 600px) { .config-field-form.source .field { grid-template-columns: minmax(0, 1fr); } }
     {{ config_field_styles() }}
 </style>
 {% endblock %}

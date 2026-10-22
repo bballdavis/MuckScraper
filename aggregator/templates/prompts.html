@@ -1,79 +1,40 @@
 {% extends 'settings_base.html' %}
+{% from 'icons.html' import icon %}
 {% block title %}Prompts{% endblock %}
 {% block settings_key %}prompts{% endblock %}
-{% block styles %}
-    <style>
-        .container { max-width: 900px; margin: 48px auto; padding: 0 20px; }
-        h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
-        .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 32px; }
-        .card {
-            background: var(--surface);
-            border-radius: 16px;
-            border: 1px solid var(--border);
-            overflow: hidden;
-            box-shadow: var(--shadow);
-        }
-        table { width: 100%; border-collapse: collapse; }
-        th {
-            text-align: left;
-            padding: 14px 20px; font-size: var(--fs-label);
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-muted);
-            border-bottom: 1px solid var(--border);
-            background: rgba(0,0,0,0.02);
-        }
-        td { padding: 12px 20px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-        tr:last-child td { border-bottom: none; }
-        .key-cell { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-muted); }
-        .badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 999px;
-            font-size: var(--fs-label);
-            font-weight: 700;
-        }
-        .badge-customized { background: #fef3c7; color: #92400e; }
-        [data-theme="dark"] .badge-customized { background: #4a3a10; color: #fbbf24; }
-        .edit-link { color: var(--accent-text); font-weight: 700; text-decoration: none; font-size: 13px; }
-        .empty { padding: 48px; text-align: center; color: var(--text-faint); font-style: italic; }
-    </style>
-{% endblock %}
 {% block settings_body %}
-<div class="container">
+<div class="page-head">
     <h1>Prompts</h1>
-    <p class="subtitle">LLM prompts used for summaries, deep reports, topic classification, outlet bias, and headline generation. Each can be edited and reset back to its original default independently.</p>
-
-    <div class="card">
-        {% if prompts %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Key</th>
-                    <th>Description</th>
-                    <th>Status</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for prompt in prompts %}
-                <tr>
-                    <td class="key-cell">{{ prompt.key }}</td>
-                    <td>{{ prompt.description }}</td>
-                    <td>
-                        {% if prompt.current_text != prompt.default_text %}
-                        <span class="badge badge-customized">Customized</span>
-                        {% endif %}
-                    </td>
-                    <td><a class="edit-link" href="{{ url_for('admin.edit_prompt', key=prompt.key) }}">Edit →</a></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="empty">No prompts registered.</div>
-        {% endif %}
-    </div>
+    <p>The LLM prompts behind summaries, deep reports, topic classification, outlet bias and headlines. Each can be edited and reset to its default on its own.</p>
 </div>
+
+<section class="panel">
+    {%- if prompts %}
+    <div class="table-scroll">
+    <table class="data-table stack-sm">
+        <thead>
+            <tr>
+                <th scope="col">Prompt</th>
+                <th scope="col">Status</th>
+                <th scope="col"><span class="visually-hidden">Edit</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {%- for prompt in prompts %}
+            <tr>
+                <td class="cell-main">
+                    <div>{{ prompt.description }}</div>
+                    <code class="row-sub">{{ prompt.key }}</code>
+                </td>
+                <td>{% if prompt.current_text != prompt.default_text %}<span class="chip chip-broad">Customized</span>{% else %}<span class="chip">Default</span>{% endif %}</td>
+                <td class="num"><a class="btn btn-quiet btn-square" href="{{ url_for('admin.edit_prompt', key=prompt.key) }}" aria-label="Edit {{ prompt.key }}" title="Edit">{{ icon('pencil') }}</a></td>
+            </tr>
+            {%- endfor %}
+        </tbody>
+    </table>
+    </div>
+    {%- else %}
+    <div class="panel-body muted">No prompts registered.</div>
+    {%- endif %}
+</section>
 {% endblock %}

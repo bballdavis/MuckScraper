@@ -1,169 +1,86 @@
 {% extends 'settings_base.html' %}
-{% block title %}Ingestion Blocklist{% endblock %}
-{% block settings_key %}ingest{% endblock %}
-{% block styles %}
-    <style>
-        .container { max-width: 1000px; margin: 48px auto; padding: 0 20px; }
-        h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
-        .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 16px; line-height: 1.6; }
-        .subtitle a { color: var(--accent-text); font-weight: 600; }
-        [data-theme="dark"] .subtitle a { color: #89b4fa; }
-        .notice {
-            background: rgba(37, 99, 235, 0.08);
-            border: 1px solid rgba(37, 99, 235, 0.2);
-            border-radius: 12px;
-            padding: 14px 18px;
-            font-size: 13px;
-            line-height: 1.6;
-            margin-bottom: 32px;
-            color: var(--text-muted);
-        }
-        .card {
-            background: var(--surface);
-            border-radius: 16px;
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-            overflow: hidden;
-        }
-        .card + .card { margin-top: 28px; }
-        .card-head { padding: 20px 22px 0; }
-        .card-title { font-size: 16px; font-weight: 800; }
-        .card-copy { color: var(--text-muted); font-size: 13px; margin-top: 4px; line-height: 1.6; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th {
-            text-align: left;
-            padding: 10px 22px; font-size: var(--fs-label);
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-muted);
-            border-bottom: 1px solid var(--border);
-            background: rgba(0,0,0,0.02);
-        }
-        [data-theme="dark"] th { background: rgba(255,255,255,0.02); }
-        td { padding: 8px 22px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-        tr:last-child td { border-bottom: none; }
-        tr.disabled { opacity: 0.45; }
-        input[type="text"] {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text);
-            padding: 6px 8px;
-            font-size: 13px;
-            font-family: inherit;
-            width: 100%;
-        }
-        td.pattern-cell { width: 30%; }
-        td.pattern-cell input { font-family: ui-monospace, monospace; }
-        td.actions { white-space: nowrap; width: 1%; }
-        .save-btn, .add-btn { background: var(--accent); }
-        .save-btn, .add-btn, .delete-btn {
-            color: white;
-            border: none;
-            padding: 6px 13px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-        .delete-btn { background: #b51a1a; }
-        .add-form {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            padding: 18px 22px;
-            flex-wrap: wrap;
-            border-top: 1px solid var(--border);
-            background: rgba(0,0,0,0.015);
-        }
-        [data-theme="dark"] .add-form { background: rgba(255,255,255,0.02); }
-        .add-form input[type="text"] { width: auto; flex: 1; min-width: 160px; }
-        .check-label { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-        .count { color: var(--text-faint); font-size: 12px; font-weight: 600; }
-        .empty { padding: 24px 22px; color: var(--text-faint); font-style: italic; font-size: 13px; }
-    </style>
-{% endblock %}
+{% from 'icons.html' import icon %}
+{%- set is_source = kind == 'source' %}
+{% block title %}{{ 'Blocked sources' if is_source else 'Blocked title keywords' }}{% endblock %}
+{% block settings_key %}{{ 'blocksources' if is_source else 'blockkeywords' }}{% endblock %}
 {% block settings_body %}
-<div class="container">
-    <h1>Ingestion Blocklist</h1>
-    <p class="subtitle">
-        Articles refused before anything is stored. Changes apply on the next run — no restart needed.
+{%- set active = blocks | selectattr('is_active') | list | length %}
+<div class="page-head">
+    <h1>{{ 'Blocked sources' if is_source else 'Blocked title keywords' }}</h1>
+    <p>
+        {%- if is_source %}
+        Articles whose URL contains one of these are refused before anything is stored. Use them for outlets whose whole output is off-limits: official team media, press-release wires, aggregators.
+        {%- else %}
+        Articles whose headline contains one of these are refused before anything is stored. Use them for formats rather than outlets: recaps, changelogs, gaming coverage.
+        {%- endif %}
+        Changes apply on the next run.
     </p>
-    <div class="notice">
-        <strong>Not the same as the <a href="{{ url_for('admin.scrape_blocklist') }}">Scrape Blocklist</a>.</strong>
-        That one lists domains whose <em>content</em> won't scrape — those articles are still ingested and still
-        count toward a story. These are never stored at all.
-        <br><br>
-        Matching is a plain case-insensitive substring, not a regex or an exact match. That is load-bearing for
-        the league domains — <code>nfl.com</code> is what catches <code>*-frontend.pocket.nfl.com</code>, and
-        <code>nba.com</code> also catches <code>wnba.com</code> — but it cuts both ways, so single common words
-        make bad title keywords: <code>picks</code> would kill "Trump picks Supreme Court nominee".
-        Untick <strong>Active</strong> to disable a rule without losing it.
-    </div>
-
-    {% for kind in kinds %}
-    {% set blocks = blocks_by_kind[kind] %}
-    <div class="card">
-        <div class="card-head">
-            <div class="card-title">
-                {{ 'Blocked Sources' if kind == 'source' else 'Blocked Title Keywords' }}
-                <span class="count">— {{ blocks | selectattr('is_active') | list | length }} active of {{ blocks | length }}</span>
-            </div>
-            <div class="card-copy">
-                {% if kind == 'source' %}
-                Matched against the article's URL. Use these for outlets whose entire output is off-limits —
-                official team media, press-release wires, aggregators.
-                {% else %}
-                Matched against the article's headline. Use these for formats rather than outlets —
-                recaps, changelogs, gaming coverage.
-                {% endif %}
-            </div>
-        </div>
-
-        {% if blocks %}
-        <table>
-            <thead>
-                <tr>
-                    <th>{{ 'URL substring' if kind == 'source' else 'Title substring' }}</th>
-                    <th>Why</th>
-                    <th>Active</th>
-                    <th></th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for block in blocks %}
-                <tr class="{{ 'disabled' if not block.is_active else '' }}">
-                    <form method="POST" action="{{ url_for('admin.update_ingestion_block', block_id=block.id) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <td class="pattern-cell"><input type="text" name="pattern" value="{{ block.pattern }}" required></td>
-                        <td><input type="text" name="note" value="{{ block.note or '' }}" placeholder="why this is blocked"></td>
-                        <td><input type="checkbox" name="is_active" {{ 'checked' if block.is_active else '' }}></td>
-                        <td class="actions"><button type="submit" class="save-btn">Save</button></td>
-                    </form>
-                    <td class="actions">
-                        <form method="POST" action="{{ url_for('admin.delete_ingestion_block', block_id=block.id) }}" onsubmit="return confirm('Delete the &quot;{{ block.pattern }}&quot; rule?');">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="delete-btn">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="empty">Nothing blocked in this category.</div>
-        {% endif %}
-
-        <form method="POST" action="{{ url_for('admin.add_ingestion_block') }}" class="add-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="kind" value="{{ kind }}">
-            <input type="text" name="pattern" placeholder="{{ 'e.g. example.com' if kind == 'source' else 'e.g. game recap' }}" required>
-            <input type="text" name="note" placeholder="why (optional)">
-            <button type="submit" class="add-btn">+ Add Rule</button>
-        </form>
-    </div>
-    {% endfor %}
 </div>
+
+<section class="panel">
+    <form method="POST" action="{{ url_for('admin.add_ingestion_block') }}" class="add-bar">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="kind" value="{{ kind }}">
+        <label class="add-field grow"><span>{{ 'URL contains' if is_source else 'Headline contains' }}</span><input type="text" name="pattern" class="mono" placeholder="{{ 'e.g. example.com' if is_source else 'e.g. game recap' }}" required></label>
+        <label class="add-field grow"><span>Why <span class="muted">(optional)</span></span><input type="text" name="note" placeholder="Shown here so the next person knows"></label>
+        <button type="submit" class="btn">{{ icon('plus') }} Add rule</button>
+    </form>
+    <details class="block-help">
+        <summary>How matching works</summary>
+        <p>A plain, case-insensitive substring: not a regex and not an exact match.
+        {%- if is_source %} That is what lets <code>nfl.com</code> catch <code>*-frontend.pocket.nfl.com</code>, but <code>nba.com</code> also catches <code>wnba.com</code>.
+        {%- else %} Single common words make bad rules: <code>picks</code> would drop "Trump picks Supreme Court nominee".{% endif %}
+        Switch a rule off to pause it without losing it.</p>
+        <p>Not the same as the <a href="{{ url_for('admin.scrape_blocklist') }}">scrape blocklist</a>: those articles are still stored and still count toward a story, only their text isn't scraped. These are never stored.</p>
+    </details>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Rules</h2>
+        <span class="chip">{{ active }} active of {{ blocks | length }}</span>
+    </div>
+    {%- if blocks %}
+    <div class="table-scroll">
+    <table class="data-table stack-sm">
+        <thead>
+            <tr>
+                <th scope="col">{{ 'URL contains' if is_source else 'Headline contains' }}</th>
+                <th scope="col">Why</th>
+                <th scope="col">Active</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {%- for block in blocks %}
+            {%- set f = 'block-' ~ block.id %}
+            <tr id="{{ f }}" class="{{ 'is-off' if not block.is_active else '' }}">
+                <td class="cell-main" style="width: 34%;"><input type="text" form="{{ f }}-form" name="pattern" class="mono" value="{{ block.pattern }}" required aria-label="Pattern" style="width: 100%;"></td>
+                <td><input type="text" form="{{ f }}-form" name="note" value="{{ block.note or '' }}" placeholder="Why this is blocked" aria-label="Why" style="width: 100%;"></td>
+                <td>
+                    <label class="switch" title="{{ 'Active' if block.is_active else 'Paused' }}">
+                        <input type="checkbox" form="{{ f }}-form" name="is_active" {{ 'checked' if block.is_active else '' }} onchange="this.form.requestSubmit()" aria-label="Rule active"><span></span>
+                    </label>
+                </td>
+                <td>
+                    <div class="cell-actions">
+                        <form id="{{ f }}-form" method="POST" action="{{ url_for('admin.update_ingestion_block', block_id=block.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-quiet btn-square" aria-label="Save rule" title="Save">{{ icon('save') }}</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('admin.delete_ingestion_block', block_id=block.id) }}" onsubmit="return confirm({{ ('Delete the “' ~ block.pattern ~ '” rule?')|tojson|forceescape }});">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger btn-square" aria-label="Delete rule" title="Delete">{{ icon('trash') }}</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {%- endfor %}
+        </tbody>
+    </table>
+    </div>
+    {%- else %}
+    <div class="panel-body muted">No rules yet.</div>
+    {%- endif %}
+</section>
 {% endblock %}
