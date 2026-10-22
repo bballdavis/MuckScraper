@@ -14,27 +14,86 @@ from .config_crud import pipeline_schedule_restart_needed
 logger = logging.getLogger(__name__)
 
 
+# The Overview's job list, safest first (settings mock, 2026-10-22). `bulk` is
+# the BULK_TASK_ACTIONS key whose status the page polls; `post` is the form
+# endpoint (or None for a script-run job); `confirm` asks before broad and
+# dangerous ones.
+OVERVIEW_JOBS = [
+    {"name": "Wake Ollama", "desc": "Send the Wake-on-LAN packet to the Ollama machine",
+     "risk": "safe", "post": "admin.wake_ollama", "button": "Wake"},
+    {"name": "Run AI catch-up", "desc": "Fill missing summaries and ratings without a full pipeline run",
+     "risk": "safe", "post": "admin.ollama_catchup_route", "button": "Run", "bulk": "ollama_catchup"},
+    {"name": "Scrape missing", "desc": "Retry recent articles with no content, or marked failed or pending",
+     "risk": "safe", "post": "admin.scrape_all_missing", "button": "Run", "bulk": "scrape_all_missing"},
+    {"name": "Sync AllSides ratings", "desc": "Refresh outlet bias from the AllSides mapping and pass it on to articles",
+     "risk": "maintenance", "post": "admin.sync_allsides", "button": "Run"},
+    {"name": "Reclassify topics", "desc": "Re-run topic classification on stored stories and articles",
+     "risk": "broad", "post": "admin.reclassify_articles", "button": "Run", "bulk": "reclassify_articles",
+     "confirm": "Reclassify every stored story and article? Topics can change across the site."},
+    {"name": "Audit stored scrapes", "desc": "Catch login walls, duplicate junk and weak content in stored articles",
+     "risk": "broad", "post": "admin.audit_scrapes", "button": "Run", "bulk": "audit_scrapes",
+     "confirm": "Re-audit every stored scrape? Articles that fail are marked for repair."},
+    {"name": "Rebuild story summaries", "desc": "Clear and regenerate every summary and deep report",
+     "risk": "danger", "post": "admin.force_resummarize", "button": "Run", "bulk": "force_resummarize",
+     "confirm": "Clear and regenerate every story summary and deep report? This takes a long time and can't be undone."},
+    {"name": "Merge duplicate outlets", "desc": "Normalize outlet names and merge duplicates onto one outlet",
+     "risk": "danger", "post": None, "button": "Run", "script": "merge-outlets",
+     "confirm": "Merge and rename duplicate outlets? This changes stored outlet records and article associations."},
+]
+
+
+def _next_scheduled_run():
+    """The next active PipelineSchedule firing, as (datetime, is_full) in the
+    schedule's own zone (America/New_York), or None when nothing is scheduled."""
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+    from aggregator.models import PipelineSchedule
+
+    entries = PipelineSchedule.query.filter_by(is_active=True).all()
+    if not entries:
+        return None
+    now = datetime.now(ZoneInfo("America/New_York"))
+    best = None
+    for entry in entries:
+        at = now.replace(hour=entry.hour, minute=0, second=0, microsecond=0)
+        if at <= now:
+            at += timedelta(days=1)
+        if best is None or at < best[0]:
+            best = (at, entry.run_full_pipeline)
+    return best
+
+
+def _job_queue_counts():
+    from aggregator.models import Job
+    try:
+        return {
+            "queued": Job.query.filter_by(status="queued").count(),
+            "running": Job.query.filter_by(status="running").count(),
+        }
+    except Exception as e:  # the jobs table is newer than some installs' schema
+        logger.warning("[Overview] Could not count jobs: %s", e)
+        return None
+
+
 @admin.route("/tools")
 @role_required(ROLE_ADMIN)
 def tools_page():
-    from news_fetcher.fetch_and_store_articles import (
-        AUTO_ARTICLE_DEEP_ANALYSIS_SETTING_KEY,
-    )
-    auto_deep = bool(_load_json_setting(AUTO_ARTICLE_DEEP_ANALYSIS_SETTING_KEY))
-
     running_ops = _running_operations()
     fetch_ops = [op for op in running_ops if op["kind"] == "fetch"]
     other_ops = [op for op in running_ops if op["kind"] == "other"]
+    containers = _list_containers()
 
     return render_template(
         "admin_tools.html",
-        auto_article_deep_analysis_enabled=auto_deep,
-        containers=_list_containers(),
+        containers=containers,
+        containers_running=sum(1 for c in containers if c.get("status") == "running"),
         container_service_order=CONTAINER_SERVICE_NAMES,
         pipeline_schedule_restart_needed=pipeline_schedule_restart_needed(),
-        fetch_running=bool(fetch_ops),
         fetch_running_ops=fetch_ops,
         other_running_ops=other_ops,
+        next_run=_next_scheduled_run(),
+        job_queue=_job_queue_counts(),
+        jobs=OVERVIEW_JOBS,
         restart_blocked_reason=request.args.get("blocked_reason"),
         restart_blocked_target=request.args.get("blocked_target"),
     )
@@ -49,7 +108,7 @@ def toggle_auto_article_deep_analysis():
     enabled = request.form.get("enabled") == "true"
     _save_json_setting(AUTO_ARTICLE_DEEP_ANALYSIS_SETTING_KEY, enabled)
     logger.info(f"[Settings] auto_article_deep_analysis_enabled set to {enabled}")
-    return redirect(url_for("admin.tools_page"))
+    return redirect(url_for("admin.llm_providers_page"))
 
 
 @admin.route("/containers/<name>/restart", methods=["POST"])

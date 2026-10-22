@@ -1,764 +1,260 @@
-{% from 'icons.html' import theme_toggle %}
-{% from 'account_menu.html' import account_menu with context %}
-<!DOCTYPE html>
-<html data-theme="light">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_32.png') }}">
-    <link rel="icon" type="image/png" sizes="128x128" href="{{ url_for('static', filename='favicon_128.png') }}">
-    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192.png') }}">
-    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512.png') }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
-    <title>Admin Tools — MuckScraper</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
-    <style>
-        :root {
-            --broad: #b08a22;
-            --broad-dark: #8d6d18;
-            --broad-soft: #fbf3dc;
-            --danger: #9a725b;
-            --danger-dark: #7b5a47;
-            --danger-soft: #f6eee9;
-            --warning-bg: #f1f3f4;
-            --warning-border: #d7dcdf;
-        }
-        [data-theme="dark"] {
-            --broad-soft: rgba(176, 138, 34, 0.18);
-            --danger-soft: rgba(154, 114, 91, 0.18);
-            --warning-bg: #1d2430;
-            --warning-border: #364152;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-        }
-        .topbar {
-            background: var(--topbar-bg);
-            padding: 16px 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-        }
-        .topbar-left { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
-        .topbar a { color: #89b4fa; text-decoration: none; font-size: 14px; font-weight: 600; }
-        .topbar-title { color: var(--topbar-text); font-size: 18px; font-weight: 800; }
-        .theme-toggle {
-            background: none;
-            border: 1px solid rgba(255,255,255,0.2);
-            color: var(--topbar-text);
-            padding: 6px 14px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-        }
-        .container { max-width: 1160px; margin: 40px auto; padding: 0 20px 48px; }
-        h1 { font-size: 32px; font-weight: 800; margin-bottom: 10px; }
-        .subtitle {
-            color: var(--text-muted);
-            font-size: 15px;
-            margin-bottom: 28px;
-            max-width: 780px;
-            line-height: 1.55;
-        }
-        .warning-banner {
-            margin-bottom: 28px;
-            padding: 16px 18px;
-            border-radius: 14px;
-            background: var(--warning-bg);
-            border: 1px solid var(--warning-border);
-            color: var(--text);
-            font-size: 14px;
-            line-height: 1.55;
-        }
-        .warning-banner strong { color: var(--danger-dark); display: block; margin-bottom: 8px; font-weight: 800; }
-        .warning-banner p + p { margin-top: 10px; }
-        .section {
-            margin-bottom: 28px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
-        }
-        .section-head {
-            padding: 20px 22px 16px;
-            border-bottom: 1px solid var(--border);
-            background: linear-gradient(180deg, rgba(90, 95, 82, 0.08), rgba(90, 95, 82, 0.02));
-        }
-        .section-title {
-            font-size: 17px;
-            font-weight: 800;
-            margin-bottom: 6px;
-        }
-        .section-copy {
-            color: var(--text-muted);
-            font-size: 14px;
-            line-height: 1.55;
-            max-width: 780px;
-        }
-        .tool-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 0;
-        }
-        .tool-card {
-            padding: 18px 20px 20px;
-            border-right: 1px solid var(--border);
-            border-bottom: 1px solid var(--border);
-        }
-        .tool-card:nth-child(3n) { border-right: none; }
-        .tool-card-title {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 16px;
-            font-weight: 800;
-            margin-bottom: 8px;
-        }
-        .tool-card p {
-            color: var(--text-muted);
-            font-size: 14px;
-            line-height: 1.55;
-            margin-bottom: 14px;
-            min-height: 66px;
-        }
-        .meta-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-bottom: 14px;
-        }
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: var(--fs-label);
-            font-weight: 800;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            border-radius: 999px;
-            padding: 5px 10px;
-            background: rgba(90, 95, 82, 0.12);
-            color: var(--accent-dark);
-        }
-        .badge-danger {
-            background: var(--danger-soft);
-            color: var(--danger-dark);
-            border: 1px solid rgba(154, 114, 91, 0.22);
-        }
-        .badge-broad {
-            background: var(--broad-soft);
-            color: var(--broad-dark);
-            border: 1px solid rgba(176, 138, 34, 0.22);
-        }
-        .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--accent);
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 10px;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            text-decoration: none;
-        }
-        .btn:hover { background: var(--accent-dark); }
-        .btn:disabled {
-            opacity: 0.55;
-            cursor: not-allowed;
-        }
-        .btn-secondary {
-            background: transparent;
-            color: var(--accent-text);
-            border: 1px solid var(--border);
-        }
-        .btn-secondary:hover {
-            border-color: var(--accent);
-            color: var(--accent-dark);
-            background: rgba(90, 95, 82, 0.05);
-        }
-        .btn-danger {
-            background: var(--danger);
-        }
-        .btn-danger:hover { background: var(--danger-dark); }
-        .btn-broad {
-            background: var(--broad);
-            color: white;
-        }
-        .btn-broad:hover { background: var(--broad-dark); }
-        .status-box {
-            margin-top: 10px;
-            padding: 12px 14px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            background: rgba(90, 95, 82, 0.05);
-        }
-        .status-line {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 6px;
-        }
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            font-size: var(--fs-label);
-            font-weight: 800;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            border-radius: 999px;
-            padding: 5px 10px;
-            border: 1px solid var(--border);
-            background: var(--surface);
-        }
-        .status-pill.running {
-            background: var(--broad-soft);
-            color: var(--broad-dark);
-            border-color: rgba(176, 138, 34, 0.25);
-        }
-        .status-pill.success {
-            background: rgba(90, 95, 82, 0.12);
-            color: var(--accent-dark);
-            border-color: rgba(90, 95, 82, 0.22);
-        }
-        .status-pill.error {
-            background: var(--danger-soft);
-            color: var(--danger-dark);
-            border-color: rgba(154, 114, 91, 0.22);
-        }
-        .status-pill.idle {
-            color: var(--text-muted);
-        }
-        .status-copy {
-            color: var(--text-muted);
-            font-size: 13px;
-            line-height: 1.45;
-        }
-        .status-meta {
-            color: var(--text-faint);
-            font-size: 12px;
-            line-height: 1.45;
-            margin-top: 6px;
-        }
-        .fetch-status {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 14px 18px;
-            border-radius: 14px;
-            font-size: 15px;
-            font-weight: 700;
-            margin-bottom: 16px;
-        }
-        .fetch-status .dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-        .fetch-status.is-running {
-            background: rgba(220, 38, 38, 0.10);
-            color: #b91c1c;
-            border: 1px solid rgba(220, 38, 38, 0.25);
-        }
-        .fetch-status.is-running .dot { background: #dc2626; }
-        [data-theme="dark"] .fetch-status.is-running { color: #fca5a5; background: rgba(220, 38, 38, 0.15); }
-        .fetch-status.is-idle {
-            background: rgba(22, 163, 74, 0.10);
-            color: #15803d;
-            border: 1px solid rgba(22, 163, 74, 0.25);
-        }
-        .fetch-status.is-idle .dot { background: #16a34a; }
-        [data-theme="dark"] .fetch-status.is-idle { color: #86efac; background: rgba(22, 163, 74, 0.15); }
-        .other-running-list {
-            list-style: none;
-            margin-bottom: 16px;
-            font-size: 13px;
-            color: var(--text-muted);
-        }
-        .other-running-list li {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 0;
-        }
-        .other-running-list .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #dc2626;
-            flex-shrink: 0;
-        }
-        .restart-error {
-            border-color: rgba(154, 114, 91, 0.4) !important;
-        }
-        .restart-error strong { color: var(--danger-dark); }
-        .container-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
-            padding: 20px 22px;
-        }
-        .container-card {
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 14px 16px;
-        }
-        .container-card .name {
-            font-weight: 800;
-            font-size: 14px;
-            margin-bottom: 6px;
-        }
-        .container-card form { margin-top: 10px; }
-        .restart-all-row {
-            padding: 0 22px 20px;
-        }
-        @media (max-width: 980px) {
-            .tool-card:nth-child(3n) { border-right: 1px solid var(--border); }
-            .tool-card:nth-child(2n) { border-right: none; }
-        }
-        @media (max-width: 760px) {
-            .topbar { padding: 16px 18px; }
-            .container { margin: 28px auto; padding: 0 14px 32px; }
-            .tool-list { grid-template-columns: 1fr; }
-            .tool-card { border-right: none; }
-        }
-    </style>
-</head>
-<body>
-{% macro bulk_task_status_box(action) %}
-<div class="status-box" id="bulk-status-box-{{ action }}">
-    <div class="status-line">
-        <span class="status-pill idle" id="bulk-state-{{ action }}">Idle</span>
-    </div>
-    <div class="status-copy" id="bulk-message-{{ action }}">Not run in this app session yet.</div>
-    <div class="status-meta" id="bulk-meta-{{ action }}"></div>
+{#- Settings › Overview (admin.tools_page): system health, the containers and
+    the one-off jobs. Configuration lives in the other settings sections. -#}
+{% extends 'settings_base.html' %}
+{% block title %}Settings{% endblock %}
+{% block settings_key %}overview{% endblock %}
+{% block settings_body %}
+{%- set risk_labels = {'safe': 'Safe', 'maintenance': 'Maintenance', 'broad': 'Broad change', 'danger': 'Danger'} %}
+<div class="page-head">
+    <h1>Overview</h1>
+    <p>System health and one-off jobs. Configuration lives in the sections on the left.</p>
 </div>
-{% endmacro %}
-{% from 'breadcrumb.html' import back_link %}
-<div class="topbar">
-    <div class="topbar-left crumb-bar">
-        <span class="topbar-title">MuckScraper</span>
-        {{ back_link(feed_back_url(), 'Back to Feed') }}
+
+<div class="stat-grid">
+    <div class="stat">
+        <span class="stat-label">Pipeline</span>
+        {%- if fetch_running_ops %}
+        <span class="stat-value"><span class="dot warn"></span>Running</span>
+        <span class="stat-sub">{{ fetch_running_ops[0].label }}</span>
+        {%- else %}
+        <span class="stat-value"><span class="dot ok"></span>Idle</span>
+        <span class="stat-sub">{% if next_run %}Next {{ 'full run' if next_run[1] else 'fetch' }} {{ next_run[0].strftime('%-I:%M %p') }} ET{% else %}No runs scheduled{% endif %}</span>
+        {%- endif %}
     </div>
-    <div class="topbar-right">
-        {{ theme_toggle() }}
-        {{ account_menu() }}
+    <div class="stat">
+        <span class="stat-label">Containers</span>
+        {%- if containers %}
+        <span class="stat-value"><span class="dot {{ 'ok' if containers_running == containers|length else 'bad' }}"></span>{{ containers_running }} of {{ containers|length }} running</span>
+        <span class="stat-sub">{{ 'All healthy' if containers_running == containers|length else 'Some are stopped' }}</span>
+        {%- else %}
+        <span class="stat-value"><span class="dot off"></span>Unknown</span>
+        <span class="stat-sub">Restart service unreachable</span>
+        {%- endif %}
+    </div>
+    <div class="stat">
+        <span class="stat-label">LLM</span>
+        <span class="stat-value" id="llm-health"><span class="dot off"></span>Checking…</span>
+        <span class="stat-sub" id="llm-health-sub"><a href="{{ url_for('admin.llm_providers_page') }}">Providers</a></span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Job queue</span>
+        {%- if job_queue is none %}
+        <span class="stat-value"><span class="dot off"></span>Unknown</span>
+        <span class="stat-sub">Jobs table missing</span>
+        {%- else %}
+        <span class="stat-value"><span class="dot {{ 'warn' if job_queue.running or job_queue.queued else 'ok' }}"></span>{% if job_queue.running or job_queue.queued %}{{ job_queue.running }} running{% else %}Empty{% endif %}</span>
+        <span class="stat-sub">{{ job_queue.queued }} queued · run by the scheduler</span>
+        {%- endif %}
     </div>
 </div>
 
-<div class="container">
-    <h1>Admin Tools</h1>
-    <p class="subtitle">This page centralizes operational tasks, repair jobs, diagnostics, and maintenance actions. Routine controls are separated from broad-impact actions so the feed page stays focused on reviewing stories.</p>
+{%- if other_running_ops %}
+<div class="notice">
+    <span><strong>Also running:</strong> {% for op in other_running_ops %}{{ op.label }}{% if not loop.last %}; {% endif %}{% endfor %}</span>
+</div>
+{%- endif %}
 
-    <div class="warning-banner">
-        <strong>WARNING!</strong>
-        <p>Tools marked with <span class="badge badge-danger">⚠ Danger</span> can rewrite large amounts of stored data, change grouping or summaries site-wide, or make troubleshooting harder if run casually. Use those only when you have a concrete repair goal.</p>
-        <p>Tools marked with <span class="badge badge-broad">⚠ Broad change</span> are less destructive, but they still update many existing records at once and can change how content is categorized or interpreted.</p>
+{%- if pipeline_schedule_restart_needed %}
+<div class="notice" role="alert">
+    <span><strong>Scheduler restart needed.</strong> The run schedule changed since the scheduler last started.</span>
+    <form method="POST" action="{{ url_for('admin.restart_container', name='scheduler') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-broad">Restart scheduler</button>
+    </form>
+</div>
+{%- endif %}
+
+{%- if restart_blocked_reason %}
+<div class="notice is-error" role="alert">
+    <span><strong>Restart refused.</strong> {{ restart_blocked_reason }}</span>
+    {%- if restart_blocked_target %}
+    <form method="POST" action="{{ url_for('admin.restart_all_containers') if restart_blocked_target == 'all' else url_for('admin.restart_container', name=restart_blocked_target) }}"
+          onsubmit="return confirm('This will interrupt what\'s currently running. Restart anyway?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="force" value="true">
+        <button type="submit" class="btn btn-danger">Restart anyway</button>
+    </form>
+    {%- endif %}
+</div>
+{%- endif %}
+
+<div class="stack" style="margin-top: 16px;">
+<section class="panel">
+    <div class="panel-head">
+        <h2>Containers</h2>
+        {%- if containers %}
+        <form method="POST" action="{{ url_for('admin.restart_all_containers') }}" onsubmit="return confirm('Restart every container? This briefly stops the whole app, including this page.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger">Restart all</button>
+        </form>
+        {%- endif %}
     </div>
-
-    <div class="section">
-        <div class="section-head">
-            <div class="section-title">Configuration</div>
-            <div class="section-copy">Manage the topic taxonomy, news sources and queries, LLM prompts, the run schedule, and the public headlines feed.</div>
-        </div>
-        <div class="tool-list">
-            <div class="tool-card">
-                <div class="tool-card-title">Topics</div>
-                <p>Add, reorder, or deactivate the topics used for classification and the sidebar filter.</p>
-                <a href="{{ url_for('admin.topics_page') }}" class="btn btn-secondary">Open Topics</a>
-            </div>
-            <div class="tool-card">
-                <div class="tool-card-title">RSS Feeds</div>
-                <p>Manage general-ingestion and left/right enrichment RSS feed sources.</p>
-                <a href="{{ url_for('admin.rss_feeds_page') }}" class="btn btn-secondary">Open RSS Feeds</a>
-            </div>
-            <div class="tool-card">
-                <div class="tool-card-title">Prompts</div>
-                <p>Edit the LLM prompts used for summaries, deep reports, classification, and bias scoring. Each can be reset back to its original default.</p>
-                <a href="{{ url_for('admin.prompts_page') }}" class="btn btn-secondary">Open Prompts</a>
-            </div>
-            <div class="tool-card">
-                <div class="tool-card-title">Pipeline Schedule</div>
-                <p>Add, edit, or remove when fetch-only and full-pipeline runs happen.</p>
-                <a href="{{ url_for('admin.pipeline_schedule_page') }}" class="btn btn-secondary">Open Pipeline Schedule</a>
-            </div>
-            <div class="tool-card">
-                <div class="tool-card-title">Ingestion Blocklist</div>
-                <p>Edit which sources and headline keywords are refused before an article is ever stored.</p>
-                <a href="{{ url_for('admin.ingestion_blocks_page') }}" class="btn btn-secondary">Open Ingestion Blocklist</a>
-            </div>
-            <div class="tool-card">
-                <div class="tool-card-title">Scheduled Fetches</div>
-                <p>Edit the NewsAPI/GNews categories and search queries each run pulls from.</p>
-                <a href="{{ url_for('admin.scheduled_fetches_page') }}" class="btn btn-secondary">Open Scheduled Fetches</a>
-            </div>
-            <div class="tool-card">
-                <div class="tool-card-title">Headlines</div>
-                <p>View the latest published edition's headlines and analysis as a plain list.</p>
-                <a href="{{ url_for('public.headlines_feed') }}" class="btn btn-secondary">Open Headlines</a>
-            </div>
-            <div class="tool-card">
-                <div class="tool-card-title">Auto Article Deep Analysis</div>
-                <p>When on, ingestion also generates per-article deep analysis for qualifying articles (politics/science/business) alongside their summaries. Off by default &mdash; each analysis costs extra GPU time.</p>
-                <div class="meta-row">
-                    <span class="badge">{{ 'Enabled' if auto_article_deep_analysis_enabled else 'Disabled' }}</span>
-                </div>
-                <form method="POST" action="{{ url_for('admin.toggle_auto_article_deep_analysis') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="enabled" value="{{ 'false' if auto_article_deep_analysis_enabled else 'true' }}">
-                    <button type="submit" class="btn">{{ 'Disable' if auto_article_deep_analysis_enabled else 'Enable' }}</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-head">
-            <div class="section-title">Container Restart</div>
-            <div class="section-copy">Restart individual containers, or everything at once. Blocked automatically while a fetch or other background task is running so a restart can't silently kill it.</div>
-        </div>
-        <div style="padding: 20px 22px 0;">
-            {% if fetch_running %}
-            <div class="fetch-status is-running">
-                <span class="dot"></span>
-                {% for op in fetch_running_ops %}
-                {{ op.label }} (started {{ op.started_at }}){% if not loop.last %}; {% endif %}
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="fetch-status is-idle">
-                <span class="dot"></span>
-                No fetch or pipeline run in progress
-            </div>
-            {% endif %}
-
-            {% if other_running_ops %}
-            <ul class="other-running-list">
-                {% for op in other_running_ops %}
-                <li><span class="dot"></span>{{ op.label }} (started {{ op.started_at }})</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-
-            {% if pipeline_schedule_restart_needed %}
-            <div class="warning-banner">
-                <strong>Scheduler restart needed</strong>
-                <p>The pipeline schedule was changed after the scheduler last started. Restart <code>scheduler</code> below for the new run times to take effect.</p>
-            </div>
-            {% endif %}
-
-            {% if restart_blocked_reason %}
-            <div class="warning-banner restart-error">
-                <strong>Restart refused</strong>
-                <p>{{ restart_blocked_reason }}</p>
-                {% if restart_blocked_target %}
-                <form method="POST" action="{{ url_for('admin.restart_all_containers') if restart_blocked_target == 'all' else url_for('admin.restart_container', name=restart_blocked_target) }}"
-                      onsubmit="return confirm('This will interrupt what\'s currently running. Restart anyway?');"
-                      style="margin-top: 10px;">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="force" value="true">
-                    <button type="submit" class="btn btn-danger">Restart Anyway</button>
-                </form>
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-
-        {% if containers %}
-        <div class="container-grid">
-            {% for service in container_service_order %}
-            {% set c = containers | selectattr('service', 'equalto', service) | first %}
-            {% if c %}
-            <div class="container-card">
-                <div class="name">{{ service }}</div>
-                <span class="badge {{ 'badge-danger' if c.status != 'running' else '' }}">{{ c.status }}</span>
-                <form method="POST" action="{{ url_for('admin.restart_container', name=service) }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-secondary">Restart</button>
-                </form>
-            </div>
-            {% endif %}
-            {% endfor %}
-        </div>
-        <div class="restart-all-row">
-            <form method="POST" action="{{ url_for('admin.restart_all_containers') }}" onsubmit="return confirm('Restart every container? This briefly stops the whole app, including this page.');">
+    {%- if containers %}
+    <div class="container-chips">
+        {%- for service in container_service_order %}
+        {%- set c = containers | selectattr('service', 'equalto', service) | first %}
+        {%- if c %}
+        <div class="container-chip" title="{{ c.status }}">
+            <span class="dot {{ 'ok' if c.status == 'running' else 'bad' }}"></span>{{ service }}
+            <form method="POST" action="{{ url_for('admin.restart_container', name=service) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-danger">Restart All</button>
+                <button type="submit" class="btn btn-icon" aria-label="Restart {{ service }}" title="Restart {{ service }}">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>
+                </button>
             </form>
         </div>
-        {% else %}
-        <div style="padding: 0 22px 20px; color: var(--text-faint); font-style: italic;">Could not reach the container restart service.</div>
-        {% endif %}
+        {%- endif %}
+        {%- endfor %}
     </div>
+    {%- else %}
+    <div class="panel-body muted">Could not reach the container restart service.</div>
+    {%- endif %}
+</section>
 
-    <div class="section">
-        <div class="section-head">
-            <div class="section-title">Operational</div>
-            <div class="section-copy">Short-running actions you might use during normal day-to-day monitoring or when the AI side is offline or behind.</div>
-        </div>
-        <div class="tool-list">
-            <div class="tool-card">
-                <div class="tool-card-title">Wake Ollama</div>
-                <p>Sends the Wake-on-LAN packet to the Ollama machine so AI tasks can resume if the box is asleep.</p>
-                <p id="ollama-active-host" style="font-size: 0.85em; color: var(--text-muted);">Checking Ollama host&hellip;</p>
-                <div class="meta-row">
-                    <span class="badge">Safe</span>
-                </div>
-                <form method="POST" action="{{ url_for('admin.wake_ollama') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="next" value="{{ url_for('admin.tools_page') }}">
-                    <button type="submit" class="btn">Wake Ollama</button>
-                </form>
-            </div>
-            <div class="tool-card">
-                <div class="tool-card-title">Run AI Catch-up</div>
-                <p>Fills in missing AI outputs for existing stories and articles without running a full scheduled pipeline.</p>
-                <div class="meta-row">
-                    <span class="badge">Safe</span>
-                </div>
-                <form method="POST" action="{{ url_for('admin.ollama_catchup_route') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="next" value="{{ url_for('admin.tools_page') }}">
-                    <button type="submit" class="btn" id="bulk-btn-ollama_catchup">Run AI Catch-up</button>
-                </form>
-                {{ bulk_task_status_box("ollama_catchup") }}
-            </div>
-            <div class="tool-card">
-                <div class="tool-card-title">Scrape Missing</div>
-                <p>Attempts to fetch readable article content for recent articles that are missing content or still marked failed/pending.</p>
-                <div class="meta-row">
-                    <span class="badge">Safe</span>
-                </div>
-                <form method="POST" action="{{ url_for('admin.scrape_all_missing') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="next" value="{{ url_for('admin.tools_page') }}">
-                    <button type="submit" class="btn" id="bulk-btn-scrape_all_missing">Scrape Missing</button>
-                </form>
-                {{ bulk_task_status_box("scrape_all_missing") }}
-            </div>
+<section class="panel">
+    <div class="panel-head">
+        <h2>Jobs</h2>
+        <div class="seg" role="group" aria-label="Show jobs">
+            <button type="button" data-risk="all" aria-pressed="true">All</button>
+            <button type="button" data-risk="safe" aria-pressed="false">Safe</button>
+            <button type="button" data-risk="broad" aria-pressed="false">Broad</button>
+            <button type="button" data-risk="danger" aria-pressed="false">Danger</button>
         </div>
     </div>
-
-    <div class="section">
-        <div class="section-head">
-            <div class="section-title">Content Repair</div>
-            <div class="section-copy">Use these when existing stories need repair or normalization after a ranking, grouping, topic, or outlet-bias issue.</div>
-        </div>
-        <div class="tool-list">
-            <div class="tool-card">
-                <div class="tool-card-title">Reclassify Topics</div>
-                <p>Re-runs topic classification so stored stories/articles can be reassigned to better topics after prompt or model changes.</p>
-                <div class="meta-row">
-                    <span class="badge badge-broad">⚠ Broad change</span>
-                </div>
-                <form method="POST" action="{{ url_for('admin.reclassify_articles') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="next" value="{{ url_for('admin.tools_page') }}">
-                    <button type="submit" class="btn btn-broad" id="bulk-btn-reclassify_articles">Reclassify Topics</button>
-                </form>
-                {{ bulk_task_status_box("reclassify_articles") }}
-            </div>
-            <div class="tool-card">
-                <div class="tool-card-title">Rebuild Story Summaries</div>
-                <p>Clears and regenerates summaries/deep reports across stories. Useful after major prompt or scraper improvements.</p>
-                <div class="meta-row">
-                    <span class="badge badge-danger">⚠ Danger</span>
-                </div>
-                <form method="POST" action="{{ url_for('admin.force_resummarize') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="next" value="{{ url_for('admin.tools_page') }}">
-                    <button type="submit" class="btn btn-danger" id="bulk-btn-force_resummarize">Rebuild Story Summaries</button>
-                </form>
-                {{ bulk_task_status_box("force_resummarize") }}
-            </div>
-            <div class="tool-card">
-                <div class="tool-card-title">Sync AllSides Ratings</div>
-                <p>Refreshes outlet bias from the built-in AllSides mapping and propagates updated outlet scores to related articles.</p>
-                <div class="meta-row">
-                    <span class="badge">Maintenance</span>
-                </div>
-                <form method="POST" action="{{ url_for('admin.sync_allsides') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="next" value="{{ url_for('admin.tools_page') }}">
-                    <button type="submit" class="btn">Sync AllSides Ratings</button>
-                </form>
-            </div>
-        </div>
+    <div class="table-scroll">
+        <table class="data-table jobs-table">
+            <thead>
+                <tr>
+                    <th scope="col">Job</th>
+                    <th scope="col">Impact</th>
+                    <th scope="col">Last run</th>
+                    <th scope="col" class="num"><span class="visually-hidden">Action</span></th>
+                </tr>
+            </thead>
+            <tbody>
+            {%- for job in jobs %}
+                {%- set chip = {'safe': 'chip-safe', 'broad': 'chip-broad', 'danger': 'chip-danger'}.get(job.risk, '') %}
+                {%- set btn = {'broad': 'btn-broad', 'danger': 'btn-danger'}.get(job.risk, 'btn-quiet') %}
+                <tr data-risk="{{ job.risk }}">
+                    <td>
+                        <div class="row-label">{{ job.name }}</div>
+                        <span class="row-sub">{{ job.desc }}</span>
+                        <span class="chip {{ chip }} job-risk-inline">{{ risk_labels[job.risk] }}</span>
+                    </td>
+                    <td><span class="chip {{ chip }}">{{ risk_labels[job.risk] }}</span></td>
+                    <td class="muted" style="white-space: nowrap;"{% if job.bulk %} id="job-last-{{ job.bulk }}"{% endif %}>—</td>
+                    <td class="num">
+                        {%- if job.post %}
+                        <form method="POST" action="{{ url_for(job.post) }}"{% if job.confirm %} onsubmit="return confirm({{ job.confirm|tojson|forceescape }});"{% endif %}>
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="next" value="{{ url_for('admin.tools_page') }}">
+                            <button type="submit" class="btn {{ btn }}"{% if job.bulk %} id="job-btn-{{ job.bulk }}"{% endif %}>{{ job.button }}{% if job.confirm %}…{% endif %}</button>
+                        </form>
+                        {%- else %}
+                        <button type="button" class="btn {{ btn }}" data-script="{{ job.script }}" data-confirm="{{ job.confirm }}">{{ job.button }}…</button>
+                        {%- endif %}
+                    </td>
+                </tr>
+            {%- endfor %}
+            </tbody>
+        </table>
     </div>
-
-    <div class="section">
-        <div class="section-head">
-            <div class="section-title">Scraper Diagnostics</div>
-            <div class="section-copy">Navigate to live scraper telemetry or run targeted auditing when you suspect blocklist or content-quality problems.</div>
-        </div>
-        <div class="tool-list">
-            <div class="tool-card">
-                <div class="tool-card-title">Scrape Blocklist</div>
-                <p>Opens the dedicated blocklist page with recent domain trouble, retry cache information, and unblock controls.</p>
-                <div class="meta-row">
-                    <span class="badge">Navigation</span>
-                </div>
-                <a href="{{ url_for('admin.scrape_blocklist') }}" class="btn btn-secondary">Open Scrape Blocklist</a>
-            </div>
-            <div class="tool-card">
-                <div class="tool-card-title">Audit Stored Scrapes</div>
-                <p>Re-audits existing stored article content to catch bad login pages, duplicate junk, or weak content that should be repaired.</p>
-                <div class="meta-row">
-                    <span class="badge badge-broad">⚠ Broad change</span>
-                </div>
-                <form method="POST" action="{{ url_for('admin.audit_scrapes') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="next" value="{{ url_for('admin.tools_page') }}">
-                    <button type="submit" class="btn btn-broad" id="bulk-btn-audit_scrapes">Audit Stored Scrapes</button>
-                </form>
-                {{ bulk_task_status_box("audit_scrapes") }}
-            </div>
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-head">
-            <div class="section-title">Data Maintenance</div>
-            <div class="section-copy">These actions change canonical stored data and should be used carefully, ideally when you already know the inconsistency you are fixing.</div>
-        </div>
-        <div class="tool-list">
-            <div class="tool-card">
-                <div class="tool-card-title">Merge Duplicate Outlets</div>
-                <p>Renames outlets to their normalized forms and merges duplicates, reassigning articles to a single canonical outlet.</p>
-                <div class="meta-row">
-                    <span class="badge badge-danger">⚠ Danger</span>
-                </div>
-                <div class="btn-row">
-                    <button onclick="runMergeOutlets()" class="btn btn-danger" type="button">Merge Duplicate Outlets</button>
-                </div>
-            </div>
-        </div>
-    </div>
+</section>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    function applyTheme(theme) {
-        // The button's Dark/Light text is switched by CSS (theme_toggle_label).
-        document.documentElement.setAttribute('data-theme', theme);
-    }
+    // Jobs: filter by impact. Broad also shows Maintenance, as in the mock's tabs.
+    document.querySelectorAll('.seg [data-risk]').forEach((tab) => {
+        tab.addEventListener('click', () => {
+            const risk = tab.dataset.risk;
+            document.querySelectorAll('.seg [data-risk]').forEach((t) => t.setAttribute('aria-pressed', String(t === tab)));
+            document.querySelectorAll('.jobs-table tbody tr').forEach((row) => {
+                const r = row.dataset.risk;
+                row.hidden = !(risk === 'all' || r === risk || (risk === 'broad' && r === 'maintenance'));
+            });
+        });
+    });
 
-    function toggleTheme() {
-        const current = document.documentElement.getAttribute('data-theme');
-        const next = current === 'dark' ? 'light' : 'dark';
-        localStorage.setItem('muckscraper-theme', next);
-        applyTheme(next);
-    }
-
-    function runMergeOutlets() {
-        if (!confirm('Merge and rename duplicate outlets? This changes stored outlet records and article associations.')) return;
-        fetch('{{ url_for("admin.merge_outlets") }}', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content },
-        })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'ok') {
-                    alert(
-                        'Done.\n' +
-                        'Outlets renamed: ' + data.renamed + '\n' +
-                        'Duplicate outlets removed: ' + data.outlets_deleted + '\n' +
-                        'Articles reassigned: ' + data.articles_reassigned
-                    );
-                } else {
-                    alert('Error: ' + data.message);
-                }
+    document.querySelectorAll('[data-script="merge-outlets"]').forEach((button) => {
+        button.addEventListener('click', () => {
+            if (!confirm(button.dataset.confirm)) return;
+            button.disabled = true;
+            fetch('{{ url_for("admin.merge_outlets") }}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content },
             })
-            .catch(e => alert('Request failed: ' + e));
-    }
+                .then(r => r.json())
+                .then(data => {
+                    const cell = button.closest('tr').querySelector('td.muted');
+                    cell.textContent = data.status === 'ok'
+                        ? `Renamed ${data.renamed}, merged ${data.outlets_deleted}, moved ${data.articles_reassigned} articles`
+                        : 'Failed: ' + data.message;
+                })
+                .catch(e => { button.closest('tr').querySelector('td.muted').textContent = 'Request failed: ' + e; })
+                .finally(() => { button.disabled = false; });
+        });
+    });
 
-    function formatStatusTimestamp(value) {
+    // Last run for the queued jobs, from their task status.
+    const BULK_TASK_STATUS_URL_TEMPLATE = '{{ url_for("admin.bulk_task_status", action="__ACTION__") }}';
+    const BULK_ACTIONS = {{ jobs | selectattr('bulk') | map(attribute='bulk') | list | tojson }};
+
+    function shortTime(value) {
         if (!value) return '';
         const date = new Date(value + 'Z');
-        return date.toLocaleString();
+        const today = new Date();
+        return date.toDateString() === today.toDateString()
+            ? 'Today, ' + date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+            : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
 
-    const BULK_TASK_ACTIONS = [
-        'ollama_catchup', 'scrape_all_missing', 'reclassify_articles',
-        'force_resummarize', 'audit_scrapes',
-    ];
-    const BULK_TASK_STATUS_URL_TEMPLATE = '{{ url_for("admin.bulk_task_status", action="__ACTION__") }}';
-
-    function applyBulkTaskStatus(action, status) {
-        const button = document.getElementById(`bulk-btn-${action}`);
-        const state = document.getElementById(`bulk-state-${action}`);
-        const message = document.getElementById(`bulk-message-${action}`);
-        const meta = document.getElementById(`bulk-meta-${action}`);
-        if (!button || !state || !message || !meta) return;
-
-        const currentStatus = status.status || 'idle';
-        state.className = `status-pill ${currentStatus}`;
-        state.textContent = currentStatus === 'running'
-            ? 'Working'
-            : currentStatus === 'success'
-                ? 'Successful'
-                : currentStatus === 'error'
-                    ? 'Failed'
-                    : 'Idle';
-
-        message.textContent = status.message || 'No status available.';
-
-        const details = [];
-        if (status.started_at) details.push(`Started: ${formatStatusTimestamp(status.started_at)}`);
-        if (status.finished_at) details.push(`Finished: ${formatStatusTimestamp(status.finished_at)}`);
-        meta.textContent = details.join(' · ');
-
-        button.disabled = currentStatus === 'running';
+    function applyBulkStatus(action, status) {
+        const cell = document.getElementById('job-last-' + action);
+        const button = document.getElementById('job-btn-' + action);
+        if (!cell) return;
+        const state = status.status || 'idle';
+        if (state === 'running') cell.textContent = 'Running';
+        else if (state === 'error') cell.textContent = 'Failed ' + shortTime(status.finished_at);
+        else if (status.finished_at) cell.textContent = shortTime(status.finished_at);
+        else cell.textContent = '—';
+        cell.title = status.message || '';
+        if (button) button.disabled = state === 'running';
     }
 
-    function pollBulkTaskStatuses() {
-        BULK_TASK_ACTIONS.forEach((action) => {
+    function pollBulkStatuses() {
+        BULK_ACTIONS.forEach((action) => {
             fetch(BULK_TASK_STATUS_URL_TEMPLATE.replace('__ACTION__', action))
                 .then(r => r.json())
-                .then(status => applyBulkTaskStatus(action, status))
+                .then(status => applyBulkStatus(action, status))
                 .catch(() => {});
         });
     }
 
-    // Show which Ollama host is actually serving (primary vs. fallback) next to
-    // the Wake button, so a sleeping GPU box covered by the fallback is visible.
-    function pollOllamaActiveHost() {
-        const el = document.getElementById('ollama-active-host');
-        if (!el) return;
+    // LLM health: one line per provider in use, from the sidebar's status route.
+    function pollLlmHealth() {
+        const value = document.getElementById('llm-health');
         fetch('{{ url_for("admin.ollama_status_detail") }}')
             .then(r => r.json())
             .then(data => {
-                if (data.provider && data.provider !== 'ollama') {
-                    el.textContent = `LLM provider: ${data.provider}`;
-                } else if (data.online && data.host) {
-                    const role = data.role === 'fallback' ? 'fallback — primary unreachable' : 'primary';
-                    el.textContent = `Active Ollama: ${data.host} (${role})`;
-                } else {
-                    el.textContent = 'Ollama: no host reachable';
-                }
+                const entries = data.providers && data.providers.length ? data.providers : [data];
+                const name = (p) => p ? p.charAt(0).toUpperCase() + p.slice(1) : 'LLM';
+                const allUp = entries.every(e => e.online);
+                value.innerHTML = '';
+                const dot = document.createElement('span');
+                dot.className = 'dot ' + (allUp ? 'ok' : 'bad');
+                value.appendChild(dot);
+                value.appendChild(document.createTextNode(
+                    entries.map(e => name(e.provider) + (e.online ? (e.role === 'fallback' ? ' on fallback' : ' online') : ' offline')).join(', ')
+                ));
             })
-            .catch(() => { el.textContent = 'Ollama: status unavailable'; });
+            .catch(() => { value.textContent = 'Status unavailable'; });
     }
 
-    const savedTheme = localStorage.getItem('muckscraper-theme') || 'light';
-    applyTheme(savedTheme);
-    pollOllamaActiveHost();
-    setInterval(pollOllamaActiveHost, 30000);
-    pollBulkTaskStatuses();
-    setInterval(pollBulkTaskStatuses, 5000);
+    pollBulkStatuses();
+    setInterval(pollBulkStatuses, 5000);
+    pollLlmHealth();
+    setInterval(pollLlmHealth, 30000);
 </script>
-</body>
-</html>
+{% endblock %}
