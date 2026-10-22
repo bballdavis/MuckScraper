@@ -56,6 +56,16 @@ All notable changes to MuckScraper are documented here.
   opinion linker, grouping review and scrape blocklist page all ask for
   "articles fetched since X", which scanned the whole table each time
   (46 ms to 0.3 ms on a 47,000-article test database).
+- **Admin bulk actions and AI tasks run in the scheduler container.** Catch
+  up, Force Resummarize, Reclassify, Audit Scrapes, Scrape Missing and the
+  per-story/article summary and analysis buttons used to run in a thread
+  inside a gunicorn worker, which died with the worker on any restart or
+  timeout. They are now queued in a new `jobs` table (Postgres, no Redis) and
+  run one at a time by a worker thread in the scheduler, which a `NOTIFY`
+  wakes at once; single-story/article tasks go ahead of bulk ones. Their
+  status boxes work as before and say "Queued" until the worker picks them
+  up, so the scheduler container must be running. A job cut off by a
+  scheduler restart is marked failed, not left "running" for hours.
 - **`docker-compose.yml`:** the app and scheduler share one environment block
   (`x-app-env`), so a new setting is added once. The scheduler waits for a
   Postgres health check instead of a fixed 15-second sleep.

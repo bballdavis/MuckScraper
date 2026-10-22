@@ -15,8 +15,7 @@ logger = logging.getLogger(__name__)
 def ollama_catchup_route():
     label = request.form.get("label", "")
     scrape_status = request.form.get("scrape_status", "").strip() or None
-    from news_fetcher.fetch_and_store_articles import ollama_catchup
-    _start_bulk_task("ollama_catchup", ollama_catchup)
+    _start_bulk_task("ollama_catchup")
     return redirect_to_articles(label, scrape_status)
 
 
@@ -25,8 +24,7 @@ def ollama_catchup_route():
 def force_resummarize():
     label = request.form.get("label", "")
     scrape_status = request.form.get("scrape_status", "").strip() or None
-    from news_fetcher.fetch_and_store_articles import force_resummarize_all
-    _start_bulk_task("force_resummarize", force_resummarize_all)
+    _start_bulk_task("force_resummarize")
     return redirect_to_articles(label, scrape_status)
 
 
@@ -58,16 +56,14 @@ def ollama_status_detail():
 def reclassify_articles():
     label = request.form.get("label", "")
     scrape_status = request.form.get("scrape_status", "").strip() or None
-    from news_fetcher.fetch_and_store_articles import reclassify_all_articles
-    _start_bulk_task("reclassify_articles", reclassify_all_articles)
+    _start_bulk_task("reclassify_articles")
     return redirect_to_articles(label, scrape_status)
 
 
 @admin.route("/audit-scrapes", methods=["POST"])
 @role_required(ROLE_ADMIN)
 def audit_scrapes():
-    from news_fetcher.fetch_and_store_articles import audit_existing_scrapes
-    _start_bulk_task("audit_scrapes", audit_existing_scrapes)
+    _start_bulk_task("audit_scrapes")
     return redirect(url_for("admin.scrape_blocklist"))
 
 

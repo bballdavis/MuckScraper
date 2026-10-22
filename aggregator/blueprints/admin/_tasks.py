@@ -1,11 +1,11 @@
 import json
 import logging
-import threading
+import importlib
 from datetime import datetime
-from flask import current_app, request, jsonify
+from flask import request, jsonify
 from aggregator.permissions import ROLE_ADMIN, ROLE_SCRAPER, role_required
 from sqlalchemy import or_
-from aggregator import db
+from aggregator import db, jobs
 from aggregator.models import AppSetting, Article, Story
 from news_fetcher.llm_client import TIER_QUALITY
 
@@ -140,73 +140,81 @@ def _save_ai_task_status(task_type, resource_id, payload):
     _save_json_setting(_ai_task_status_key(task_type, resource_id), base_payload)
 
 
-def _run_ai_task(app, task_type, resource_id):
-    with app.app_context():
-        started_at = _ai_task_status_payload(task_type, resource_id).get("started_at")
+def _run_ai_task(payload):
+    """Job handler (aggregator/jobs.py) for one story/article AI task."""
+    task_type = payload["task_type"]
+    resource_id = payload["resource_id"]
+    started_at = datetime.utcnow().isoformat()
+    _save_ai_task_status(task_type, resource_id, {
+        "status": "running",
+        "started_at": started_at,
+        "finished_at": None,
+        "message": "AI task is running.",
+    })
 
-        try:
-            from news_fetcher.summarizer import (
-                summarize_story,
-                summarize_article,
-                generate_deep_report,
-                check_ollama_status,
-            )
+    from news_fetcher.summarizer import (
+        summarize_story,
+        summarize_article,
+        generate_deep_report,
+        check_ollama_status,
+    )
 
-            if not check_ollama_status(TIER_QUALITY):
-                raise RuntimeError("The summarization LLM is offline.")
+    if not check_ollama_status(TIER_QUALITY):
+        raise RuntimeError("The summarization LLM is offline.")
 
-            if task_type == "story_summary":
-                story = Story.query.get_or_404(resource_id)
-                summary = summarize_story(story)
-                if not summary:
-                    raise RuntimeError("No story summary was generated.")
-                story.summary = summary
-                db.session.commit()
-                message = "Story summary completed successfully."
-            elif task_type == "story_deep_report":
-                story = Story.query.get_or_404(resource_id)
-                if len(story.articles) < 2:
-                    raise RuntimeError("Story analysis requires at least two articles.")
-                report = generate_deep_report(story)
-                if not report:
-                    raise RuntimeError("No story analysis was generated.")
-                story.deep_report = report
-                db.session.commit()
-                message = "Story analysis completed successfully."
-            elif task_type == "article_summary":
-                article = Article.query.get_or_404(resource_id)
-                summary = summarize_article(article)
-                if not summary:
-                    raise RuntimeError("No article summary was generated.")
-                article.summary = summary
-                db.session.commit()
-                message = "Article summary completed successfully."
-            else:
-                raise RuntimeError(f"Unknown AI task type: {task_type}")
+    if task_type == "story_summary":
+        story = Story.query.get(resource_id)
+        if story is None:
+            raise RuntimeError(f"Story {resource_id} no longer exists.")
+        summary = summarize_story(story)
+        if not summary:
+            raise RuntimeError("No story summary was generated.")
+        story.summary = summary
+        db.session.commit()
+        message = "Story summary completed successfully."
+    elif task_type == "story_deep_report":
+        story = Story.query.get(resource_id)
+        if story is None:
+            raise RuntimeError(f"Story {resource_id} no longer exists.")
+        if len(story.articles) < 2:
+            raise RuntimeError("Story analysis requires at least two articles.")
+        report = generate_deep_report(story)
+        if not report:
+            raise RuntimeError("No story analysis was generated.")
+        story.deep_report = report
+        db.session.commit()
+        message = "Story analysis completed successfully."
+    elif task_type == "article_summary":
+        article = Article.query.get(resource_id)
+        if article is None:
+            raise RuntimeError(f"Article {resource_id} no longer exists.")
+        summary = summarize_article(article)
+        if not summary:
+            raise RuntimeError("No article summary was generated.")
+        article.summary = summary
+        db.session.commit()
+        message = "Article summary completed successfully."
+    else:
+        raise RuntimeError(f"Unknown AI task type: {task_type}")
 
-            _save_ai_task_status(
-                task_type,
-                resource_id,
-                {
-                    "status": "success",
-                    "started_at": started_at,
-                    "finished_at": datetime.utcnow().isoformat(),
-                    "message": message,
-                },
-            )
-        except Exception as e:
-            db.session.rollback()
-            logger.exception("Async AI task error type=%s resource_id=%s: %s", task_type, resource_id, e)
-            _save_ai_task_status(
-                task_type,
-                resource_id,
-                {
-                    "status": "error",
-                    "started_at": started_at,
-                    "finished_at": datetime.utcnow().isoformat(),
-                    "message": str(e),
-                },
-            )
+    _save_ai_task_status(task_type, resource_id, {
+        "status": "success",
+        "started_at": started_at,
+        "finished_at": datetime.utcnow().isoformat(),
+        "message": message,
+    })
+
+
+def _fail_ai_task(payload, message):
+    task_type = payload["task_type"]
+    resource_id = payload["resource_id"]
+    started_at = _ai_task_status_payload(task_type, resource_id).get("started_at")
+    _save_ai_task_status(task_type, resource_id, {
+        "status": "error",
+        "started_at": started_at,
+        "finished_at": datetime.utcnow().isoformat(),
+        "message": message,
+    })
 
 
 def _bulk_task_status_key(action):
@@ -225,61 +233,84 @@ def _bulk_task_status_payload(action):
     }
 
 
-def _run_bulk_task(app, action, fn):
-    with app.app_context():
-        started_at = _bulk_task_status_payload(action).get("started_at")
-        try:
-            fn()
-            _save_json_setting(
-                _bulk_task_status_key(action),
-                {
-                    "status": "success",
-                    "started_at": started_at,
-                    "finished_at": datetime.utcnow().isoformat(),
-                    "message": f"{action} completed successfully.",
-                },
-            )
-            logger.info(f"[BulkTask] {action} completed")
-        except Exception as e:
-            db.session.rollback()
-            logger.exception(f"[BulkTask] {action} failed: {e}")
-            _save_json_setting(
-                _bulk_task_status_key(action),
-                {
-                    "status": "error",
-                    "started_at": started_at,
-                    "finished_at": datetime.utcnow().isoformat(),
-                    "message": str(e),
-                },
-            )
+# What each bulk action runs, as "module:function", so a queued job names it
+# by action and the worker imports it.
+BULK_TASK_FUNCTIONS = {
+    "ollama_catchup": "news_fetcher.fetch_and_store_articles:ollama_catchup",
+    "force_resummarize": "news_fetcher.fetch_and_store_articles:force_resummarize_all",
+    "reclassify_articles": "news_fetcher.fetch_and_store_articles:reclassify_all_articles",
+    "audit_scrapes": "news_fetcher.fetch_and_store_articles:audit_existing_scrapes",
+    "scrape_all_missing": "aggregator.blueprints.admin.articles:_scrape_all_missing_task",
+}
 
 
-def _start_bulk_task(action, fn):
-    """
-    Run a long-running admin action (reclassify, resummarize, regroup, scrape
-    backlog, etc.) in a background thread instead of inline in the request.
-    These can take minutes on a full DB, which was blowing past gunicorn's
-    worker timeout and killing the request mid-run (GitHub issue #3).
-
-    Returns (started, status) — started is False (with the current running
-    status) if this action is already in progress on any worker process.
-    """
+def _run_bulk_task(payload):
+    """Job handler (aggregator/jobs.py) for one admin bulk action."""
+    action = payload["action"]
+    module_name, function_name = BULK_TASK_FUNCTIONS[action].split(":")
+    fn = getattr(importlib.import_module(module_name), function_name)
     started_at = datetime.utcnow().isoformat()
+    _save_json_setting(_bulk_task_status_key(action), {
+        "status": "running",
+        "started_at": started_at,
+        "finished_at": None,
+        "message": f"{action} is running.",
+    })
+    fn()
+    _save_json_setting(_bulk_task_status_key(action), {
+        "status": "success",
+        "started_at": started_at,
+        "finished_at": datetime.utcnow().isoformat(),
+        "message": f"{action} completed successfully.",
+    })
+    logger.info(f"[BulkTask] {action} completed")
+
+
+def _fail_bulk_task(payload, message):
+    action = payload["action"]
+    _save_json_setting(_bulk_task_status_key(action), {
+        "status": "error",
+        "started_at": _bulk_task_status_payload(action).get("started_at"),
+        "finished_at": datetime.utcnow().isoformat(),
+        "message": message,
+    })
+
+
+jobs.register("bulk_task", _run_bulk_task, _fail_bulk_task)
+jobs.register("ai_task", _run_ai_task, _fail_ai_task)
+
+# Clicked on one story or article and watched, so ahead of bulk actions.
+AI_TASK_PRIORITY = 10
+BULK_TASK_PRIORITY = 0
+QUEUED_MESSAGE = "Queued; the scheduler container's worker will start it shortly."
+
+
+def _start_bulk_task(action):
+    """
+    Queue a long-running admin action (reclassify, resummarize, regroup,
+    scrape backlog, etc.) for the job worker in the scheduler container.
+    These can take minutes on a full DB, which was blowing past gunicorn's
+    worker timeout (GitHub issue #3), and a thread inside a gunicorn worker
+    died with it on any restart.
+
+    Returns (started, status) — started is False (with the current status)
+    if this action is already queued or running.
+    """
+    if action not in BULK_TASK_FUNCTIONS:
+        raise ValueError(f"Unknown bulk action {action!r}")
     claimed = _try_claim_task_status(
         _bulk_task_status_key(action),
         {
             "status": "running",
-            "started_at": started_at,
+            "started_at": datetime.utcnow().isoformat(),
             "finished_at": None,
-            "message": f"{action} is running.",
+            "message": QUEUED_MESSAGE,
         },
     )
     if not claimed:
         return False, _bulk_task_status_payload(action)
 
-    app = current_app._get_current_object()
-    thread = threading.Thread(target=_run_bulk_task, args=(app, action, fn), daemon=True)
-    thread.start()
+    jobs.enqueue("bulk_task", {"action": action}, priority=BULK_TASK_PRIORITY)
     return True, _bulk_task_status_payload(action)
 
 
@@ -312,16 +343,15 @@ def start_ai_task():
             "message": "Invalid AI task type.",
         }), 400
 
-    started_at = datetime.utcnow().isoformat()
     claimed = _try_claim_task_status(
         _ai_task_status_key(task_type, resource_id),
         {
             "task_type": task_type,
             "resource_id": resource_id,
             "status": "running",
-            "started_at": started_at,
+            "started_at": datetime.utcnow().isoformat(),
             "finished_at": None,
-            "message": "AI task is running.",
+            "message": QUEUED_MESSAGE,
         },
     )
     if not claimed:
@@ -330,13 +360,11 @@ def start_ai_task():
             "status": _ai_task_status_payload(task_type, resource_id),
         }), 409
 
-    app = current_app._get_current_object()
-    thread = threading.Thread(
-        target=_run_ai_task,
-        args=(app, task_type, resource_id),
-        daemon=True,
+    jobs.enqueue(
+        "ai_task",
+        {"task_type": task_type, "resource_id": resource_id},
+        priority=AI_TASK_PRIORITY,
     )
-    thread.start()
 
     return jsonify({
         "started": True,
