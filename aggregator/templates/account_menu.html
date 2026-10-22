@@ -1,9 +1,10 @@
 {#- Top-right account control. Signed out: a "Sign in" button. Signed in: a
-    round person button that opens Profile, Users and Settings (admins) and
-    Sign out. Import it with context, since it reads current_user and can():
+    rounded-square person button that opens Profile, Users and Settings
+    (admins), the Dark/Light mode switch and Sign out. The page provides
+    toggleTheme() (static/js/theme_toggle.js or its own). Import it with context, since it reads current_user and can():
         {% from 'account_menu.html' import account_menu with context %}
     Styles are in static/css/theme.css; behaviour in static/js/account_menu.js. -#}
-{% from 'icons.html' import icon %}
+{% from 'icons.html' import icon, theme_menu_label, theme_toggle %}
 {%- macro account_menu() -%}
 <div class="account-area">
 {%- if current_user.is_authenticated %}
@@ -20,6 +21,7 @@
             <a role="menuitem" href="{{ url_for('admin.users_page', back=menu_back()) }}">{{ icon('users') }} Users</a>
             <a role="menuitem" href="{{ url_for('admin.tools_page', back=menu_back()) }}">{{ icon('wrench') }} Settings</a>
             {%- endif %}
+            <button type="button" role="menuitem" class="account-theme" onclick="toggleTheme()">{{ theme_menu_label() }}</button>
             <form method="POST" action="{{ url_for('auth.logout') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" role="menuitem">{{ icon('log-out') }} Sign out</button>
@@ -28,6 +30,7 @@
     </div>
     <script src="{{ url_for('static', filename='js/account_menu.js') }}" defer></script>
 {%- else %}
+    {{ theme_toggle() }}
     <a class="account-signin" href="{{ url_for('auth.login', next=request.full_path if request.query_string else request.path) }}">{{ icon('log-in') }} Sign in</a>
 {%- endif %}
 </div>
