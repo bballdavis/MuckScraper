@@ -131,7 +131,15 @@
 .rr-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 4px; font-size: var(--fs-label); color: var(--text-muted); }
 .rr-gone { color: var(--text-faint); font-style: italic; }
 .rr-unmark { position: relative; }
-.rr-unmark .tip { right: 0; left: auto; top: auto; bottom: calc(100% + 8px); transform: none; }
+/* Opens to the left, inside the row: the panel clips anything past its edge. */
+.rr-unmark .tip { right: calc(100% + 8px); left: auto; top: 50%; bottom: auto; transform: translateY(-50%); }
+/* Search, the width of the list under it. */
+.rr-search { position: relative; display: flex; align-items: center; margin-bottom: 12px; }
+.rr-search > .icon { position: absolute; left: 12px; width: 16px; height: 16px; color: var(--text-faint); pointer-events: none; }
+.app-page .page-body .rr-search input[type="search"] { flex: 1; height: 38px; padding: 0 36px 0 36px; background: var(--surface); border-radius: 3px; }
+.rr-search-clear { position: absolute; right: 8px; display: flex; padding: 4px; color: var(--text-faint); }
+.rr-search-clear:hover { color: var(--text); }
+.rr-search input[type="search"]::-webkit-search-cancel-button { display: none; }
 .rr-empty { padding: 48px 16px; text-align: center; color: var(--text-faint); }
 
 .rr-meta .bias-tag { height: 18px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: 3px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }

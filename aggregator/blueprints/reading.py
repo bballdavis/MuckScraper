@@ -38,15 +38,17 @@ def toggle_read(kind, item_id):
 @login_required
 def recently_read():
     """Everything the reader marked read, newest first, with a way to mark
-    each one unread."""
+    each one unread. ?q= searches titles and outlet names."""
     per_page = 50
     page = max(1, request.args.get("page", 1, type=int) or 1)
-    total = reads.count(current_user.id)
+    q = (request.args.get("q") or "").strip()[:200]
+    total = reads.count(current_user.id, q=q)
     total_pages = max(1, (total + per_page - 1) // per_page)
     page = min(page, total_pages)
     return render_template(
         "recently_read.html",
-        items=reads.recent(current_user.id, offset=(page - 1) * per_page, limit=per_page),
+        items=reads.recent(current_user.id, offset=(page - 1) * per_page, limit=per_page, q=q),
+        q=q,
         total=total,
         page=page,
         total_pages=total_pages,
