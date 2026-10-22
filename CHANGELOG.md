@@ -72,9 +72,10 @@ All notable changes to MuckScraper are documented here.
   section headings (replacing "Summarize Story" and "Analyze Story"), and
   as indicators beside each Headlines card's "Coverage & Analysis" button.
   Source rows show only the summary icon, since analysis covers the whole
-  story. Filled means it has run; the icon in the
-  theme colour is a button that runs it; grey means it isn't available.
-  Hover explains which.
+  story. Filled means it has run; the icon in the theme colour is a button
+  that runs it; grey means it isn't available. Hover explains which, in one
+  wording everywhere ("Generate executive summary", "Multi-source analysis
+  generated", "Article summary not generated yet").
 - **Live search results.** Typing in the top bar shows the best matching
   stories (thumbnail, article and outlet counts, Left/Center/Right counts and
   bar) and articles (outlet and lean) as you type, from the new
