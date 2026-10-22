@@ -278,6 +278,7 @@ An optional, read-only [MCP](https://modelcontextprotocol.io) server lets an AI 
 - NewsAPI and GNews support
 - RSS ingestion support, with an optional fallback URL per feed for when a feed goes down
 - Outlets without a working feed can come in through Google News search feeds; links are resolved to the publisher's own URL before anything is stored
+- Default feeds include free nonprofit newsrooms (The Texas Tribune, ProPublica, CalMatters, KFF Health News, Inside Climate News), so those stories arrive with their full text
 - Duplicate article detection by URL and normalized title/outlet checks
 - Copied articles (wire copies, one outlet running another's piece) marked and not counted as extra sources
 - Junk filtered before storage: betting picks, fantasy advice, roundups, editorial cartoons, plus your own source and title blocks
@@ -286,6 +287,7 @@ An optional, read-only [MCP](https://modelcontextprotocol.io) server lets an AI 
 ### Scraping and reliability
 - Full article scraping during ingestion
 - Multi-step scrape fallback pipeline
+- Paywalled sites are not bypassed: they stay headline-and-description only. With an optional free `NYT_API_KEY`, a New York Times article gets its abstract and opening paragraph from NYT's Article Search API instead
 - Scrape telemetry stored per article
 - Bad-scrape auditing and status-aware retries
 - Domain and URL cooldown behavior for repeated failures

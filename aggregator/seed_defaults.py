@@ -156,7 +156,13 @@ SEED_RSS_GENERAL = ['https://feeds.bbci.co.uk/news/rss.xml',
  'https://thedispatch.com/feed/',
  'https://freebeacon.com/feed/',
  'https://dailycaller.com/feed/',
- 'https://feeds.feedburner.com/breitbart']
+ 'https://feeds.feedburner.com/breitbart',
+ # a8d3e6f1c2b7: free nonprofit newsrooms (full text, no paywall).
+ 'https://feeds.texastribune.org/feeds/main/',
+ 'https://www.propublica.org/feeds/propublica/main',
+ 'https://calmatters.org/feed/',
+ 'https://kffhealthnews.org/feed/',
+ 'https://insideclimatenews.org/feed/']
 
 SEED_RSS_RIGHT_ENRICHMENT = ['https://moxie.foxnews.com/google-publisher/latest.xml',
  'https://nypost.com/feed/',
@@ -186,7 +192,12 @@ SEED_RSS_OP_ED = ['https://rss.nytimes.com/services/xml/rss/nyt/Opinion.xml',
  'https://www.nationalreview.com/feed/',
  'https://thehill.com/opinion/feed/']
 
-SEED_RSS_LABELS = {('https://dailycaller.com/feed/', 'general'): 'The Daily Caller',
+SEED_RSS_LABELS = {('https://feeds.texastribune.org/feeds/main/', 'general'): 'The Texas Tribune',
+ ('https://www.propublica.org/feeds/propublica/main', 'general'): 'ProPublica',
+ ('https://calmatters.org/feed/', 'general'): 'CalMatters',
+ ('https://kffhealthnews.org/feed/', 'general'): 'KFF Health News',
+ ('https://insideclimatenews.org/feed/', 'general'): 'Inside Climate News',
+ ('https://dailycaller.com/feed/', 'general'): 'The Daily Caller',
  ('https://feeds.feedburner.com/breitbart', 'general'): 'Breitbart',
  ('https://feeds.washingtonpost.com/rss/opinions', 'op_ed'): 'Washington Post Opinions (Op/Ed)',
  ('https://freebeacon.com/feed/', 'general'): 'Washington Free Beacon',
@@ -228,7 +239,8 @@ SEED_RSS_LABELS = {('https://dailycaller.com/feed/', 'general'): 'The Daily Call
  ('https://www.washingtontimes.com/rss/headlines/opinion/', 'op_ed'): 'Washington Times Opinion '
                                                                       '(Op/Ed)'}
 
-SEED_RSS_FALLBACKS = {'https://feeds.washingtonpost.com/rss/opinions': 'https://news.google.com/rss/search?q=site:washingtonpost.com/opinions+when:1d&hl=en-US&gl=US&ceid=US:en',
+SEED_RSS_FALLBACKS = {'https://feeds.texastribune.org/feeds/main/': 'https://news.google.com/rss/search?q=site:texastribune.org+when:1d&hl=en-US&gl=US&ceid=US:en',
+ 'https://feeds.washingtonpost.com/rss/opinions': 'https://news.google.com/rss/search?q=site:washingtonpost.com/opinions+when:1d&hl=en-US&gl=US&ceid=US:en',
  'https://feeds.washingtonpost.com/rss/world': 'https://news.google.com/rss/search?q=site:washingtonpost.com/world+when:1d&hl=en-US&gl=US&ceid=US:en'}
 
 SEED_BLOCK_SOURCES = [('github.com', 'Developer/repo noise, not news'),
