@@ -363,6 +363,38 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertEqual(self._send("DELETE", f"/api/v1/me/newsbox/{self.ids['story']}", token).status_code, 204)
         self.assertEqual(self._get("/api/v1/me/newsbox", token).get_json()["items"], [])
 
+    def _restore_summary(self, story_id, summary):
+        from aggregator import db
+        from aggregator.models import Story
+        with self.app.app_context():
+            Story.query.get(story_id).summary = summary
+            db.session.commit()
+
+    def test_analysis_depth_alone_and_combined(self):
+        from aggregator import db, newsbox
+        from aggregator.models import Story
+        self._clear_newsbox()
+        story = Story.query.get(self.ids["story"])
+        kept = story.summary
+        story.summary, story.deep_report = None, "The story: long report."
+        db.session.commit()
+        self.addCleanup(self._restore_summary, self.ids["story"], kept)
+        token = self._pair(scopes=("read", "summarize"))
+        path = f"/api/v1/stories/{self.ids['story']}/summarize"
+        # The analysis is there, so asking for it alone is ready at once.
+        r = self._send("POST", path, token, json={"depth": "analysis"})
+        self.assertEqual((r.status_code, r.get_json()["state"]), (200, "ready"))
+        # Asking for the summary as well needs a job.
+        r = self._send("POST", path, token, json={"depth": "summary"})
+        self.assertEqual((r.status_code, r.get_json()["state"]), (202, "pending"))
+        self.assertEqual(newsbox._deeper("summary", "analysis"), "summary_analysis")
+        self.assertTrue(newsbox._covers("summary_analysis", "analysis"))
+        self.assertFalse(newsbox._covers("summary", "analysis"))
+        # A one-article story has no analysis to write: the summary stands in.
+        lone = Story.query.get(self.ids["lone"])
+        self.assertEqual(newsbox._needs(lone, "analysis"), {"summary"})
+        self._clear_newsbox()
+
     def test_unsummarized_story_queues_one_job_and_turns_ready(self):
         from aggregator import db, jobs
         from aggregator.models import Job, Story

@@ -81,7 +81,7 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 | `GET /stories/{id}` | Summary, deep report, opinion roundup, articles and columns by leaning |
 | `GET /articles/{id}` | Title, outlet, leaning, summary, analysis, link, and scraped text when allowed |
 | `GET /search?q=&kind=stories\|articles&range=&limit=` | Compact hits for as-you-type search |
-| `POST /stories/{id}/summarize` `{depth, origin}` | Adds the story to the user's NewsBox: `200` ready when already summarized, `202` pending when a summary was queued. `depth` is `summary` or `summary_analysis`; `origin` is `swiped` or `saved`. Needs `summarize`. |
+| `POST /stories/{id}/summarize` `{depth, origin}` | Adds the story to the user's NewsBox: `200` ready when already summarized, `202` pending when a summary was queued. `depth` is `summary`, `analysis` (the multi-source analysis alone; the summary stands in when a story has one article) or `summary_analysis`; `origin` is `swiped` or `saved`. Needs `summarize`. |
 | `GET /me/newsbox?state=&origin=&unread=&cursor=&limit=` | The user's NewsBox, newest first, with `unread_count` |
 | `PATCH /me/newsbox/{story_id}` `{is_unread}`, `DELETE` | Mark one item read or unread, or remove it |
 | `POST /me/newsbox/read` | Mark every item read |
