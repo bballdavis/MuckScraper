@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta
-from flask import render_template, request, redirect, url_for, jsonify
+from flask import flash, render_template, request, redirect, url_for, jsonify
 from flask_login import current_user
 from aggregator.permissions import ROLE_ADMIN, ROLE_SCRAPER, public_or_login, role_required
 from sqlalchemy import case, func, or_
@@ -316,14 +316,23 @@ def rate_article(article_id):
     article = Article.query.get_or_404(article_id)
     label = request.form.get("label", "")
     scrape_status = request.form.get("scrape_status", "").strip() or None
+    # The article page asks for a note saying how it went (report=1); the
+    # list pages don't show flashes, so they don't ask.
+    report = request.form.get("report") == "1"
     try:
-        from news_fetcher.outlet_bias_llm import get_article_bias_from_llm
+        from news_fetcher.outlet_bias_llm import BIAS_LABELS, get_article_bias_from_llm
         bias_score = get_article_bias_from_llm(article.title, article.content)
         if bias_score is not None:
             article.bias_score = bias_score
             db.session.commit()
+            if report:
+                flash(f"Rated this article {BIAS_LABELS[bias_score]}.", "success")
+        elif report:
+            flash("The AI could not rate this article's lean, so it keeps its current rating.", "error")
     except Exception as e:
         logger.error(f"Article rating error: {e}")
+        if report:
+            flash("Rating this article's lean failed. Check that the AI provider is online.", "error")
     return redirect_to_articles(label, scrape_status)
 
 
