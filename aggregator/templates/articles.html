@@ -81,11 +81,9 @@
     so an explicit "All" survives a saved scrape default. -#}
 {%- set base = {'topic': active_label, 'scrape_status': scrape_param, 'show_single': show_single|string|lower, 'q': active_search_query, 'range': active_range} -%}
 {%- set range_short = {'24h': '24h', '7d': '7 days', '30d': '30 days', 'all': 'All'} -%}
-{%- set filter_count = (1 if active_range != 'all' else 0) + (1 if active_scrape_status else 0) + (1 if not is_multi_view and not show_single else 0) -%}
 {%- set sidebar_toggle_in_topbar = true -%}
     {% call feed_topbar(section_title, url_for(list_endpoint), active_search_query,
-                        {'topic': active_label, 'scrape_status': scrape_param, 'show_single': show_single|string|lower, 'range': active_range},
-                        filter_count) %}
+                        {'topic': active_label, 'scrape_status': scrape_param, 'show_single': show_single|string|lower, 'range': active_range}) %}
         <div>
             <span class="fp-label">Time range</span>
             <div class="fp-segment">
