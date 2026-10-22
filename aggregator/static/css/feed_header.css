@@ -207,13 +207,12 @@
 /* ── Filters ── */
 .ft-filters { position: relative; flex: 0 0 auto; }
 .ft-filter-btn {
+    width: 40px;
     height: 40px;
-    min-width: 40px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 0 10px;
+    padding: 0;
     border-radius: 10px;
     border: 1px solid #3a3a55;
     background: #2a2a3e;
@@ -223,19 +222,6 @@
 }
 .ft-filter-btn:hover, .ft-filter-btn[aria-expanded="true"] { background: var(--accent); border-color: var(--accent-light); }
 .ft-filter-btn:focus-visible { outline: 2px solid var(--sidebar-accent-text); outline-offset: 2px; }
-.ft-badge {
-    min-width: 20px;
-    height: 20px;
-    padding: 0 5px;
-    border-radius: 10px;
-    background: var(--sidebar-accent-text);
-    color: var(--topbar-bg);
-    font-size: 12px;
-    font-weight: 800;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
 
 .ft-popover {
     position: absolute;

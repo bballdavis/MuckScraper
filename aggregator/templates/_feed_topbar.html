@@ -3,7 +3,7 @@
     the Filters button beside it when the page passes popover content:
 
         {% from '_feed_topbar.html' import feed_topbar with context %}
-        {% call feed_topbar('International News', url_for(...), q, hidden, filter_count) %}
+        {% call feed_topbar('International News', url_for(...), q, hidden) %}
             ...popover content...
         {% endcall %}
 
@@ -14,7 +14,7 @@
     Styles: static/css/feed_header.css. Behaviour: static/js/feed_header.js. -#}
 {% from 'icons.html' import icon, theme_toggle %}
 {% from 'account_menu.html' import account_menu with context %}
-{%- macro feed_topbar(section_title, search_action, q='', hidden={}, filter_count=0) -%}
+{%- macro feed_topbar(section_title, search_action, q='', hidden={}) -%}
 <header class="feed-topbar">
     <div class="ft-left">
         {#- Shows and hides the sidebar (sidebar_script.html); the page sets
@@ -48,9 +48,8 @@
         <div class="ft-filters">
             <button type="button" class="ft-filter-btn" id="feed-filter-btn" aria-haspopup="dialog"
                     aria-expanded="false" aria-controls="feed-filters"
-                    aria-label="Filters{% if filter_count %}, {{ filter_count }} active{% endif %}" title="Filters">
+                    aria-label="Filters" title="Filters">
                 {{ icon('sliders') }}
-                {%- if filter_count %}<span class="ft-badge" aria-hidden="true">{{ filter_count }}</span>{% endif %}
             </button>
             <div class="ft-popover" id="feed-filters" role="dialog" aria-label="Feed filters" hidden>
                 {{ caller() }}

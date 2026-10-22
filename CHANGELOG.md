@@ -22,8 +22,7 @@ All notable changes to MuckScraper are documented here.
 - **New feed top bar** on Headlines, All Stories and Grouped Stories: the
   section name sits beside the logo, search is centred, and the time range,
   scrape status and single-article filters moved into an icon-only Filters
-  popover with a count badge. Active filters show above the list as chips
-  you can remove.
+  popover. Active filters show above the list as chips you can remove.
 - **Live search results.** Typing in the top bar shows the best matching
   stories (thumbnail, article and outlet counts, Left/Center/Right counts and
   bar) and articles (outlet and lean) as you type, from the new
