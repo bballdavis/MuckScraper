@@ -362,8 +362,9 @@ class ApiEndToEndTests(unittest.TestCase):
 
     def _clear_newsbox(self):
         from aggregator import db
-        from aggregator.models import Job, NewsBoxItem, Story, SummarySchedule
+        from aggregator.models import Job, NewsBoxItem, Story, StorySkip, SummarySchedule
         NewsBoxItem.query.delete()
+        StorySkip.query.delete()
         SummarySchedule.query.delete()
         Job.query.delete()
         Story.query.get(self.ids["story"]).deep_report = "The story: long report."
@@ -526,6 +527,52 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertEqual(NewsBoxItem.query.filter_by(user_id=self.ids["reader"], origin="scheduled").count(), 1)
         self.assertGreater(SummarySchedule.query.get(self.ids["reader"]).next_run_at, datetime.utcnow())
         self.assertEqual(newsbox.run_due_schedules(), 0)
+
+    def test_swipe_deck_and_skips(self):
+        from aggregator import db, newsbox
+        from aggregator.models import Story
+        self._clear_newsbox()
+        token = self._pair(scopes=("read", "summarize"))
+        story, lone = self.ids["story"], self.ids["lone"]
+        deck = lambda: [(c["id"], c["tier"]) for c in self._get("/api/v1/me/deck", token).get_json()["items"]]
+        # The budget story has both parts; the lone story has no summary yet.
+        self.assertEqual(deck(), [(lone, "more")])
+        # A headline missing its analysis comes first.
+        Story.query.get(story).deep_report = None
+        db.session.commit()
+        self.assertEqual(deck(), [(story, "headlines"), (lone, "more")])
+        # A one-article story is done once summarized: it has no analysis to write.
+        Story.query.get(lone).summary = "The big picture: alone."
+        db.session.commit()
+        self.assertEqual(deck(), [(story, "headlines")])
+        # Queued stories leave the deck.
+        self._send("POST", f"/api/v1/stories/{story}/summarize", token, json={"depth": "summary_analysis"})
+        self.assertEqual(deck(), [])
+        self._clear_newsbox()
+        Story.query.get(story).deep_report = None
+        db.session.commit()
+
+        r = self._send("PUT", f"/api/v1/me/skips/{story}", token)
+        self.assertEqual((r.status_code, r.get_json()["story_id"]), (200, story))
+        self.assertEqual(self._send("PUT", f"/api/v1/me/skips/{story}", token).status_code, 200)
+        self.assertEqual(self._send("PUT", "/api/v1/me/skips/999999", token).status_code, 404)
+        self.assertEqual([i["story_id"] for i in self._get("/api/v1/me/skips", token).get_json()["items"]], [story])
+        self.assertTrue(self._get(f"/api/v1/stories/{story}", token).get_json()["is_skipped"])
+        self.assertNotIn(story, [sid for sid, _ in deck()])
+        # Scheduled runs pass over it; asking by hand still works.
+        settings, _ = newsbox.load_schedule(self.ids["reader"])
+        settings = {**settings, "skip_already_summarized": False,
+                    "sections": [{"section": "Headlines", "is_enabled": True, "amount": 5}]}
+        self.assertNotIn(story, [s.id for s in newsbox.pick_stories(self.ids["reader"], settings)])
+        r = self._send("POST", f"/api/v1/stories/{story}/summarize", token, json={"depth": "summary"})
+        self.assertIn(r.status_code, (200, 202))
+        self._send("DELETE", f"/api/v1/me/newsbox/{story}", token)
+
+        self.assertEqual(self._send("DELETE", f"/api/v1/me/skips/{story}", token).status_code, 204)
+        self.assertEqual(self._send("DELETE", f"/api/v1/me/skips/{story}", token).status_code, 204)
+        self.assertFalse(self._get(f"/api/v1/stories/{story}", token).get_json()["is_skipped"])
+        self.assertIn(story, [s.id for s in newsbox.pick_stories(self.ids["reader"], settings)])
+        self._clear_newsbox()
 
     def _bookmark_env(self):
         import tempfile
