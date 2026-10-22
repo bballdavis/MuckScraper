@@ -222,7 +222,7 @@ def update_pipeline_schedule(entry_id):
     entry.is_active = request.form.get("is_active") == "on"
     db.session.commit()
     _mark_pipeline_schedule_changed()
-    return redirect(url_for("admin.pipeline_schedule_page"))
+    return redirect(url_for("admin.pipeline_schedule_page", _anchor=f"run-{entry.id}"))
 
 
 @admin.route("/pipeline-schedule/<int:entry_id>/delete", methods=["POST"])
