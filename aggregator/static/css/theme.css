@@ -132,10 +132,11 @@
    dark top bar and the light page header, so it carries its own colours. */
 .account-area { display: inline-flex; align-items: center; }
 .account-menu { position: relative; }
+/* A rounded square like the app's other icon buttons (the Filters button). */
 .account-button {
-    width: 36px; height: 36px; border-radius: 50%; padding: 0; cursor: pointer;
+    width: 40px; height: 40px; border-radius: 10px; padding: 0; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center; font-size: 18px;
-    background: var(--accent); color: #fff; border: 2px solid rgba(255, 255, 255, 0.35);
+    background: var(--accent); color: #fff; border: 1px solid rgba(255, 255, 255, 0.35);
     box-shadow: var(--shadow);
 }
 .account-button:hover { background: var(--accent-dark); }
@@ -155,6 +156,8 @@
     background: none; border: none; cursor: pointer; text-decoration: none; text-align: left;
     color: var(--text); font: inherit; font-size: 14px; font-weight: 500;
 }
+.account-menu .account-dropdown .account-theme .theme-when-light,
+.account-menu .account-dropdown .account-theme .theme-when-dark { gap: 10px; }
 .account-menu .account-dropdown a:hover,
 .account-menu .account-dropdown button:hover { background: var(--btn-muted-bg); color: var(--accent-text); }
 .account-area a.account-signin {
@@ -163,6 +166,7 @@
     border: 1px solid rgba(255, 255, 255, 0.25);
 }
 .account-area a.account-signin:hover { background: var(--accent-dark); }
+.account-area .theme-toggle { margin-right: 10px; }
 
 /* The line under a page title (templates/title_meta.html). A chip placed
    after the items (an outlet's lean) sits at the right end. */
