@@ -1,14 +1,16 @@
-"""LLM provider settings saved from Settings › LLM providers.
+"""Settings saved from the admin UI: LLM providers (Settings › LLM
+providers) and news source API keys (Settings › Source API keys).
 
-Each setting overrides the environment variable of the same name
-(news_fetcher/llm_client.py); a cleared setting falls back to the
-environment again. API keys are encrypted with aggregator/secret_box.py and
-never sent back to the browser: the page only sees whether one is saved and
-its last four characters.
+Each setting overrides the environment variable of the same name; a cleared
+setting falls back to the environment again. API keys are encrypted with
+aggregator/secret_box.py and never sent back to the browser: a page only
+sees whether one is saved and its last four characters.
 
-The app and the scheduler both read the saved settings through
-llm_client's config source, at most every RELOAD_SECONDS, so a change in
-Settings reaches the pipeline within that time without a restart.
+install() hands config_source() to news_fetcher/saved_settings.py, which
+the app and scheduler read through (saved_settings.get(name), and
+llm_client for the provider settings). The database is read at most every
+RELOAD_SECONDS, so a change reaches the pipeline within that time without a
+restart.
 """
 import logging
 import os
@@ -57,8 +59,24 @@ PROVIDER_FIELDS = {
     ],
 }
 ROUTING_FIELDS = ("LLM_PROVIDER", "LLM_FAST_PROVIDER")
-SECRET_NAMES = {name for fields in PROVIDER_FIELDS.values() for name, _, kind in fields if kind == "secret"}
-ALL_NAMES = set(ROUTING_FIELDS) | {name for fields in PROVIDER_FIELDS.values() for name, _, _ in fields}
+
+# News source APIs (Settings › Source API keys), same shape as PROVIDER_FIELDS.
+SOURCE_FIELDS = {
+    "newsapi": [("NEWS_API_KEY", "API key", "secret")],
+    "gnews": [("GNEWS_API_KEY", "API key", "secret")],
+    "nyt": [
+        ("NYT_API_KEY", "API key", "secret"),
+        ("NYT_API_DAILY_LIMIT", "Daily request limit", "int"),
+    ],
+}
+
+# Defaults the code applies when neither a saved value nor the environment
+# sets one, shown as the field's placeholder.
+DEFAULTS = {"NYT_API_DAILY_LIMIT": "450"}
+
+_FIELD_GROUPS = list(PROVIDER_FIELDS.values()) + list(SOURCE_FIELDS.values())
+SECRET_NAMES = {name for fields in _FIELD_GROUPS for name, _, kind in fields if kind == "secret"}
+ALL_NAMES = set(ROUTING_FIELDS) | {name for fields in _FIELD_GROUPS for name, _, _ in fields}
 
 _MODEL_RE = re.compile(r"^[A-Za-z0-9._:/@+-]{1,200}$")
 _URL_RE = re.compile(r"^https?://[^\s/$.?#][^\s]{0,250}$")
@@ -78,6 +96,8 @@ def validate(name, value, kind=None):
         return None if _URL_RE.match(value) else "Enter a URL starting with http:// or https://."
     if kind == "model":
         return None if _MODEL_RE.match(value) else "Model names have no spaces and are at most 200 characters."
+    if kind == "int":
+        return None if value.isdigit() and 0 < int(value) <= 100000 else "Enter a whole number."
     if kind == "secret":
         if len(value) > 500 or any(c.isspace() for c in value):
             return "That doesn't look like an API key."
@@ -99,7 +119,8 @@ def field_states(rows=None):
     for name in ALL_NAMES:
         row = rows.get(name)
         env = os.environ.get(name, "").strip()
-        state = {"source": "saved" if row else ("env" if env else "unset"), "saved": "", "env": ""}
+        state = {"source": "saved" if row else ("env" if env else "unset"), "saved": "", "env": "",
+                 "default": DEFAULTS.get(name, "")}
         if name in SECRET_NAMES:
             state["env_hint"] = env[-4:] if len(env) > 8 else ("set" if env else "")
             if row:
@@ -182,12 +203,15 @@ def config_source():
 
 def reload_now():
     """Apply the saved settings in this process right away (after a save)."""
-    from news_fetcher import llm_client
+    from news_fetcher import llm_client, saved_settings
     _state["checked"] = 0.0
     _state["fingerprint"] = None
+    saved_settings.refresh()
     llm_client._sync_config()
 
 
 def install():
-    from news_fetcher import llm_client
-    llm_client.set_config_source(config_source)
+    from news_fetcher import saved_settings
+    _state["checked"] = 0.0
+    _state["fingerprint"] = None
+    saved_settings.set_source(config_source)

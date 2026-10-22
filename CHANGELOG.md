@@ -30,6 +30,11 @@ All notable changes to MuckScraper are documented here.
   their last four characters. The encryption key is `CONFIG_ENCRYPTION_KEY`
   when set, otherwise derived from `SECRET_KEY`. The app applies a save at
   once and the scheduler within 15 seconds of its next LLM call, no restart.
+- **Settings › Source API keys** (`/admin/settings/source-keys`): the
+  NewsAPI, GNews and New York Times keys (and the NYT daily request limit),
+  saved encrypted the same way. Code reads saved settings with
+  `news_fetcher.saved_settings.get(name)`, which falls back to the
+  environment.
 
 ### Changed
 - **New feed top bar** on Headlines, All Stories and Grouped Stories: the

@@ -1,12 +1,12 @@
 """Tests for provider settings saved from Settings › LLM providers:
 encryption of saved keys (aggregator/secret_box.py), validation
-(aggregator/llm_config.py) and how llm_client applies overrides."""
+(aggregator/config_store.py) and how llm_client applies overrides."""
 
 import os
 import unittest
 from unittest import mock
 
-from news_fetcher import llm_client
+from news_fetcher import llm_client, saved_settings
 
 
 class SecretBoxTests(unittest.TestCase):
@@ -32,7 +32,7 @@ class SecretBoxTests(unittest.TestCase):
 
 class ValidateTests(unittest.TestCase):
     def test_kinds(self):
-        from aggregator.llm_config import validate
+        from aggregator.config_store import validate
         self.assertIsNone(validate("LLM_PROVIDER", "anthropic"))
         self.assertIsNotNone(validate("LLM_PROVIDER", "openai"))
         self.assertIsNone(validate("LLM_FAST_PROVIDER", "main"))
@@ -43,6 +43,28 @@ class ValidateTests(unittest.TestCase):
         self.assertIsNotNone(validate("OLLAMA_MODEL", "two words", "model"))
         self.assertIsNotNone(validate("GROQ_API_KEY", "has space", "secret"))
         self.assertIsNone(validate("GROQ_API_KEY", "", "secret"))
+        self.assertIsNone(validate("NYT_API_DAILY_LIMIT", "450", "int"))
+        self.assertIsNotNone(validate("NYT_API_DAILY_LIMIT", "-1", "int"))
+        self.assertIsNotNone(validate("NYT_API_DAILY_LIMIT", "lots", "int"))
+
+
+class SavedSettingsTests(unittest.TestCase):
+    def tearDown(self):
+        saved_settings.set_source(None)
+
+    def test_saved_value_then_environment_then_default(self):
+        saved_settings.set_source(lambda: {"NYT_API_KEY": "saved-key"})
+        with mock.patch.dict(os.environ, {"NYT_API_KEY": "env-key", "GNEWS_API_KEY": "env-gnews"}):
+            self.assertEqual(saved_settings.get("NYT_API_KEY"), "saved-key")
+            self.assertEqual(saved_settings.get("GNEWS_API_KEY"), "env-gnews")
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(saved_settings.get("NYT_API_DAILY_LIMIT", "450"), "450")
+
+    def test_unchanged_source_keeps_last_values(self):
+        answers = iter([{"NEWS_API_KEY": "k1"}, None, None])
+        saved_settings.set_source(lambda: next(answers))
+        self.assertEqual(saved_settings.get("NEWS_API_KEY"), "k1")
+        self.assertEqual(saved_settings.get("NEWS_API_KEY"), "k1")
 
 
 class ConfigureTests(unittest.TestCase):
@@ -70,24 +92,30 @@ class ConfigureTests(unittest.TestCase):
             calls.append(1)
             return {"LLM_PROVIDER": "groq", "GROQ_API_KEY": "x", "GROQ_MODEL": "m"} if len(calls) == 1 else None
 
-        llm_client.set_config_source(source)
+        saved_settings.set_source(source)
         try:
             self.assertEqual(llm_client.provider_for_tier(llm_client.TIER_QUALITY), "groq")
             self.assertTrue(llm_client.is_configured(llm_client.TIER_QUALITY))
         finally:
-            llm_client.set_config_source(None)
+            saved_settings.set_source(None)
 
     def test_failing_source_keeps_settings(self):
-        llm_client.configure({"LLM_PROVIDER": "gemini"})
+        calls = []
 
         def source():
+            calls.append(1)
+            if len(calls) == 1:
+                return {"LLM_PROVIDER": "gemini"}
             raise RuntimeError("db down")
 
-        llm_client.set_config_source(source)
+        saved_settings.set_source(source)
         try:
             self.assertEqual(llm_client.provider_for_tier(llm_client.TIER_QUALITY), "gemini")
+            # The next read fails; the last good settings stay in force.
+            self.assertEqual(llm_client.provider_for_tier(llm_client.TIER_QUALITY), "gemini")
+            self.assertEqual(len(calls), 2)
         finally:
-            llm_client.set_config_source(None)
+            saved_settings.set_source(None)
 
 
 if __name__ == "__main__":

@@ -97,8 +97,8 @@ def create_app():
 
     # Provider keys and models saved in Settings › LLM providers override
     # the environment in this process (app, scheduler and scripts alike).
-    from aggregator import llm_config
-    llm_config.install()
+    from aggregator import config_store
+    config_store.install()
 
     return app
 
