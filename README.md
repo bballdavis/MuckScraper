@@ -287,7 +287,7 @@ An optional, read-only [MCP](https://modelcontextprotocol.io) server lets an AI 
 ### Scraping and reliability
 - Full article scraping during ingestion
 - Multi-step scrape fallback pipeline
-- Paywalled sites are not bypassed: they stay headline-and-description only. With an optional free `NYT_API_KEY`, a New York Times article gets its abstract and opening paragraph from NYT's Article Search API instead
+- Paywalled sites are not bypassed: they stay headline-and-description only. With an optional free `NYT_API_KEY` (set on Settings > Source API keys or in `.env`), a New York Times article gets its abstract and opening paragraph from NYT's Article Search API instead
 - Scrape telemetry stored per article
 - Bad-scrape auditing and status-aware retries
 - Domain and URL cooldown behavior for repeated failures
