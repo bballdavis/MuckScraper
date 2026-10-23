@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
-from aggregator import db, feed_prefs
+from aggregator import appearance_prefs, db, feed_prefs
 from aggregator.accounts import email_error, password_error
 from aggregator.models import User
 
@@ -61,6 +61,10 @@ def profile():
             feed_prefs.save(current_user, {**request.form.to_dict(), "hide_single": "hide_single" in request.form})
             flash("Feed defaults saved.", "success")
             return redirect(url_for("auth.profile"))
+        if action == "appearance":
+            appearance_prefs.save(current_user, request.form.to_dict())
+            flash("Appearance saved.", "success")
+            return redirect(url_for("auth.profile"))
         if not current_user.check_password(request.form.get("current_password", "")):
             flash("Your current password was not correct.", "error")
         elif action == "email":
@@ -89,6 +93,8 @@ def profile():
         start_pages=feed_prefs.START_PAGES,
         ranges=feed_prefs.RANGES,
         scrape_statuses=feed_prefs.SCRAPE_STATUSES,
+        appearance=appearance_prefs.load(current_user),
+        analysis_layouts=appearance_prefs.ANALYSIS_LAYOUTS,
     )
 
 

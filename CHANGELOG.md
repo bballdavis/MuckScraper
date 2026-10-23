@@ -7,6 +7,15 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **Story analysis layouts.** The story page's multi-source analysis is no
+  longer one block of text. It is split into its labelled sections
+  (`aggregator/story_analysis.py`) and shown as Cards (default): the story
+  as a lead callout, left/center/right side by side under a bar sized by
+  source count, the other sections as callouts and What's next as a
+  banner. Sections is the alternative: each section under its own icon and
+  title, with the coverage buckets in their bias colours. Pick one under
+  Appearance on your profile. Long bucket text stacks the cards full width
+  instead of squeezing three columns.
 - **Reporting grade.** Outlets get a five-level grade of how reliable their
   reporting is (Very high, High, Mostly factual, Mixed, Low), kept by hand in
   `aggregator/outlet_reporting.py` from Media Bias/Fact Check's factual

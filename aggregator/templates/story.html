@@ -6,6 +6,7 @@
 {% from 'ai_actions.html' import ai_action, story_summary_action, story_analysis_action with context %}
 {% from 'oped_columns.html' import oped_columns, oped_roundup with context %}
 {% from 'read_toggle.html' import read_toggle %}
+{% from 'story_analysis.html' import story_analysis %}
 <!DOCTYPE html>
 <html data-theme="light">
 <head>
@@ -24,6 +25,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reads.css') }}">
     <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/oped_columns.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/story_analysis.css') }}">
     <style>
         :root {
             --shadow:        0 10px 30px rgba(0,0,0,0.08);
@@ -344,23 +346,11 @@
             <h2 class="section-label">Multi-Source Analysis</h2>
             {{ story_analysis_action(story, can('scraper') and ollama_online) }}
         </div>
+        {% if analysis.sections %}
+        {{ story_analysis(analysis, story, analysis_layout) }}
+        {% else %}
         <div class="analysis-box">
-            {% if story.deep_report %}
-                <div class="analysis-content">
-                    {% for line in story.deep_report.split('\n') %}
-                        {% set l = line.strip() %}
-                        {% if l %}
-                            {% if ':' in l and l.split(':')[0].strip()|length < 35 %}
-                                {% set label = l.split(':', 1)[0].strip() %}
-                                {% set rest = l.split(':', 1)[1].strip() %}
-                                <p><strong>{{ label }}:</strong> {{ rest }}</p>
-                            {% else %}
-                                <p>{{ l }}</p>
-                            {% endif %}
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            {% elif not ollama_online %}
+            {% if not ollama_online %}
                 <div class="status-msg">
                     Analysis will be generated when Ollama is back online. This story has been queued for processing.
                 </div>
@@ -370,6 +360,7 @@
                 </div>
             {% endif %}
         </div>
+        {% endif %}
 
         {% if opinion %}
         <div class="story-opinion">
