@@ -7,6 +7,20 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **More sources, including international ones.** Twelve default feeds,
+  each checked for fresh items and free-to-read articles: Semafor,
+  NewsNation, Courthouse News Service, Stateline, The 19th and The Center
+  Square; and Deutsche Welle, Kyiv Independent, CNA, ABC News (Australia),
+  CBC News and Daily Maverick.
+- **Outlet countries.** Outlets get a `country` and an optional `funding`
+  (`public` / `state`), from `aggregator/outlet_origins.py` by name, else
+  by the domain's country code. A non-US outlet that AllSides rates keeps
+  its rating; any other is no longer LLM-rated on the US left/right scale,
+  shows as International, and stays out of the Left/Center/Right counts
+  (cards show those articles as a grey globe segment). A small flag follows
+  the outlet's name on cards, the story page, the article page and Recently
+  Read, with the country on hover. The API's outlet object adds `country`
+  and `funding`. Migration `e4a7c2f9b1d6`.
 - **API keys** for the API (Settings › API), for scripts, servers and other
   apps that can't pair with a code. Off by default behind an **API keys**
   switch; a key has a name, a user, `read` or `read` + `summarize`, and an
