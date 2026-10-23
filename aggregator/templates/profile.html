@@ -88,6 +88,28 @@
                 </div>
                 {%- endif %}
             </section>
+
+            {#- Appearance (Philip, 2026-10-23): the story page's analysis
+                layout, Cards by default. Saves on change. -#}
+            <form class="panel" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="appearance">
+                <div class="panel-head">
+                    <div>
+                        <h2>Appearance</h2>
+                        <p>How story pages lay out the multi-source analysis.</p>
+                    </div>
+                </div>
+                <div class="row">
+                    <span><span class="row-label">Analysis layout</span><span class="row-sub">Cards puts left, center and right side by side; Sections stacks titled sections</span></span>
+                    <span class="seg" role="radiogroup" aria-label="Analysis layout">
+                        {%- for value, label in analysis_layouts.items() %}
+                        <label><input type="radio" name="analysis_layout" value="{{ value }}"{% if appearance.analysis_layout == value %} checked{% endif %} onchange="this.form.submit()"><span>{{ label }}</span></label>
+                        {%- endfor %}
+                    </span>
+                </div>
+                <noscript><div class="panel-foot"><button type="submit" class="btn">Save</button></div></noscript>
+            </form>
         </div>
 
         <form class="panel profile-defaults" method="POST">
