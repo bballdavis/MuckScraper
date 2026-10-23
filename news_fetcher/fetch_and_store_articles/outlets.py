@@ -8,6 +8,7 @@ import logging
 from urllib.parse import urlparse
 from aggregator import db
 from aggregator.models import Outlet
+from aggregator.outlet_origins import is_international, origin_for
 from news_fetcher.allsides_lookup import get_allsides_score
 from news_fetcher.outlet_bias_llm import get_outlet_bias_from_llm
 
@@ -18,10 +19,15 @@ def retry_unrated_outlets():
     """Find outlets with no bias score and retry.
     Checks AllSides lookup table first, then falls back to Ollama.
     Outlets that have failed Ollama 15 or more times are permanently skipped.
+    Outlets based abroad with no AllSides rating are never sent to the LLM
+    (see aggregator/outlet_origins.py).
     """
+    apply_outlet_origins()
+
     unrated = Outlet.query.filter(
         Outlet.bias_score == None,
-        Outlet.bias_retry_count < 15
+        Outlet.bias_retry_count < 15,
+        db.or_(Outlet.bias_source == None, Outlet.bias_source != "international"),
     ).all()
 
     if not unrated:
@@ -73,6 +79,49 @@ def retry_unrated_outlets():
     logger.info("Finished retrying unrated outlets.")
 
 
+def apply_outlet_origins():
+    """Set each outlet's country and funding from aggregator/outlet_origins.py.
+
+    A non-US outlet with no AllSides rating loses any LLM-guessed score and
+    becomes bias_source "international", and its articles lose the copy of
+    that score, so they stop counting as Left/Center/Right. Articles whose
+    score differs from the outlet's were rated on their own and keep it.
+    Runs before every retry_unrated_outlets() pass; idempotent.
+    """
+    changed = 0
+    for outlet in Outlet.query.all():
+        country, funding = origin_for(outlet.name, outlet.url)
+        if (outlet.country, outlet.funding) != (country, funding):
+            outlet.country, outlet.funding = country, funding
+            changed += 1
+        if not is_international(country):
+            if outlet.bias_source == "international":
+                outlet.bias_source = None  # moved home: back in the LLM queue
+                changed += 1
+            continue
+        if outlet.bias_source in ("allsides", "international"):
+            continue
+        if get_allsides_score(outlet.name) is not None:
+            continue  # the AllSides pass below picks it up
+        logger.info(f"  {outlet.name} is based abroad ({country}): dropping its "
+                    f"{outlet.bias_source or 'missing'} rating {outlet.bias_score}")
+        old_score = outlet.bias_score
+        outlet.bias_score = None
+        outlet.bias_source = "international"
+        outlet.bias_retry_count = 0
+        if old_score is not None:
+            db.session.execute(
+                db.text("UPDATE articles SET bias_score = NULL "
+                        "WHERE outlet_id = :id AND bias_score = :score"),
+                {"id": outlet.id, "score": old_score},
+            )
+        changed += 1
+    db.session.commit()
+    if changed:
+        logger.info(f"Updated country or rating for {changed} outlets.")
+    return changed
+
+
 # Domain -> canonical outlet name overrides. Used when a feed's channel
 # <title> can't be trusted to identify the outlet -- e.g. the Washington
 # Post's world-section RSS feed has a channel title of literally "World",
@@ -101,6 +150,21 @@ DOMAIN_SOURCE_OVERRIDES = {
     # Its feed is titled just "Politics": 299 articles AI-rated Center under
     # that name (AllSides: Politico, Lean Left). Too generic to map by name.
     "politico.com": "Politico",
+    # Feeds added 2026-10-23. Mapped by domain because feed titles vary
+    # ("DW | Deutsche Welle", "Top Stories") and the international names
+    # must match aggregator/outlet_origins.py to get their country.
+    "semafor.com": "Semafor",
+    "courthousenews.com": "Courthouse News Service",
+    "newsnationnow.com": "NewsNation",
+    "stateline.org": "Stateline",
+    "thecentersquare.com": "The Center Square",
+    "19thnews.org": "The 19th",
+    "dw.com": "Deutsche Welle",
+    "kyivindependent.com": "Kyiv Independent",
+    "channelnewsasia.com": "CNA",
+    "abc.net.au": "ABC News (Australia)",
+    "cbc.ca": "CBC News",
+    "dailymaverick.co.za": "Daily Maverick",
 }
 
 
@@ -111,7 +175,13 @@ def source_name_from_url(url):
     domain = urlparse(url).netloc.lower()
     if domain.startswith("www."):
         domain = domain[4:]
-    return DOMAIN_SOURCE_OVERRIDES.get(domain)
+    # Also try parent domains, so edition.dw.com would find dw.com.
+    parts = domain.split(".")
+    for i in range(len(parts) - 1):
+        name = DOMAIN_SOURCE_OVERRIDES.get(".".join(parts[i:]))
+        if name:
+            return name
+    return None
 
 
 def normalize_source_name(name):
@@ -156,8 +226,7 @@ def normalize_source_name(name):
         "businessinsider.com": "Business Insider",
         "the-independent.com": "The Independent",
         "dailymail.com": "Daily Mail",
-        "upi.com": "UPI",
-        "reason.com": "Reason",
+            "reason.com": "Reason",
     }
     domain = name_lower[4:] if name_lower.startswith("www.") else name_lower
     if domain in domain_names:
@@ -219,8 +288,8 @@ def normalize_source_name(name):
     if "pbs" in name_lower and "news" in name_lower:
         return "PBS News"
 
-    # ABC News
-    if "abc news" in name_lower:
+    # ABC News -- not the Australian ABC
+    if "abc news" in name_lower and "australia" not in name_lower:
         return "ABC News"
 
     # NPR variants

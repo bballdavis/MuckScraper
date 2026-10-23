@@ -1,4 +1,4 @@
-{% from 'story_card_macros.html' import bias_tag with context %}
+{% from 'story_card_macros.html' import bias_tag, outlet_bias_tag, outlet_flag with context %}
 <!-- muckscraperHeadlinesGoogleNEW/aggregator/templates/article.html -->
 {% from 'icons.html' import icon %}
 {% from '_feed_topbar.html' import feed_topbar with context %}
@@ -324,10 +324,10 @@
             same score the story's Left/Center/Right counts use. -#}
         {% set lean = article.bias_score if article.bias_score is not none else (article.outlet.bias_score if article.outlet else none) %}
         {% call title_meta() %}
-            {{ meta_item('Source', article.outlet.name if article.outlet else 'Unknown') }}
+            {{ meta_item('Source', (article.outlet.name|e ~ outlet_flag(article.outlet))|safe if article.outlet else 'Unknown') }}
             {{ meta_item('Published', when=article.date) }}
             {% if article.last_updated and article.last_updated != article.date %}{{ meta_item('Last updated', when=article.last_updated) }}{% endif %}
-            {{ bias_tag(lean) }}
+            {% if lean is none and article.outlet %}{{ outlet_bias_tag(article.outlet) }}{% else %}{{ bias_tag(lean) }}{% endif %}
         {% endcall %}
 
         {% if article.has_usable_image %}

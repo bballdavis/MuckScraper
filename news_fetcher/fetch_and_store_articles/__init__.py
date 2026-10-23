@@ -41,6 +41,7 @@ from .providers import (  # noqa: F401
     fetch_and_store_articles,
 )
 from .outlets import (  # noqa: F401
+    apply_outlet_origins,
     retry_unrated_outlets,
     DOMAIN_SOURCE_OVERRIDES,
     source_name_from_url,

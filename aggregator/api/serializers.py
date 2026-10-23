@@ -12,6 +12,7 @@ from aggregator.article_copies import copy_label, is_copy_in_story
 from aggregator.filters import summary_paragraph
 from aggregator.html_safety import sanitize_html
 from aggregator.opinion import leaning
+from aggregator.outlet_origins import is_international
 
 DEK_MAX_CHARS = 280
 
@@ -108,8 +109,14 @@ def story_summary(story, edition_story=None):
 
 def outlet(o, fallback_name=None):
     if o is None:
-        return {"id": None, "name": fallback_name or "Unknown", "leaning": "unrated", "logo_url": None}
-    return {"id": o.id, "name": o.name, "leaning": leaning(o.bias_score), "logo_url": _http_url(o.logo_url)}
+        return {"id": None, "name": fallback_name or "Unknown", "leaning": "unrated", "logo_url": None,
+                "country": None, "funding": None}
+    country = getattr(o, "country", None)
+    # country: ISO code for outlets based outside the US (null = US), which
+    # stay "unrated" unless AllSides rates them; funding: "public" | "state".
+    return {"id": o.id, "name": o.name, "leaning": leaning(o.bias_score), "logo_url": _http_url(o.logo_url),
+            "country": country if is_international(country) else None,
+            "funding": getattr(o, "funding", None)}
 
 
 def article_card(article):

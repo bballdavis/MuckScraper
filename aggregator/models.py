@@ -55,8 +55,33 @@ class Outlet(db.Model):
     # by news_fetcher/outlet_logos.py (2026-10-22).
     logo_url = db.Column(db.String, nullable=True)
     logo_checked_at = db.Column(db.DateTime, nullable=True)
+    # ISO country code (empty = US) and "public"/"state" funding, set by
+    # apply_outlet_origins() from aggregator/outlet_origins.py (2026-10-23).
+    country = db.Column(db.String(2), nullable=True)
+    funding = db.Column(db.String(16), nullable=True)
 
     articles = db.relationship("Article", backref="outlet", lazy=True)
+
+    @property
+    def is_international(self):
+        from aggregator.outlet_origins import is_international
+        return is_international(self.country)
+
+    @property
+    def flag(self):
+        """The country's flag emoji, for outlets based outside the US."""
+        if not self.is_international or len(self.country) != 2:
+            return None
+        return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in self.country.upper())
+
+    @property
+    def origin_label(self):
+        """'Germany · Public broadcaster', for the flag's tooltip."""
+        from aggregator.outlet_origins import country_name, funding_name
+        if not self.is_international:
+            return None
+        parts = [country_name(self.country), funding_name(self.funding)]
+        return " · ".join(p for p in parts if p)
 
 
 class Topic(db.Model):
