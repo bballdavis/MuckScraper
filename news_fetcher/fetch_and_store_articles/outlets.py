@@ -8,7 +8,7 @@ import logging
 from urllib.parse import urlparse
 from aggregator import db
 from aggregator.models import Outlet
-from aggregator.outlet_origins import is_international, origin_for
+from aggregator.outlet_origins import is_international, lean_abroad_for, origin_for
 from news_fetcher.allsides_lookup import get_allsides_score
 from news_fetcher.outlet_bias_llm import get_outlet_bias_from_llm
 
@@ -80,13 +80,16 @@ def retry_unrated_outlets():
 
 
 def apply_outlet_origins():
-    """Set each outlet's country and funding from aggregator/outlet_origins.py.
+    """Set each outlet's country and funding from aggregator/outlet_origins.py,
+    and the lean of outlets based abroad.
 
-    A non-US outlet with no AllSides rating loses any LLM-guessed score and
-    becomes bias_source "international", and its articles lose the copy of
-    that score, so they stop counting as Left/Center/Right. Articles whose
-    score differs from the outlet's were rated on their own and keep it.
-    Runs before every retry_unrated_outlets() pass; idempotent.
+    A non-US outlet that AllSides rates keeps that rating. Otherwise it takes
+    its lean from LEANS_ABROAD (Media Bias/Fact Check or Ad Fontes on the US
+    scale, bias_source "mbfc_adfontes") when it has one, and else has no
+    score at all (bias_source "international"). Either way any LLM-guessed
+    score goes, and articles that carried a copy of the old outlet score get
+    the new one. Articles rated on their own keep theirs. Runs before every
+    retry_unrated_outlets() pass; idempotent.
     """
     changed = 0
     for outlet in Outlet.query.all():
@@ -95,26 +98,27 @@ def apply_outlet_origins():
             outlet.country, outlet.funding = country, funding
             changed += 1
         if not is_international(country):
-            if outlet.bias_source == "international":
-                outlet.bias_source = None  # moved home: back in the LLM queue
+            if outlet.bias_source in ("international", "mbfc_adfontes"):
+                outlet.bias_source = None  # moved home: back in the AllSides/LLM queue
                 changed += 1
             continue
-        if outlet.bias_source in ("allsides", "international"):
+        if outlet.bias_source == "allsides" or get_allsides_score(outlet.name) is not None:
+            continue  # the AllSides pass picks it up
+        lean = lean_abroad_for(outlet.name)
+        score, source = (float(lean), "mbfc_adfontes") if lean else (None, "international")
+        if (outlet.bias_score, outlet.bias_source) == (score, source):
             continue
-        if get_allsides_score(outlet.name) is not None:
-            continue  # the AllSides pass below picks it up
-        logger.info(f"  {outlet.name} is based abroad ({country}): dropping its "
-                    f"{outlet.bias_source or 'missing'} rating {outlet.bias_score}")
+        logger.info(f"  {outlet.name} is based abroad ({country}): "
+                    f"{outlet.bias_source or 'unrated'} {outlet.bias_score} -> {source} {score}")
         old_score = outlet.bias_score
-        outlet.bias_score = None
-        outlet.bias_source = "international"
+        outlet.bias_score = score
+        outlet.bias_source = source
         outlet.bias_retry_count = 0
-        if old_score is not None:
-            db.session.execute(
-                db.text("UPDATE articles SET bias_score = NULL "
-                        "WHERE outlet_id = :id AND bias_score = :score"),
-                {"id": outlet.id, "score": old_score},
-            )
+        db.session.execute(
+            db.text("UPDATE articles SET bias_score = :score WHERE outlet_id = :id AND "
+                    + ("bias_score IS NULL" if old_score is None else "bias_score = :old")),
+            {"id": outlet.id, "score": score, "old": old_score},
+        )
         changed += 1
     db.session.commit()
     if changed:

@@ -41,6 +41,25 @@
 {%- endif -%}
 {%- endmacro %}
 
+{# The outlet's reporting grade from aggregator/outlet_reporting.py, beside
+   its lean: "Reporting", five dots filled up to the grade and coloured by
+   it, and the word, with what it means on hover (Philip, 2026-10-23). Nothing for an
+   outlet with no grade. Styles: theme.css .reporting-tag. #}
+{% set reporting_grades = {
+    'very_high': (5, 'Very high', 'Consistently factual, well sourced, corrects quickly'),
+    'high': (4, 'High', 'Factual and sourced, with rare failed fact checks'),
+    'mostly_factual': (3, 'Mostly factual', 'Generally factual, with some failed fact checks or loaded framing'),
+    'mixed': (2, 'Mixed', 'Several failed fact checks, thin sourcing or opinion mixed into news'),
+    'low': (1, 'Low', 'Often fails fact checks or presents opinion as news')} %}
+{% macro reporting_tag(outlet) -%}
+{%- set grade = outlet.reporting if outlet else none -%}
+{%- if grade in reporting_grades -%}
+{%- set n, label, tip = reporting_grades[grade] -%}
+<span class="reporting-tag reporting-{{ grade|replace('_', '-') }}" tabindex="0" aria-label="Reporting: {{ label }}" data-tip="{{ tip }}. Our grade, from Media Bias/Fact Check and Ad Fontes Media.">
+    <span class="reporting-label" aria-hidden="true">Reporting</span><span class="reporting-dots" aria-hidden="true">{% for i in range(5) %}<i{% if i < n %} class="on"{% endif %}></i>{% endfor %}</span>{{ label }}</span>
+{%- endif -%}
+{%- endmacro %}
+
 {# Left / Center / Right counts from each article's outlet rating
    (1-2 Left, 3 Center, 4-5 Right). #}
 {% macro bias_balance(story) -%}
