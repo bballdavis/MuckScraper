@@ -162,7 +162,20 @@ SEED_RSS_GENERAL = ['https://feeds.bbci.co.uk/news/rss.xml',
  'https://www.propublica.org/feeds/propublica/main',
  'https://calmatters.org/feed/',
  'https://kffhealthnews.org/feed/',
- 'https://insideclimatenews.org/feed/']
+ 'https://insideclimatenews.org/feed/',
+ # e4a7c2f9b1d6: more US outlets, and international outlets (country-tagged).
+ 'https://www.semafor.com/rss.xml',
+ 'https://www.newsnationnow.com/feed/',
+ 'https://www.courthousenews.com/feed/',
+ 'https://stateline.org/feed/',
+ 'https://19thnews.org/feed/',
+ 'https://www.thecentersquare.com/search/?f=rss&t=article&l=50&s=start_time&sd=desc',
+ 'https://rss.dw.com/rdf/rss-en-all',
+ 'https://kyivindependent.com/news-archive/rss/',
+ 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml',
+ 'https://www.abc.net.au/news/feed/2942460/rss.xml',
+ 'https://www.cbc.ca/webfeed/rss/rss-topstories',
+ 'https://www.dailymaverick.co.za/dmrss/']
 
 SEED_RSS_RIGHT_ENRICHMENT = ['https://moxie.foxnews.com/google-publisher/latest.xml',
  'https://nypost.com/feed/',
@@ -192,7 +205,19 @@ SEED_RSS_OP_ED = ['https://rss.nytimes.com/services/xml/rss/nyt/Opinion.xml',
  'https://www.nationalreview.com/feed/',
  'https://thehill.com/opinion/feed/']
 
-SEED_RSS_LABELS = {('https://feeds.texastribune.org/feeds/main/', 'general'): 'The Texas Tribune',
+SEED_RSS_LABELS = {('https://www.semafor.com/rss.xml', 'general'): 'Semafor',
+ ('https://www.newsnationnow.com/feed/', 'general'): 'NewsNation',
+ ('https://www.courthousenews.com/feed/', 'general'): 'Courthouse News Service',
+ ('https://stateline.org/feed/', 'general'): 'Stateline',
+ ('https://19thnews.org/feed/', 'general'): 'The 19th',
+ ('https://www.thecentersquare.com/search/?f=rss&t=article&l=50&s=start_time&sd=desc', 'general'): 'The Center Square',
+ ('https://rss.dw.com/rdf/rss-en-all', 'general'): 'Deutsche Welle',
+ ('https://kyivindependent.com/news-archive/rss/', 'general'): 'Kyiv Independent',
+ ('https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml', 'general'): 'CNA',
+ ('https://www.abc.net.au/news/feed/2942460/rss.xml', 'general'): 'ABC News (Australia)',
+ ('https://www.cbc.ca/webfeed/rss/rss-topstories', 'general'): 'CBC News',
+ ('https://www.dailymaverick.co.za/dmrss/', 'general'): 'Daily Maverick',
+ ('https://feeds.texastribune.org/feeds/main/', 'general'): 'The Texas Tribune',
  ('https://www.propublica.org/feeds/propublica/main', 'general'): 'ProPublica',
  ('https://calmatters.org/feed/', 'general'): 'CalMatters',
  ('https://kffhealthnews.org/feed/', 'general'): 'KFF Health News',
@@ -239,7 +264,8 @@ SEED_RSS_LABELS = {('https://feeds.texastribune.org/feeds/main/', 'general'): 'T
  ('https://www.washingtontimes.com/rss/headlines/opinion/', 'op_ed'): 'Washington Times Opinion '
                                                                       '(Op/Ed)'}
 
-SEED_RSS_FALLBACKS = {'https://feeds.texastribune.org/feeds/main/': 'https://news.google.com/rss/search?q=site:texastribune.org+when:1d&hl=en-US&gl=US&ceid=US:en',
+SEED_RSS_FALLBACKS = {'https://www.semafor.com/rss.xml': 'https://news.google.com/rss/search?q=site:semafor.com+when:1d&hl=en-US&gl=US&ceid=US:en',
+ 'https://feeds.texastribune.org/feeds/main/': 'https://news.google.com/rss/search?q=site:texastribune.org+when:1d&hl=en-US&gl=US&ceid=US:en',
  'https://feeds.washingtonpost.com/rss/opinions': 'https://news.google.com/rss/search?q=site:washingtonpost.com/opinions+when:1d&hl=en-US&gl=US&ceid=US:en',
  'https://feeds.washingtonpost.com/rss/world': 'https://news.google.com/rss/search?q=site:washingtonpost.com/world+when:1d&hl=en-US&gl=US&ceid=US:en'}
 

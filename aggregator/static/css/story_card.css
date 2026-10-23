@@ -208,6 +208,7 @@
 .card-bias .seg-l { background: var(--bias-1-bg); }
 .card-bias .seg-c { background: #8c8c8c; }
 .card-bias .seg-r { background: var(--bias-5-bg); }
+.card-bias .seg-i { background: var(--bias-unrated-bg); }
 .card-bias .bias-unrated { color: var(--text-muted); font-weight: 600; }
 
 /* The action rail down the card's right side (Philip, 2026-10-22): summary,

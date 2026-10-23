@@ -18,6 +18,7 @@ from aggregator.article_signals import (
 )
 from aggregator.html_safety import strip_title_tags
 from aggregator.models import Article, OpinionPiece, Outlet, Story, Topic, IngestionBlock
+from aggregator.outlet_origins import is_international, origin_for
 from news_fetcher.allsides_lookup import get_allsides_score
 from news_fetcher.outlet_bias_llm import get_outlet_bias_from_llm
 from news_fetcher.scraper import scrape_article
@@ -408,12 +409,20 @@ def store_articles(articles_data, topic_name, provider=None):
             image_url = None
 
         if not outlet:
+            country, funding = origin_for(source_name, url)
             as_score = get_allsides_score(source_name)
             if as_score is not None:
                 logger.info(f"  New outlet {source_name}: AllSides rating {as_score}")
                 bias_score = as_score
                 bias_source = "allsides"
                 allsides_bias_score = as_score
+            elif is_international(country):
+                # No US left/right guess for outlets based abroad
+                # (aggregator/outlet_origins.py).
+                logger.info(f"  New outlet {source_name}: based in {country}, not rated")
+                bias_score = None
+                bias_source = "international"
+                allsides_bias_score = None
             else:
                 logger.info(f"  New outlet {source_name}: no AllSides rating, asking Ollama...")
                 bias_score = get_outlet_bias_from_llm(source_name)
@@ -426,7 +435,9 @@ def store_articles(articles_data, topic_name, provider=None):
                 description="N/A",
                 bias_score=bias_score,
                 allsides_bias_score=allsides_bias_score,
-                bias_source=bias_source
+                bias_source=bias_source,
+                country=country,
+                funding=funding,
             )
             db.session.add(outlet)
             db.session.flush()
