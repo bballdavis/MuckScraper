@@ -327,8 +327,10 @@
             {{ meta_item('Source', (article.outlet.name|e ~ outlet_flag(article.outlet))|safe if article.outlet else 'Unknown') }}
             {{ meta_item('Published', when=article.date) }}
             {% if article.last_updated and article.last_updated != article.date %}{{ meta_item('Last updated', when=article.last_updated) }}{% endif %}
-            {{ reporting_tag(article.outlet) }}
-            {% if lean is none and article.outlet %}{{ outlet_bias_tag(article.outlet) }}{% else %}{{ bias_tag(lean) }}{% endif %}
+            <span class="tm-chips">
+                {{ reporting_tag(article.outlet) }}
+                {% if lean is none and article.outlet %}{{ outlet_bias_tag(article.outlet) }}{% else %}{{ bias_tag(lean) }}{% endif %}
+            </span>
         {% endcall %}
 
         {% if article.has_usable_image %}
