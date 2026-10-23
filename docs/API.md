@@ -103,7 +103,10 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 | `GET /editions/latest`, `/editions/{id}` | An edition and its ranked story cards |
 | `GET /opinion?edition=` | The edition's Opinion page: stories with their columns by leaning |
 | `GET /stories?topic=&range=&single=&cursor=&limit=` | The story feed, filtered like All Stories. Omitted filters use the user's feed defaults. |
-| `GET /stories/{id}` | Summary, deep report, opinion roundup, articles and columns by leaning |
+| `GET /stories/{id}` | Summary, deep report, opinion roundup, articles and columns by leaning. Articles from unrated outlets based outside the US are grouped under `international`, apart from `unrated`. |
+
+Outlets carry `country` (an ISO code, set only for outlets based outside the US) and `funding` (`public`, `state` or null). An outlet abroad that AllSides doesn't rate stays `unrated`: it is never put on the US left/right scale. Story `coverage` counts those articles as `international`, outside `left`/`center`/`right`.
+
 | `GET /articles/{id}` | Title, outlet, leaning, summary, analysis, link, and scraped text when allowed. `is_summarizing` and `is_rating_bias` say whether its summary or lean rating is still being written. |
 | `POST /articles/{id}/summarize` | Needs the summarize scope. Queues the article's own summary (the web page's summary button): `200` when it already has one, `202` queued, `409 no_text` when MuckScraper couldn't read the article. Poll `/articles/{id}`. Counts against the daily summary limit. |
 | `POST /articles/{id}/rate-bias` | Needs the summarize scope. Queues a rating of the article's own lean from its title and opening (`202`). Once done, its `leaning` and the story's L / C / R counts use it instead of the outlet's. Counts against the daily summary limit. |
