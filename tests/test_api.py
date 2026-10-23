@@ -255,7 +255,7 @@ class ApiEndToEndTests(unittest.TestCase):
         latest = self._get("/api/v1/editions/latest", token).get_json()
         self.assertEqual(latest["stories"][0]["headline"], "Senate passes budget")
         card = latest["stories"][0]
-        self.assertEqual(card["coverage"], {"left": 1, "center": 0, "right": 1})
+        self.assertEqual(card["coverage"], {"left": 1, "center": 0, "right": 1, "international": 0})
         self.assertEqual(card["section"], "US Politics")
         self.assertEqual(card["dek"], "The Senate passed it.")
         self.assertTrue(card["updated_at"].endswith("Z"))
@@ -624,6 +624,29 @@ class ApiEndToEndTests(unittest.TestCase):
         a2 = Article.query.get(a2.id)
         a2.content, a2.summary, a2.bias_score = kept
         db.session.commit()
+
+    def test_unrated_outlets_abroad_are_international(self):
+        from aggregator import db
+        from aggregator.models import Outlet
+        right = Outlet.query.filter_by(name="Right Times").first()
+        kept = (right.bias_score, right.country, right.funding)
+        right.bias_score, right.country, right.funding = None, "GB", "public"
+        db.session.commit()
+        try:
+            token = self._pair()
+            story = self._get(f"/api/v1/stories/{self.ids['story']}", token).get_json()
+            self.assertEqual(story["coverage"], {"left": 1, "center": 0, "right": 0, "international": 1})
+            self.assertEqual(story["articles"]["right"], [])
+            self.assertEqual(story["articles"]["unrated"], [])
+            intl = story["articles"]["international"][0]
+            self.assertEqual((intl["leaning"], intl["outlet"]["country"], intl["outlet"]["funding"]),
+                             ("unrated", "GB", "public"))
+            left = story["articles"]["left"][0]["outlet"]
+            self.assertEqual((left["country"], left["funding"]), (None, None))
+        finally:
+            right = Outlet.query.get(right.id)
+            right.bias_score, right.country, right.funding = kept
+            db.session.commit()
 
     def _bookmark_env(self):
         import tempfile
