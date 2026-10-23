@@ -3,12 +3,13 @@ from collections import OrderedDict
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify
 from flask_login import current_user
-from aggregator import breaking, feed_prefs, reads
+from aggregator import appearance_prefs, breaking, feed_prefs, reads, story_analysis
 from aggregator.models import FeedEntry
 from aggregator.permissions import ROLE_SCRAPER, public_or_login, public_read_enabled, role_required
 from aggregator.models import Article, Story, Topic, RawArticlePayload, Edition, EditionStory
 from aggregator.opinion import opinion_for_story, published_edition_opinion_cards, split_by_leaning
 from aggregator.story_view import apply_aggregator_filter, annotate_edition_story_flags
+from aggregator.blueprints.admin._shared import story_bias_totals
 from news_fetcher.llm_client import check_llm_status as check_ollama_status, TIER_QUALITY
 
 logger = logging.getLogger(__name__)
@@ -231,10 +232,13 @@ def view_story(story_id):
     ollama_online = check_ollama_status(TIER_QUALITY)
 
     apply_aggregator_filter(story)
+    story_bias_totals(story)
 
     return render_template(
         "story.html",
         story=story,
+        analysis=story_analysis.layout(story.deep_report),
+        analysis_layout=appearance_prefs.load(current_user)["analysis_layout"],
         opinion=opinion_for_story(story.id),
         ollama_online=ollama_online,
         read_item=reads.get(current_user.id, "story", story.id) if current_user.is_authenticated else None,
