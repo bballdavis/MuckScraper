@@ -251,7 +251,20 @@
 <div class="page-body">
 
 <div class="container">
-{{ float_back(feed_back_url('story-%d' % story.id), 'Back to Feed', read_toggle('story', story.id, read_item) if current_user.is_authenticated else '') }}
+{#- Round buttons under the back button: read, then (scrapers) the executive
+    summary and the multi-source analysis while each is still to be
+    generated (Philip, 2026-10-23), as on the article page. -#}
+{%- set summary_pending = not (story.summary and story.summary != story.title) -%}
+{%- set analysis_pending = not story.deep_report and story.articles|length >= 2 -%}
+{%- set rail_actions = can('scraper') and (summary_pending or analysis_pending) -%}
+{%- set rail -%}
+{%- if current_user.is_authenticated -%}
+{{ read_toggle('story', story.id, read_item) }}
+{%- if can('scraper') and summary_pending -%}{{ story_summary_action(story, ollama_online, 'rail-btn') }}{%- endif -%}
+{%- if can('scraper') and analysis_pending -%}{{ story_analysis_action(story, ollama_online, 'rail-btn') }}{%- endif -%}
+{%- endif -%}
+{%- endset -%}
+{{ float_back(feed_back_url('story-%d' % story.id), 'Back to Feed', rail, collapse=rail_actions) }}
 <div class="story-card">
         <div id="ai-task-status" style="display:none; margin-bottom:20px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.03); color:var(--text-muted); font-size:13px;"></div>
         <h1>{{ story.display_headline }}</h1>
