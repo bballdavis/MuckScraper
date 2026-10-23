@@ -120,6 +120,31 @@
 }
 .outlet-flag:hover::after, .outlet-flag:focus-visible::after { opacity: 1; }
 
+/* Reporting grade (story_card_macros.html reporting_tag, 2026-10-23): five
+   dots filled up to the grade in its colour, then the word; the meaning in
+   a dark tip above on hover or focus, like .outlet-flag. */
+.reporting-tag {
+    --rep: #2f9e5b; position: relative; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; cursor: default; outline: none;
+}
+.reporting-high { --rep: #4caf50; }
+.reporting-mostly-factual { --rep: #b3a12a; }
+.reporting-mixed { --rep: #e08a1e; }
+.reporting-low { --rep: #d64545; }
+.reporting-label { font-weight: 500; color: var(--text-faint, var(--text-muted)); }
+.reporting-dots { display: inline-flex; gap: 2px; }
+.reporting-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+.reporting-dots i.on { background: var(--rep); }
+.reporting-tag::after {
+    content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 7px);
+    width: max-content; max-width: 260px; white-space: normal;
+    padding: 6px 9px; border-radius: 6px; background: var(--topbar-bg); color: #fff;
+    font-size: 12px; font-weight: 500; line-height: 1.35; letter-spacing: normal; text-transform: none;
+    pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 30;
+}
+.reporting-tag:hover::after, .reporting-tag:focus-visible::after { opacity: 1; }
+@media (max-width: 600px) { .reporting-label { display: none; } }
+
 /* Inline SVG icons (templates/icons.html) */
 .icon { display: inline-block; vertical-align: -0.125em; flex-shrink: 0; }
 

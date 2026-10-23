@@ -107,5 +107,13 @@ class CardTests(unittest.TestCase):
         self.assertIn('class="seg-i"', html)
 
 
+class LeanAbroadTests(unittest.TestCase):
+    def test_mbfc_lean_for_outlets_allsides_skips(self):
+        self.assertEqual(oo.lean_abroad_for("Deutsche Welle"), 2)
+        self.assertEqual(oo.lean_abroad_for("daily maverick"), 3)
+        self.assertIsNone(oo.lean_abroad_for("Some Paper Abroad"))
+        self.assertIsNone(oo.lean_abroad_for(None))
+
+
 if __name__ == "__main__":
     unittest.main()
