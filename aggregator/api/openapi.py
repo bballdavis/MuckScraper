@@ -46,12 +46,15 @@ SCHEMAS = {
     "Coverage": _obj(["left", "center", "right", "international"], left=_I, center=_I, right=_I,
                      international={"type": "integer", "description": "Articles from unrated outlets based "
                                     "outside the US; not part of left/center/right"}),
-    "Outlet": _obj(["id", "name", "leaning", "logo_url", "country", "funding"], id=_NI, name=_S,
+    "Outlet": _obj(["id", "name", "leaning", "logo_url", "country", "funding", "reporting"], id=_NI, name=_S,
                    leaning=_LEANING, logo_url=_LOGO,
                    country={"type": ["string", "null"], "description": "ISO 3166 code for an outlet based "
                             "outside the US; null for US outlets. Such outlets are 'unrated' unless "
                             "AllSides rates them."},
-                   funding={"type": ["string", "null"], "enum": ["public", "state", None]}),
+                   funding={"type": ["string", "null"], "enum": ["public", "state", None]},
+                   reporting={"type": ["string", "null"], "enum": ["very_high", "high", "mostly_factual", "mixed", "low", None],
+                              "description": "Hand-kept grade of how reliable the outlet's reporting is, "
+                              "separate from its lean; null when not graded."}),
     "StorySummary": _obj(
         ["id", "section", "headline", "dek", "image_url", "logo_url", "coverage", "source_count", "updated_at",
          "is_summarized", "has_analysis", "has_ai_headline", "has_updates"],

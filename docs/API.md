@@ -129,7 +129,9 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 | `GET /me/bookmarks/{id}/versions/{n}/assets/{name}` | A saved picture, page PDF or screenshot |
 | `GET /me/bookmarks/{id}/export` | Every ready version as a zip of `v<n>/snapshot.json` and `v<n>/assets/` |
 
-Outlets carry `country` (an ISO code, set only for outlets based outside the US) and `funding` (`public`, `state` or null). An outlet abroad that AllSides doesn't rate stays `unrated`: it is never put on the US left/right scale. Story `coverage` counts those articles as `international`, outside `left`/`center`/`right`.
+Outlets carry `country` (an ISO code, set only for outlets based outside the US) and `funding` (`public`, `state` or null). An outlet abroad takes its lean from AllSides, else from Media Bias/Fact Check or Ad Fontes Media where they rate it on the US scale; one none of them rates stays `unrated` and is never guessed. Story `coverage` counts those unrated articles as `international`, outside `left`/`center`/`right`.
+
+Outlets also carry `reporting`: a hand-kept grade of how reliable the outlet's reporting is, separate from its lean, one of `very_high`, `high`, `mostly_factual`, `mixed`, `low`, or null when not graded (`aggregator/outlet_reporting.py`).
 
 Lists are paginated with an opaque `cursor`: pass back the `next_cursor` from
 the previous page, which is `null` on the last page. `limit` is 1 to 50

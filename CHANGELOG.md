@@ -16,6 +16,21 @@ All notable changes to MuckScraper are documented here.
   title, with the coverage buckets in their bias colours. Pick one under
   Appearance on your profile. Long bucket text stacks the cards full width
   instead of squeezing three columns.
+- **Reporting grade.** Outlets get a five-level grade of how reliable their
+  reporting is (Very high, High, Mostly factual, Mixed, Low), kept by hand in
+  `aggregator/outlet_reporting.py` from Media Bias/Fact Check's factual
+  rating, moved a step where Ad Fontes Media's reliability score clearly
+  disagrees. It shows as "Reporting" with five dots beside the lean chip on
+  the article page and in a story's article list, with what it means on
+  hover, and as `reporting` on the API's outlet object. Ungraded outlets show
+  nothing; nothing is guessed by an LLM.
+- **Leans for outlets abroad from MBFC / Ad Fontes.** An outlet based abroad
+  that AllSides doesn't rate but MBFC or Ad Fontes rates on the US scale now
+  takes that lean (`bias_source` `mbfc_adfontes`, from `LEANS_ABROAD` in
+  `aggregator/outlet_origins.py`) and counts as Left/Center/Right: Deutsche
+  Welle, Kyiv Independent, ABC News (Australia) and CBC News as Lean Left,
+  CNA and Daily Maverick as Center. Only outlets nobody rates stay
+  International.
 - **More sources, including international ones.** Twelve default feeds,
   each checked for fresh items and free-to-read articles: Semafor,
   NewsNation, Courthouse News Service, Stateline, The 19th and The Center

@@ -75,6 +75,12 @@ class Outlet(db.Model):
         return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in self.country.upper())
 
     @property
+    def reporting(self):
+        """A level from aggregator/outlet_reporting.py (very_high ... low), or None."""
+        from aggregator.outlet_reporting import reporting_for
+        return reporting_for(self.name)
+
+    @property
     def origin_label(self):
         """'Germany · Public broadcaster', for the flag's tooltip."""
         from aggregator.outlet_origins import country_name, funding_name

@@ -120,6 +120,39 @@
 }
 .outlet-flag:hover::after, .outlet-flag:focus-visible::after { opacity: 1; }
 
+/* Reporting grade (story_card_macros.html reporting_tag, 2026-10-23): five
+   dots filled up to the grade in its colour, then the word; the meaning in
+   a dark tip above on hover or focus, like .outlet-flag. */
+.reporting-tag {
+    --rep: #2f9e5b; position: relative; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; cursor: default; outline: none;
+}
+.reporting-high { --rep: #4caf50; }
+.reporting-mostly-factual { --rep: #b3a12a; }
+.reporting-mixed { --rep: #e08a1e; }
+.reporting-low { --rep: #d64545; }
+.reporting-label { font-weight: 500; color: var(--text-faint, var(--text-muted)); }
+.reporting-dots { display: inline-flex; gap: 2px; }
+.reporting-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+.reporting-dots i.on { background: var(--rep); }
+.reporting-tag::after {
+    content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 7px);
+    width: max-content; max-width: 260px; white-space: normal;
+    padding: 6px 9px; border-radius: 6px; background: var(--topbar-bg); color: #fff;
+    font-size: 12px; font-weight: 500; line-height: 1.35; letter-spacing: normal; text-transform: none;
+    pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 30;
+}
+.reporting-tag:hover::after, .reporting-tag:focus-visible::after { opacity: 1; }
+/* Phones: chips shrink rather than wrap their row (Philip, 2026-10-23). The
+   lean chip switches to its short form (story_card_macros.html bias_short)
+   and the reporting grade to its dots alone; tap one for its meaning. */
+.bt-short { display: none; }
+@media (max-width: 600px) {
+    .reporting-label, .reporting-word { display: none; }
+    .bt-full { display: none; }
+    .bt-short { display: inline; }
+}
+
 /* Inline SVG icons (templates/icons.html) */
 .icon { display: inline-block; vertical-align: -0.125em; flex-shrink: 0; }
 
@@ -195,6 +228,20 @@
 .tm-item + .tm-item::before { content: "·"; margin: 0 10px; color: var(--text-faint); }
 .tm-label { font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-faint); }
 .title-meta > :not(.tm-item) { margin-left: auto; }
+/* Chips that sit together at the right end (reporting grade, then lean). */
+.tm-chips { display: inline-flex; align-items: center; gap: 12px; }
+/* Phones keep the article page's line on one row (Philip, 2026-10-23):
+   no SOURCE: / PUBLISHED: labels, only the outlet and date, and the outlet
+   name gives way first. Scoped to lines that carry chips (article.html), so
+   the story page's "Sources: 7" keeps its label. */
+@media (max-width: 600px) {
+    .title-meta:has(.tm-chips) { flex-wrap: nowrap; white-space: nowrap; }
+    .title-meta:has(.tm-chips) .tm-label { display: none; }
+    .title-meta:has(.tm-chips) .tm-item:nth-child(n+3) { display: none; }
+    .title-meta:has(.tm-chips) .tm-item:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .title-meta:has(.tm-chips) .tm-item + .tm-item::before { margin: 0 6px; }
+    .tm-chips { flex-shrink: 0; padding-left: 8px; gap: 8px; }
+}
 
 /* Summary / analysis action icons (templates/ai_actions.html) and their
    tooltips. .act is a square cell; the card rail stretches it to fill. */
