@@ -32,8 +32,8 @@ _PARAS = {"type": "array", "items": _S}
 
 
 def _by_leaning(item):
-    return _obj(["left", "center", "right", "unrated"],
-                **{side: {"type": "array", "items": item} for side in ("left", "center", "right", "unrated")})
+    sides = ("left", "center", "right", "international", "unrated")
+    return _obj(list(sides), **{side: {"type": "array", "items": item} for side in sides})
 
 
 def _page(item):
@@ -43,7 +43,9 @@ def _page(item):
 SCHEMAS = {
     "Error": _obj(["error"], error=_obj(["code", "message"], code=_S, message=_S)),
     "Health": _obj(["ok", "version"], ok=_B, version=_S),
-    "Coverage": _obj(["left", "center", "right"], left=_I, center=_I, right=_I),
+    "Coverage": _obj(["left", "center", "right", "international"], left=_I, center=_I, right=_I,
+                     international={"type": "integer", "description": "Articles from unrated outlets based "
+                                    "outside the US; not part of left/center/right"}),
     "Outlet": _obj(["id", "name", "leaning", "logo_url", "country", "funding"], id=_NI, name=_S,
                    leaning=_LEANING, logo_url=_LOGO,
                    country={"type": ["string", "null"], "description": "ISO 3166 code for an outlet based "

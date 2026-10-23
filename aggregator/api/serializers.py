@@ -54,10 +54,21 @@ def _article_leaning(article):
     return leaning(score)
 
 
+def _article_side(article):
+    """The article's lean, or "international" for an unrated outlet based
+    abroad (aggregator/outlet_origins.py), which stays off the L / C / R scale."""
+    side = _article_leaning(article)
+    if side == "unrated" and article.outlet is not None and article.outlet.is_international:
+        return "international"
+    return side
+
+
 def coverage(story):
-    counts = {"left": 0, "center": 0, "right": 0}
+    """L / C / R counts, plus the articles from unrated outlets based abroad
+    (the web's grey globe segment after Right)."""
+    counts = {"left": 0, "center": 0, "right": 0, "international": 0}
     for article in story.site_articles:
-        side = _article_leaning(article)
+        side = _article_side(article)
         if side in counts:
             counts[side] += 1
     return counts
@@ -159,7 +170,7 @@ def opinion_piece(piece):
 
 
 def by_leaning(items, side_of, serialize):
-    out = {"left": [], "center": [], "right": [], "unrated": []}
+    out = {"left": [], "center": [], "right": [], "international": [], "unrated": []}
     for item in items:
         out[side_of(item)].append(serialize(item))
     return out
@@ -175,7 +186,7 @@ def story_detail(story, opinion_pieces):
         "summary": _paragraphs(story.summary),
         "deep_report": _paragraphs(story.deep_report),
         "opinion_roundup": _paragraphs(story.opinion_roundup),
-        "articles": by_leaning(articles, _article_leaning, article_card),
+        "articles": by_leaning(articles, _article_side, article_card),
         "copies_hidden": sum(1 for a in articles if is_copy_in_story(a)),
         "opinion": by_leaning(
             sorted(opinion_pieces, key=lambda p: p.date or p.fetched_at or dt.min, reverse=True),
