@@ -7,6 +7,15 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **Story analysis layouts.** The story page's multi-source analysis is no
+  longer one block of text. It is split into its labelled sections
+  (`aggregator/story_analysis.py`) and shown as Cards (default): the story
+  as a lead callout, left/center/right side by side under a bar sized by
+  source count, the other sections as callouts and What's next as a
+  banner. Sections is the alternative: each section under its own icon and
+  title, with the coverage buckets in their bias colours. Pick one under
+  Appearance on your profile. Long bucket text stacks the cards full width
+  instead of squeezing three columns.
 - **More sources, including international ones.** Twelve default feeds,
   each checked for fresh items and free-to-read articles: Semafor,
   NewsNation, Courthouse News Service, Stateline, The 19th and The Center
