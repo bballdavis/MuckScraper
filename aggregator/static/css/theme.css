@@ -143,7 +143,15 @@
     pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 30;
 }
 .reporting-tag:hover::after, .reporting-tag:focus-visible::after { opacity: 1; }
-@media (max-width: 600px) { .reporting-label { display: none; } }
+/* Phones: chips shrink rather than wrap their row (Philip, 2026-10-23). The
+   lean chip switches to its short form (story_card_macros.html bias_short)
+   and the reporting grade to its dots alone; tap one for its meaning. */
+.bt-short { display: none; }
+@media (max-width: 600px) {
+    .reporting-label, .reporting-word { display: none; }
+    .bt-full { display: none; }
+    .bt-short { display: inline; }
+}
 
 /* Inline SVG icons (templates/icons.html) */
 .icon { display: inline-block; vertical-align: -0.125em; flex-shrink: 0; }
@@ -220,6 +228,20 @@
 .tm-item + .tm-item::before { content: "·"; margin: 0 10px; color: var(--text-faint); }
 .tm-label { font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-faint); }
 .title-meta > :not(.tm-item) { margin-left: auto; }
+/* Chips that sit together at the right end (reporting grade, then lean). */
+.tm-chips { display: inline-flex; align-items: center; gap: 12px; }
+/* Phones keep the article page's line on one row (Philip, 2026-10-23):
+   no SOURCE: / PUBLISHED: labels, only the outlet and date, and the outlet
+   name gives way first. Scoped to lines that carry chips (article.html), so
+   the story page's "Sources: 7" keeps its label. */
+@media (max-width: 600px) {
+    .title-meta:has(.tm-chips) { flex-wrap: nowrap; white-space: nowrap; }
+    .title-meta:has(.tm-chips) .tm-label { display: none; }
+    .title-meta:has(.tm-chips) .tm-item:nth-child(n+3) { display: none; }
+    .title-meta:has(.tm-chips) .tm-item:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .title-meta:has(.tm-chips) .tm-item + .tm-item::before { margin: 0 6px; }
+    .tm-chips { flex-shrink: 0; padding-left: 8px; gap: 8px; }
+}
 
 /* Summary / analysis action icons (templates/ai_actions.html) and their
    tooltips. .act is a square cell; the card rail stretches it to fill. */
