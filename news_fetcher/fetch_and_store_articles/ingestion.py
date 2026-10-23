@@ -18,7 +18,7 @@ from aggregator.article_signals import (
 )
 from aggregator.html_safety import strip_title_tags
 from aggregator.models import Article, OpinionPiece, Outlet, Story, Topic, IngestionBlock
-from aggregator.outlet_origins import is_international, origin_for
+from aggregator.outlet_origins import is_international, lean_abroad_for, origin_for
 from news_fetcher.allsides_lookup import get_allsides_score
 from news_fetcher.outlet_bias_llm import get_outlet_bias_from_llm
 from news_fetcher.scraper import scrape_article
@@ -417,11 +417,13 @@ def store_articles(articles_data, topic_name, provider=None):
                 bias_source = "allsides"
                 allsides_bias_score = as_score
             elif is_international(country):
-                # No US left/right guess for outlets based abroad
+                # No LLM guess for outlets based abroad: MBFC / Ad Fontes's
+                # US-scale lean if they give one, else none
                 # (aggregator/outlet_origins.py).
-                logger.info(f"  New outlet {source_name}: based in {country}, not rated")
-                bias_score = None
-                bias_source = "international"
+                lean = lean_abroad_for(source_name)
+                logger.info(f"  New outlet {source_name}: based in {country}, lean {lean}")
+                bias_score = float(lean) if lean else None
+                bias_source = "mbfc_adfontes" if lean else "international"
                 allsides_bias_score = None
             else:
                 logger.info(f"  New outlet {source_name}: no AllSides rating, asking Ollama...")

@@ -8,13 +8,16 @@
 {% from 'ai_actions.html' import story_summary_action, story_analysis_action with context %}
 
 {% set bias_names = {1: 'Left', 2: 'Lean Left', 3: 'Center', 4: 'Lean Right', 5: 'Right'} %}
+{#- Phones show these instead, so a chip never pushes its row onto a second
+    line (Philip, 2026-10-23; theme.css .bt-short). -#}
+{% set bias_short = {1: 'Left', 2: 'Lean L', 3: 'Center', 4: 'Lean R', 5: 'Right'} %}
 
 {# Bias chip for a 1-5 score. `prefix` labels a second chip ("Article: ");
    `unrated=false` renders nothing for a missing score. #}
 {% macro bias_tag(score, prefix='', unrated=true) -%}
 {%- set b = score|int if score is not none else 0 -%}
 {%- if b in bias_names -%}
-<span class="bias-tag bias-{{ b }}">{{ prefix }}{{ bias_names[b] }}</span>
+<span class="bias-tag bias-{{ b }}" aria-label="{{ prefix }}{{ bias_names[b] }}"><span class="bt-full" aria-hidden="true">{{ prefix }}{{ bias_names[b] }}</span><span class="bt-short" aria-hidden="true">{{ prefix }}{{ bias_short[b] }}</span></span>
 {%- elif unrated -%}
 <span class="bias-tag bias-none">Unrated</span>
 {%- endif -%}
@@ -35,9 +38,28 @@
    "Unrated" (or nothing, with unrated=false). #}
 {% macro outlet_bias_tag(outlet, unrated=true) -%}
 {%- if outlet and outlet.bias_score is none and outlet.is_international -%}
-<span class="bias-tag bias-intl" title="Based outside the US, so not rated on the US left/right scale">International</span>
+<span class="bias-tag bias-intl" title="Based outside the US, so not rated on the US left/right scale" aria-label="International"><span class="bt-full" aria-hidden="true">International</span><span class="bt-short" aria-hidden="true">Intl</span></span>
 {%- else -%}
 {{ bias_tag(outlet.bias_score if outlet else none, unrated=unrated) }}
+{%- endif -%}
+{%- endmacro %}
+
+{# The outlet's reporting grade from aggregator/outlet_reporting.py, beside
+   its lean: "Reporting", five dots filled up to the grade and coloured by
+   it, and the word, with what it means on hover (Philip, 2026-10-23). Nothing for an
+   outlet with no grade. Styles: theme.css .reporting-tag. #}
+{% set reporting_grades = {
+    'very_high': (5, 'Very high', 'Consistently factual, well sourced, corrects quickly'),
+    'high': (4, 'High', 'Factual and sourced, with rare failed fact checks'),
+    'mostly_factual': (3, 'Mostly factual', 'Generally factual, with some failed fact checks or loaded framing'),
+    'mixed': (2, 'Mixed', 'Several failed fact checks, thin sourcing or opinion mixed into news'),
+    'low': (1, 'Low', 'Often fails fact checks or presents opinion as news')} %}
+{% macro reporting_tag(outlet) -%}
+{%- set grade = outlet.reporting if outlet else none -%}
+{%- if grade in reporting_grades -%}
+{%- set n, label, tip = reporting_grades[grade] -%}
+<span class="reporting-tag reporting-{{ grade|replace('_', '-') }}" tabindex="0" aria-label="Reporting: {{ label }}" data-tip="{{ tip }}. Our grade, from Media Bias/Fact Check and Ad Fontes Media.">
+    <span class="reporting-label" aria-hidden="true">Reporting</span><span class="reporting-dots" aria-hidden="true">{% for i in range(5) %}<i{% if i < n %} class="on"{% endif %}></i>{% endfor %}</span><span class="reporting-word">{{ label }}</span></span>
 {%- endif -%}
 {%- endmacro %}
 

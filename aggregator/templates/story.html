@@ -1,4 +1,4 @@
-{% from 'story_card_macros.html' import bias_tag, outlet_bias_tag, outlet_flag with context %}
+{% from 'story_card_macros.html' import bias_tag, outlet_bias_tag, outlet_flag, reporting_tag with context %}
 {% from 'icons.html' import icon %}
 {% from '_feed_topbar.html' import feed_topbar with context %}
 {% from 'title_meta.html' import title_meta, meta_item %}
@@ -97,6 +97,8 @@
         .article-meta { display: flex; align-items: baseline; gap: 10px; font-size: 12px; font-weight: 500; color: var(--text-faint); }
         .article-outlet { font-size: 14px; font-weight: 700; color: var(--text-muted); }
         .article-meta .bias-tag { margin-left: auto; align-self: center; }
+        .article-meta .reporting-tag { align-self: center; }
+        .article-meta .outlet-flag { margin-left: -4px; }
 
         .bias-tag {
             height: 18px;
@@ -234,10 +236,22 @@
             color: var(--text-muted);
         }
 
+        /* Phones (Philip, 2026-10-23): less padding on the nested boxes, and
+           every source row stays on one line. The outlet name gives way
+           first (ellipsis), the chips shrink (theme.css .bt-short), and the
+           buttons narrow so the read chip stays beside them. */
         @media (max-width: 600px) {
-            .container { margin: 24px auto; padding: 0 14px; }
-            .article-meta { flex-wrap: wrap; gap: 8px; }
-            .story-card { padding: 20px; border-radius: 0; }
+            .container { margin: 16px auto; padding: 0 8px; }
+            .story-card { padding: 16px 12px; border-radius: 0; }
+            .article-main { padding: 12px; gap: 6px; }
+            .article-meta { gap: 8px; white-space: nowrap; }
+            .article-outlet { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+            .article-meta .local-date { flex-shrink: 0; font-size: 11px; }
+            .article-meta .reporting-tag, .article-meta .bias-tag { flex-shrink: 0; }
+            .article-link { font-size: 16px; }
+            .article-actions { flex-wrap: nowrap; gap: 6px; }
+            .pill { min-width: 0; flex: 1 1 0; padding: 0 8px; }
+            .read-chip { flex-shrink: 0; }
             h1 { font-size: 28px; }
         }
         {% include 'sidebar_styles.html' %}
@@ -377,8 +391,9 @@
                 <div class="article-item">
                     <div class="article-main">
                         <div class="article-meta">
-                            <span class="article-outlet">{{ article.outlet.name }}{{ outlet_flag(article.outlet) }}</span>
+                            <span class="article-outlet">{{ article.outlet.name }}</span>{{ outlet_flag(article.outlet) }}
                             <span class="local-date" data-utc="{{ article.date.isoformat() }}Z">{{ article.date|short_datetime }}</span>
+                            {{ reporting_tag(article.outlet) }}
                             {{ outlet_bias_tag(article.outlet, unrated=false) }}
                         </div>
                         <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="article-link">{{ article.title }}</a>

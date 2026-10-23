@@ -8,9 +8,11 @@ then move a story's Left/Center/Right counts and its enrichment direction.
 
 Decided with Philip 2026-10-23: every outlet gets a country. A non-US outlet
 that AllSides rates (BBC, Guardian, Al Jazeera...) keeps that rating, since
-AllSides rates it for US readers. Any other non-US outlet is never sent to the
-LLM, keeps no bias score (bias_source "international"), stays out of the
-Left/Center/Right counts, and shows its country instead of a lean.
+AllSides rates it for US readers. One that Media Bias/Fact Check or Ad Fontes
+rates on the US scale takes that lean from LEANS_ABROAD. Any other non-US
+outlet is never sent to the LLM, keeps no bias score (bias_source
+"international"), stays out of the Left/Center/Right counts, and shows as
+International.
 
 `funding` is a second, optional label for outlets where who pays matters more
 than left/right: "public" (a public broadcaster with editorial independence)
@@ -67,6 +69,24 @@ ORIGINS = {
     "Daily Maverick": ("ZA", None),
 }
 
+# US-scale lean (1 Left ... 5 Right) for outlets based abroad that AllSides
+# doesn't rate but Media Bias/Fact Check or Ad Fontes Media do (Philip,
+# 2026-10-23: rated on the US scale anywhere, so count it). MBFC's label
+# maps Left 1, Left-Center 2, Least Biased 3, Right-Center 4, Right 5; Ad
+# Fontes' bias score (-42 ... 42) breaks ties: under -18 is 1, -18 to -6 is
+# 2, -6 to 6 is 3, 6 to 18 is 4, over 18 is 5. Looked up 2026-10-23.
+LEANS_ABROAD = {
+    "Deutsche Welle": 2,        # MBFC Left-Center
+    "DW": 2,
+    "Kyiv Independent": 2,      # MBFC Left-Center
+    "The Kyiv Independent": 2,
+    "CNA": 3,                   # MBFC Least Biased
+    "ABC News (Australia)": 2,  # MBFC Left-Center
+    "CBC News": 2,              # MBFC Left-Center (Ad Fontes -5.0)
+    "CBC": 2,
+    "Daily Maverick": 3,        # MBFC Least Biased
+}
+
 COUNTRY_NAMES = {
     "AU": "Australia", "BE": "Belgium", "CA": "Canada", "CN": "China",
     "DE": "Germany", "FR": "France", "GB": "UK", "IE": "Ireland",
@@ -105,6 +125,17 @@ def origin_for(name, url=None):
         if hit is not None:
             return hit
     return _country_from_url(url), None
+
+
+def lean_abroad_for(name):
+    """1-5 from LEANS_ABROAD for an outlet name, or None."""
+    if not name:
+        return None
+    lean = LEANS_ABROAD.get(name)
+    if lean is None:
+        lower = name.lower().strip()
+        lean = next((v for k, v in LEANS_ABROAD.items() if k.lower() == lower), None)
+    return lean
 
 
 def is_international(country):
