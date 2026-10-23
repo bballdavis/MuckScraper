@@ -101,6 +101,24 @@
 .bias-3 { background-color: var(--bias-3-bg); color: var(--bias-3-fg); }
 .bias-4 { background-color: var(--bias-4-bg); color: var(--bias-4-fg); }
 .bias-5 { background-color: var(--bias-5-bg); color: var(--bias-5-fg); }
+/* Outlets based outside the US and not rated on its left/right scale
+   (aggregator/outlet_origins.py, 2026-10-23). */
+.bias-intl { background-color: var(--bias-unrated-bg); color: #fff; }
+
+/* The flag after an international outlet's name (story_card_macros.html
+   outlet_flag), with the country in a dark tip above it on hover or focus.
+   It sits above a card's stretched headline link so the hover reaches it. */
+.outlet-flag {
+    position: relative; z-index: 2; display: inline-block; margin-left: 5px;
+    font-size: 0.95em; line-height: 1; vertical-align: -0.05em; cursor: default; outline: none;
+}
+.outlet-flag::after {
+    content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 7px); transform: translateX(-50%);
+    padding: 5px 9px; border-radius: 6px; background: var(--topbar-bg); color: #fff;
+    font-size: 12px; font-weight: 600; letter-spacing: normal; text-transform: none; white-space: nowrap;
+    pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 30;
+}
+.outlet-flag:hover::after, .outlet-flag:focus-visible::after { opacity: 1; }
 
 /* Inline SVG icons (templates/icons.html) */
 .icon { display: inline-block; vertical-align: -0.125em; flex-shrink: 0; }

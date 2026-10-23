@@ -20,6 +20,27 @@
 {%- endif -%}
 {%- endmacro %}
 
+{# A small flag after the name of an outlet based outside the US, with the
+   country (and "Public broadcaster" / "State-owned") on hover or focus
+   (Philip, 2026-10-23). US outlets show nothing. Countries come from
+   aggregator/outlet_origins.py; styles: theme.css .outlet-flag. #}
+{% macro outlet_flag(outlet) -%}
+{%- if outlet and outlet.flag -%}
+<span class="outlet-flag" tabindex="0" role="img" aria-label="{{ outlet.origin_label }}" data-tip="{{ outlet.origin_label }}">{{ outlet.flag }}</span>
+{%- endif -%}
+{%- endmacro %}
+
+{# The lean chip for an outlet: its rating, else "International" for an
+   unrated outlet based abroad (never put on the US left/right scale), else
+   "Unrated" (or nothing, with unrated=false). #}
+{% macro outlet_bias_tag(outlet, unrated=true) -%}
+{%- if outlet and outlet.bias_score is none and outlet.is_international -%}
+<span class="bias-tag bias-intl" title="Based outside the US, so not rated on the US left/right scale">International</span>
+{%- else -%}
+{{ bias_tag(outlet.bias_score if outlet else none, unrated=unrated) }}
+{%- endif -%}
+{%- endmacro %}
+
 {# Left / Center / Right counts from each article's outlet rating
    (1-2 Left, 3 Center, 4-5 Right). #}
 {% macro bias_balance(story) -%}
@@ -47,8 +68,11 @@
 {%- set l = story.left_bias_count|default(0) -%}
 {%- set c = story.center_bias_count|default(0) -%}
 {%- set r = story.right_bias_count|default(0) -%}
-<span class="card-bias" role="img" aria-label="Left {{ l }}, center {{ c }}, right {{ r }}">
-    {%- for n, side, letter in [(l, 'l', 'L'), (c, 'c', 'C'), (r, 'r', 'R')] if n %}
+{#- Articles from unrated outlets based abroad get their own grey segment
+    after Right, marked with a globe (2026-10-23). -#}
+{%- set intl = story.articles|selectattr('bias_score', 'none')|map(attribute='outlet')|select|selectattr('bias_score', 'none')|selectattr('is_international')|list|length -%}
+<span class="card-bias" role="img" aria-label="Left {{ l }}, center {{ c }}, right {{ r }}{% if intl %}, international {{ intl }}{% endif %}">
+    {%- for n, side, letter in [(l, 'l', 'L'), (c, 'c', 'C'), (r, 'r', 'R'), (intl, 'i', '🌐')] if n %}
     <span class="seg-{{ side }}" style="flex-grow: {{ n }}">{{ letter }} {{ n }}</span>
     {%- else %}
     <span class="bias-unrated">Unrated</span>
@@ -119,7 +143,7 @@
         <div class="story-content">
             <h2><a class="story-link" href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ story.display_headline }}</a></h2>
             <div class="card-meta">
-                {% if single and single.outlet %}<span class="meta-item">{{ single.outlet.name }}</span>{% endif %}
+                {% if single and single.outlet %}<span class="meta-item">{{ single.outlet.name }}{{ outlet_flag(single.outlet) }}</span>{% endif %}
                 {% if story.last_updated %}<span class="meta-item meta-date">{{ story.last_updated|short_datetime }}</span>{% endif %}
                 {% if not single %}<span class="meta-item">{{ article_count }} article{{ 's' if article_count != 1 else '' }}{% if story.source_count is defined %} · {{ story.source_count }} outlet{{ 's' if story.source_count != 1 else '' }}{% endif %}</span>{% endif %}
                 {% if story.has_ai_headline %}<span class="meta-item">AI headline</span>{% endif %}
@@ -127,7 +151,7 @@
             </div>
             <div class="card-bottom">
                 {% if single %}
-                    {{ bias_tag(single.outlet.bias_score if single.outlet else none) }}
+                    {{ outlet_bias_tag(single.outlet) }}
                     {% if single.bias_score and single.outlet and single.bias_score != single.outlet.bias_score %}
                     {{ bias_tag(single.bias_score, prefix='Article: ', unrated=false) }}
                     {% endif %}

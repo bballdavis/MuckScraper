@@ -44,7 +44,12 @@ SCHEMAS = {
     "Error": _obj(["error"], error=_obj(["code", "message"], code=_S, message=_S)),
     "Health": _obj(["ok", "version"], ok=_B, version=_S),
     "Coverage": _obj(["left", "center", "right"], left=_I, center=_I, right=_I),
-    "Outlet": _obj(["id", "name", "leaning", "logo_url"], id=_NI, name=_S, leaning=_LEANING, logo_url=_LOGO),
+    "Outlet": _obj(["id", "name", "leaning", "logo_url", "country", "funding"], id=_NI, name=_S,
+                   leaning=_LEANING, logo_url=_LOGO,
+                   country={"type": ["string", "null"], "description": "ISO 3166 code for an outlet based "
+                            "outside the US; null for US outlets. Such outlets are 'unrated' unless "
+                            "AllSides rates them."},
+                   funding={"type": ["string", "null"], "enum": ["public", "state", None]}),
     "StorySummary": _obj(
         ["id", "section", "headline", "dek", "image_url", "logo_url", "coverage", "source_count", "updated_at",
          "is_summarized", "has_analysis", "has_ai_headline", "has_updates"],
