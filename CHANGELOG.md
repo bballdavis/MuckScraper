@@ -4,6 +4,16 @@ All notable changes to MuckScraper are documented here.
  
 ---
 
+## [Unreleased]
+
+### Added
+- **Article bylines** (`articles.author`). Taken from the feed or NewsAPI
+  entry, or from the publisher's page when the scraper reads it, and cleaned
+  ("By Jane Doe, CNN" becomes "Jane Doe"; "Staff" and outlet names are left
+  blank). Not shown on pages yet. Upgrading adds one empty column
+  (`./install.sh` applies the migration); articles stored before it have no
+  byline.
+
 ## [1.0.1] - 2026-10-22
 
 ### Added
