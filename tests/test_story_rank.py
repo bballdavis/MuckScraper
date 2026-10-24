@@ -95,6 +95,21 @@ class RankEndToEndTests(unittest.TestCase):
         (row,) = _signal_rows(story_ids=[story.id])
         self.assertEqual((row.outlets, row.left, row.center, row.right, row.recent), (3, 1, 1, 1, 3))
 
+    def test_copy_of_an_article_elsewhere_counts(self):
+        from aggregator import db
+        from aggregator.models import Article
+        from aggregator.story_rank import _signal_rows
+        story = self._story("Port strike talks resume", [("ap", 3)], copies_of_first=1)
+        other = self._story("Unrelated story", [("bbc", 3)])
+        copy = Article.query.filter(Article.copy_of_id.isnot(None)).one()
+        copy.copy_of_id = other.articles[0].id
+        db.session.commit()
+        self.assertEqual(_signal_rows(story_ids=[story.id])[0].outlets, 2)
+        # An original that left every story (story_id NULL) no longer makes it a copy.
+        other.articles[0].story_id = None
+        db.session.commit()
+        self.assertEqual(_signal_rows(story_ids=[story.id])[0].outlets, 2)
+
     def test_ranker_writes_scores_and_edition_leads_with_the_broad_story(self):
         from aggregator.models import EditionStory, Story
         from news_fetcher.fetch_and_store_articles.edition_publish import publish_edition
