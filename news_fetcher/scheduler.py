@@ -78,17 +78,16 @@ FETCH_RUN_STATUS_KEY = "fetch_run_status_v1"
 
 def run_optional_headline_ranking():
     """
-    Run the private ranking plugin when it exists locally.
-    The open-source scheduler must not require ignored/private modules.
+    Run the private ranking plugin when it exists locally, else the built-in
+    ranker (aggregator/story_rank.py), so Story.headline_score is never left
+    at 0. The open-source scheduler must not require ignored/private modules.
     """
     try:
         from news_fetcher.headline_ranker import run_headline_ranking
     except ImportError as e:
-        logging.info(f"--- Headline ranking skipped ({e}) ---")
-        return {
-            "status": "skipped",
-            "reason": str(e),
-        }
+        from aggregator.story_rank import rank_recent_stories
+        logging.info(f"--- Private headline ranking unavailable ({e}); using the built-in ranker ---")
+        return rank_recent_stories()
 
     run_headline_ranking()
     return {"status": "ok"}

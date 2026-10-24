@@ -7,6 +7,15 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **Built-in headline ranking.** `Story.headline_score` was only ever set by
+  upstream's private `headline_ranker` plugin, which isn't in the repository,
+  so every score stayed 0 and Headlines showed the edition in its
+  selection-pass order (which put right-leaning single-outlet stories first).
+  When the plugin is missing, the scheduler now runs
+  `aggregator/story_rank.py`: distinct outlets (copies excluded), a bonus for
+  left-and-right coverage and for outlets that reported in the last 6 hours,
+  halved every 12 hours since the newest article. With scores set, the
+  targeted second enrichment passes, which pick stories by score, run again.
 - **Story analysis layouts.** The story page's multi-source analysis is no
   longer one block of text. It is split into its labelled sections
   (`aggregator/story_analysis.py`) and shown as Cards (default): the story
