@@ -7,6 +7,18 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **Headlines views: Trending, Latest and Controversial.** Headlines now opens
+  on a live view, picked with a chip as wide as the column under Breaking
+  News (each segment with its count and a one-line rule) instead of the
+  newest edition in its stored order (`aggregator/headline_views.py`).
+  Trending lists stories with 3+ outlets in the last 24 hours by the headline
+  score. Latest lists every story from the last 24 hours, single-source
+  included, newest first, as compact rows under hour headers. Controversial
+  needs 2+ left- and 2+ right-leaning outlets in the last 48 hours and is
+  ranked by the framing gap (how far apart the two sides' article embeddings
+  are) plus linked op-eds. Cards say why they're listed ("Framing gap: high ·
+  6 op-eds"). Editions still drive automatic summaries and open by id from
+  Past editions, the newest one included.
 - **Built-in headline ranking.** `Story.headline_score` was only ever set by
   upstream's private `headline_ranker` plugin, which isn't in the repository,
   so every score stayed 0 and Headlines showed the edition in its
