@@ -19,7 +19,7 @@ candidate filter keeps working.
 """
 from datetime import datetime, timedelta
 
-from sqlalchemy import and_, case, func, literal, not_
+from sqlalchemy import and_, case, func, literal, or_
 from sqlalchemy.orm import aliased
 
 from aggregator import db
@@ -67,8 +67,10 @@ def _signal_rows(story_ids=None, created_since=None, now=None):
         .outerjoin(Outlet, Outlet.id == Article.outlet_id)
         .outerjoin(original, original.id == Article.copy_of_id)
         .filter(Article.story_id.isnot(None))
-        # Drop copies whose original is in the same story.
-        .filter(not_(and_(original.id.isnot(None), original.story_id == Article.story_id)))
+        # Drop copies whose original is in the same story. Spelled out so a
+        # NULL original.story_id keeps the row instead of making it unknown.
+        .filter(or_(original.id.is_(None), original.story_id.is_(None),
+                    original.story_id != Article.story_id))
         .group_by(Article.story_id)
     )
     if story_ids is not None:
