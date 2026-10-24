@@ -84,14 +84,14 @@ class ReadStateTests(unittest.TestCase):
 
     def test_marking_read_hides_the_story_from_headlines(self):
         first, second, _ = self.ids["stories"]
-        page = self.client.get("/headlines").get_data(as_text=True)
+        page = self.client.get("/headlines?view=latest").get_data(as_text=True)
         self.assertIn("Headline 0", page)
         self.assertIn('data-story-id="%d"' % first, page)
 
         r = self.client.post(f"/read/story/{first}")
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.get_json()["is_read"])
-        page = self.client.get("/headlines").get_data(as_text=True)
+        page = self.client.get("/headlines?view=latest").get_data(as_text=True)
         self.assertNotIn("Headline 0", page)
         self.assertIn("Headline 1", page)
         self.assertIn("1 story you've read is hidden", page)
@@ -99,14 +99,14 @@ class ReadStateTests(unittest.TestCase):
         # Undo brings it back.
         r = self.client.delete(f"/read/story/{first}")
         self.assertFalse(r.get_json()["is_read"])
-        self.assertIn("Headline 0", self.client.get("/headlines").get_data(as_text=True))
+        self.assertIn("Headline 0", self.client.get("/headlines?view=latest").get_data(as_text=True))
 
     def test_read_state_is_per_user(self):
         first = self.ids["stories"][0]
         self.client.post(f"/read/story/{first}")
         other = self.web.test_client()
         self._login(other, self.ids["other"])
-        self.assertIn("Headline 0", other.get("/headlines").get_data(as_text=True))
+        self.assertIn("Headline 0", other.get("/headlines?view=latest").get_data(as_text=True))
         self.assertNotIn("Headline 0", other.get("/read").get_data(as_text=True))
 
     def test_recently_read_lists_newest_first_with_articles(self):
@@ -160,7 +160,7 @@ class ReadStateTests(unittest.TestCase):
         r = api.put(f"/api/v1/me/read/stories/{first}", headers=auth)
         self.assertEqual(r.status_code, 200, r.get_json())
         self.assertEqual(r.get_json()["kind"], "story")
-        self.assertNotIn("Headline 0", self.client.get("/headlines").get_data(as_text=True))
+        self.assertNotIn("Headline 0", self.client.get("/headlines?view=latest").get_data(as_text=True))
 
         cards = api.get("/api/v1/editions/latest", headers=auth).get_json()["stories"]
         self.assertEqual({c["id"]: c["is_read"] for c in cards}[first], True)
@@ -178,7 +178,7 @@ class ReadStateTests(unittest.TestCase):
         self.assertTrue(api.get(f"/api/v1/articles/{self.ids['article']}", headers=auth).get_json()["is_read"])
 
         self.assertEqual(api.delete(f"/api/v1/me/read/stories/{first}", headers=auth).status_code, 204)
-        self.assertIn("Headline 0", self.client.get("/headlines").get_data(as_text=True))
+        self.assertIn("Headline 0", self.client.get("/headlines?view=latest").get_data(as_text=True))
         self.assertEqual(api.put("/api/v1/me/read/stories/999999", headers=auth).status_code, 404)
         self.assertEqual(api.put(f"/api/v1/me/read/topics/{first}", headers=auth).status_code, 404)
 
