@@ -1,4 +1,5 @@
-{% from 'story_card_macros.html' import story_card, bias_balance, bias_tag with context %}
+{% from 'story_card_macros.html' import story_card, bias_balance, bias_line, bias_tag with context %}
+{%- set view_icons = {'trending': 'trending-up', 'latest': 'clock', 'controversial': 'flame'} %}
 {% from '_feed_topbar.html' import feed_topbar with context %}
 {% from 'icons.html' import icon %}
 {% from 'ai_actions.html' import story_summary_action, story_analysis_action with context %}
@@ -21,6 +22,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/feed_header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/breaking.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reads.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/headline_views.css') }}">
     <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -59,14 +61,14 @@
     <div class="main-header">
         <div>
             <h1>Headlines</h1>
-            <div class="subtitle">{{ edition_label }}</div>
+            {% if edition_label %}<div class="subtitle">{{ edition_label }}</div>{% endif %}
             {% if hidden_read %}
             <div class="read-hidden-note">{{ hidden_read }} {{ 'story' if hidden_read == 1 else 'stories' }} you've read {{ 'is' if hidden_read == 1 else 'are' }} hidden · <a href="{{ url_for('reading.recently_read') }}">Recently Read</a></div>
             {% endif %}
         </div>
         <div class="edition-links">
             {% if is_past_edition %}
-            <a href="{{ url_for('public.headlines_feed') }}" class="btn btn-muted">Latest edition</a>
+            <a href="{{ url_for('public.headlines_feed') }}" class="btn btn-muted">Back to Headlines</a>
             {% endif %}
             {% if edition %}
             <a href="{{ url_for('public.edition_opinion', edition=edition.id if is_past_edition else none) }}" class="btn btn-muted">{{ icon('newspaper') }} Opinion ({{ opinion_count }})</a>
@@ -77,10 +79,48 @@
     {#- Breaking News sits under the edition line (Philip, 2026-10-22). -#}
     {% if breaking_rows %}{% include '_breaking_bar.html' %}{% endif %}
     {% if is_past_edition %}
-    <p class="past-note">An earlier edition, shown as its stories stand now: articles and opinion added since it was published are included.</p>
+    <p class="past-note">A published edition, shown as its stories stand now: articles and opinion added since it was published are included.</p>
+    {% endif %}
+    {#- Trending / Latest / Controversial (aggregator/headline_views.py): one
+        chip as wide as the column, each segment with its own one-line rule
+        (Philip picked layout B, 2026-10-24). -#}
+    {% if views %}
+    <nav class="view-switch" aria-label="Headline views">
+        {%- for key, label, rule, count in views %}
+        <a class="view-seg{{ ' on' if key == view else '' }}" href="{{ url_for('public.headlines_feed', view=key) }}"{% if key == view %} aria-current="page"{% endif %}>
+            <span class="view-name">{{ icon(view_icons[key]) }}{{ label }}<span class="view-count">{{ count }}</span></span>
+            <span class="view-rule">{{ rule }}</span>
+        </a>
+        {%- endfor %}
+    </nav>
     {% endif %}
 
-    {% if stories %}
+    {% set can_mark_read = current_user.is_authenticated %}
+    {% if view == 'latest' and stories %}
+        {#- Latest: compact rows under hour headers, so single-source stories
+            are easy to tell from broad ones. -#}
+        {% for label, group in latest_groups %}
+        <div class="latest-hour">{{ label }}</div>
+        <div class="latest-rows">
+            {% for story in group %}
+            {%- set sig = story.rank_entry.signals %}
+            {%- set names = story.site_articles|map(attribute='outlet')|select|map(attribute='name')|unique|list %}
+            {% if can_mark_read %}<div class="hl-item latest-item" data-story-id="{{ story.id }}">{% endif %}
+            <a class="latest-row" href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">
+                <span class="latest-age">{{ story.age_label }}</span>
+                <span class="latest-title">{{ story.display_headline }}
+                    <small>{{ names[:3]|join(', ') }}{% if names|length > 3 %} +{{ names|length - 3 }}{% endif %}</small></span>
+                {% if sig.outlets > 1 %}{{ bias_line(story) }}{% else %}<span class="latest-single">single source</span>{% endif %}
+                <span class="latest-src">{{ sig.outlets }} outlet{{ 's' if sig.outlets != 1 else '' }}</span>
+            </a>
+            {% if can_mark_read %}
+            <button type="button" class="hl-read" data-mark-read aria-label="Mark as read"><span class="hl-read-icon">{{ icon('glasses') }}<span class="tip" role="tooltip"><strong>Mark as read</strong> Hides it from Headlines. Find it again under Recently Read.</span></span></button>
+            </div>{% endif %}
+            {% endfor %}
+        </div>
+        {% endfor %}
+        {{ pager(page, total_pages) }}
+    {% elif stories %}
         {#- Signed-in readers can mark a story read: the reading-glasses
             button beside the card on hover (in the action row on touch
             screens) slides it away, with Undo (static/js/reads.js). -#}
@@ -88,6 +128,7 @@
         {% for story in stories %}
         {% if can_mark_read %}<div class="hl-item" data-story-id="{{ story.id }}">{% endif %}
         {% call story_card(story) %}
+            {% if story.why_label %}<div class="why-row"><span class="why{{ ' why-hot' if view == 'controversial' else '' }}">{{ story.why_label }}</span></div>{% endif %}
             {{ bias_balance(story) }}
 
             {% if story.summary %}
@@ -118,7 +159,13 @@
 
         {{ pager(page, total_pages) }}
     {% else %}
+        {% if view == 'controversial' %}
+        <div class="empty">Nothing in the last two days has two or more outlets on each side yet.</div>
+        {% elif view == 'trending' %}
+        <div class="empty">No story has three or more outlets in the last day yet. Latest lists everything.</div>
+        {% else %}
         <div class="empty">No headlines yet — check back after the next scheduled fetch.</div>
+        {% endif %}
     {% endif %}
 </div>
 
