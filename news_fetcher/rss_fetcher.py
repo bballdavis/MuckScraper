@@ -7,6 +7,7 @@ from datetime import datetime
 from datetime import timedelta
 from aggregator.article_signals import bias_bucket_for_score
 from news_fetcher import google_news
+from news_fetcher.bylines import feed_entry_author
 from news_fetcher.fetch_and_store_articles import merge_count_maps, normalize_source_name
 from news_fetcher.story_grouper import normalize_title_tokens, titles_are_near_duplicates
 
@@ -153,6 +154,7 @@ def fetch_feed(feed_url, max_entries=30, fallback_url=None):
                 "source_name":  entry_source,
                 "published_at": _parse_published(entry),
                 "image_url":    _extract_image(entry),
+                "author":       feed_entry_author(entry),
             })
 
         if google_feed:

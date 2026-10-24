@@ -113,6 +113,9 @@ class Article(db.Model):
     title      = db.Column(db.String, nullable=False)
     content    = db.Column(db.Text)
     source     = db.Column(db.String)
+    # Byline as the feed, API or publisher's page gave it, cleaned by
+    # news_fetcher/bylines.py; NULL when none named a person.
+    author     = db.Column(db.String(255), nullable=True)
     url        = db.Column(db.String, unique=True)
     outlet_id  = db.Column(db.Integer, db.ForeignKey("outlets.id"))
     story_id   = db.Column(db.Integer, db.ForeignKey("stories.id"))

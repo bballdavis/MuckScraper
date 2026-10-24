@@ -72,6 +72,7 @@ def fetch_newsapi(topic_name, mode="top", query=None, country="us", category=Non
                 "source_name":  (a.get("source") or {}).get("name", "Unknown"),
                 "published_at": published_at,
                 "image_url":    a.get("urlToImage"),
+                "author":       a.get("author"),
             })
 
         metrics = store_articles(normalized, topic_name, provider="newsapi")

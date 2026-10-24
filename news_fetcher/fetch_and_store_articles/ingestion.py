@@ -19,6 +19,7 @@ from aggregator.article_signals import (
 from aggregator.html_safety import strip_title_tags
 from aggregator.models import Article, OpinionPiece, Outlet, Story, Topic, IngestionBlock
 from news_fetcher.allsides_lookup import get_allsides_score
+from news_fetcher.bylines import clean_byline
 from news_fetcher.outlet_bias_llm import get_outlet_bias_from_llm
 from news_fetcher.scraper import scrape_article
 from news_fetcher.story_grouper import find_or_create_story, get_embedding
@@ -357,6 +358,7 @@ def store_articles(articles_data, topic_name, provider=None):
         source_name  = source_name_from_url(raw_url) or normalize_source_name(article.get("source_name", "Unknown"))
         published_at = article.get("published_at", datetime.utcnow())
         image_url    = article.get("image_url")
+        author       = clean_byline(article.get("author"), source_name)
 
         if not title or not raw_url:
             metrics["skipped"]["missing_required"] += 1
@@ -494,6 +496,7 @@ def store_articles(articles_data, topic_name, provider=None):
             title=title,
             content=final_content,
             source=source_name,
+            author=author or clean_byline(scrape_result.author, source_name),
             outlet_id=outlet.id,
             # story_id is deliberately NOT set here -- the append below establishes
             # it. Setting the FK here as well makes the collection's first lazy
