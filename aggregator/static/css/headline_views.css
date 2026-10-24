@@ -1,0 +1,74 @@
+/* Headlines' Trending / Latest / Controversial switcher and the Latest rows
+   (templates/headlines_feed.html, aggregator/headline_views.py). Layout B
+   from the mocks (Philip, 2026-10-24): one chip as wide as the column,
+   split three ways, each segment with its own one-line rule. */
+.view-switch {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 0 0 20px;
+    background: var(--surface); border: 1px solid var(--input-border); border-radius: 14px; box-shadow: var(--shadow);
+}
+.view-seg {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    padding: 9px 10px; border-radius: 10px; color: var(--text-muted); text-decoration: none; text-align: center;
+}
+.view-seg:hover { background: var(--btn-muted-bg); }
+.view-seg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.view-seg.on, .view-seg.on:hover { background: var(--accent); color: #fff; }
+.view-name { display: inline-flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 700; }
+.view-count {
+    font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px;
+    background: var(--btn-muted-bg); color: var(--btn-muted-text);
+}
+.view-seg.on .view-count { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.view-rule { font-size: 12px; opacity: 0.85; }
+[data-theme="dark"] .view-seg.on { background: var(--accent-light); }
+
+/* Why a card is in the view: "+7 outlets in 6h", "Framing gap: high · 6 op-eds". */
+.why-row { margin: -2px 0 10px; }
+.why {
+    display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 99px;
+    color: var(--accent-text); background: var(--summary-bg); border: 1px solid var(--input-border);
+}
+.why-hot { color: #b45309; }
+[data-theme="dark"] .why-hot { color: #fb923c; }
+
+/* Latest: compact rows under hour headers. */
+.latest-hour {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-faint); margin: 6px 4px 8px;
+}
+.latest-rows {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    box-shadow: var(--shadow); margin-bottom: 18px;
+}
+/* Rows sit in .hl-item (reads.css) for the mark-read button beside them;
+   the list keeps its rounded corners without clipping that button. */
+.latest-item { margin-bottom: 0; }
+.latest-item:hover > .story { transform: none; }
+.latest-item + .latest-item, .latest-rows > :first-child, .latest-rows > :first-child .latest-row { border-radius: 16px 16px 0 0; }
+.latest-rows > :last-child, .latest-rows > :last-child .latest-row { border-radius: 0 0 16px 16px; }
+.latest-rows > :only-child, .latest-rows > :only-child .latest-row { border-radius: 16px; }
+.latest-item .hl-read-icon { width: 36px; height: 36px; }
+.latest-row {
+    display: grid; grid-template-columns: 54px minmax(0, 1fr) 130px 76px; gap: 14px; align-items: center;
+    padding: 12px 18px; color: var(--text); text-decoration: none;
+}
+.latest-row:hover { background: var(--summary-bg); }
+.latest-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.latest-age, .latest-src { font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.latest-src { text-align: right; }
+.latest-title { font-weight: 700; font-size: 15px; line-height: 1.3; }
+.latest-title small { display: block; font-weight: 400; font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+.latest-single {
+    font-size: 12px; font-weight: 600; color: var(--text-faint); text-align: center;
+    border: 1px dashed var(--input-border); border-radius: 99px; padding: 1px 0;
+}
+
+@media (max-width: 640px) {
+    .view-seg { padding: 8px 4px; }
+    .view-name { font-size: 14px; gap: 5px; }
+    .view-name .icon { display: none; }
+    .view-rule { display: none; }
+    .latest-row { grid-template-columns: 44px minmax(0, 1fr) 64px; gap: 10px; padding: 10px 14px; }
+    .latest-row .card-bias, .latest-row .latest-single { grid-column: 2; grid-row: 2; }
+    .latest-src { grid-column: 3; grid-row: 1; }
+}

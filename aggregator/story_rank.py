@@ -38,9 +38,10 @@ MIN_SCORE = 0.001
 RANK_WINDOW_DAYS = 3
 
 
-def _signal_rows(story_ids=None, created_since=None, now=None):
+def _signal_rows(story_ids=None, created_since=None, active_since=None, now=None):
     """One row per story: id, outlets, left/center/right outlets, outlets that
-    reported in the last MOMENTUM_HOURS, newest article time."""
+    reported in the last MOMENTUM_HOURS, newest article time. active_since:
+    only stories with an article fetched since then."""
     now = now or datetime.utcnow()
     original = aliased(Article)
     outlet_key = case(
@@ -77,6 +78,9 @@ def _signal_rows(story_ids=None, created_since=None, now=None):
         query = query.filter(Article.story_id.in_(list(story_ids)))
     if created_since is not None:
         query = query.join(Story, Story.id == Article.story_id).filter(Story.created_at >= created_since)
+    if active_since is not None:
+        active = db.session.query(Article.story_id).filter(Article.fetched_at >= active_since)
+        query = query.filter(Article.story_id.in_(active))
     return query.all()
 
 

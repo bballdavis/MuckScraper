@@ -41,7 +41,7 @@
             <span class="day-name">{{ day }}</span>
             <span class="day-editions">
                 {% for edition in editions %}
-                <a class="edition-chip" href="{{ url_for('public.headlines_feed', edition=edition.id) if edition.id != latest_id else url_for('public.headlines_feed') }}">
+                <a class="edition-chip" href="{{ url_for('public.headlines_feed', edition=edition.id) }}">
                     {{ edition.edition_type | title }} <span class="count">· {{ story_counts.get(edition.id, 0) }} stories</span>{% if edition.id == latest_id %} <span class="latest-tag">· Latest</span>{% endif %}
                 </a>
                 {% endfor %}
