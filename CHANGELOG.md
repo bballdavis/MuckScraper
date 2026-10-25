@@ -39,7 +39,8 @@ All notable changes to MuckScraper are documented here.
   whatever the text length (the story page is wider for it) and stack only
   on narrow screens; in Cards the executive summary sits in the same card.
 - **Story source rows.** The reporting grade sits at the right beside the
-  lean chip, as the word then its dots, with "Reporting" and the meaning in
+  lean chip, as the word then five rounded squares the chip's height (the
+  word in the chip's size and weight), with "Reporting" and the meaning in
   the tooltip. The Source button's border is darker. Relative times are
   capitalised ("Yesterday", "Just now").
 - **Reporting grade.** Outlets get a five-level grade of how reliable their
