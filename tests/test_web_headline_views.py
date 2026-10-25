@@ -193,13 +193,27 @@ class HeadlineViewTests(unittest.TestCase):
             card = self._card(page, self.ids["small"])
             self.assertIn('class="breaking-chip"', card)
             self.assertIn("First reported by <b>ap</b> 42 min ago. <b>3&nbsp;outlets</b> carried it", card)
-            self.assertIn("Left 1", card)
-            self.assertIn("Center 2", card)
             self.assertIn("ap, latimes, reuters", card)
+            # The tag sits on the image corner, not in the meta row; the lean
+            # is the card's own bar, not the tag's tip.
+            meta = card[card.index('class="card-meta"'):card.index("bias-balance")]
+            self.assertNotIn("breaking-chip", meta)
+            tag = card[card.index('class="breaking-chip"'):card.index('class="story-content"')]
+            self.assertNotIn("bk-tip-lean", tag)
             self.assertNotIn("breaking-chip", self._card(page, self.ids["broad"]))
         finally:
             FeedEntry.query.delete()
             db.session.commit()
+
+    def test_bias_legend_shows_counts_and_each_side_has_a_tip(self):
+        page = self._client().get("/headlines").get_data(as_text=True)
+        card = self._card(page, self.ids["broad"])
+        legend = card[card.index('class="bias-legend"'):]
+        # ap 3, npr 2, fox 4.5, wsj 3.7, nyt 1.8: bias_balance counts whole
+        # ratings only, so npr is Left, ap Center.
+        self.assertIn('Left <b>1</b><span class="bias-pct">50%</span>', legend)
+        self.assertIn("<strong>Left: 1 article · 50%</strong>npr", card)
+        self.assertIn("<strong>Center: 1 article · 50%</strong>ap", card)
 
     def test_scales_beside_unsummarized_cards_for_scrapers_only(self):
         reader = self._client().get("/headlines").get_data(as_text=True)
@@ -217,7 +231,7 @@ class HeadlineViewTests(unittest.TestCase):
         self.assertIn('class="left"', bar)
         self.assertNotIn('class="right"', bar)
         self.assertIn('bias-key right is-zero', card)
-        self.assertIn("Right <b>0%</b>", card)
+        self.assertIn('Right <b>0</b><span class="bias-pct">0%</span>', card)
 
     def test_ai_headline_is_an_icon_glued_to_the_last_word(self):
         page = self._client().get("/headlines").get_data(as_text=True)
