@@ -282,7 +282,10 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
 .act-done { background: var(--accent); border-color: var(--accent); color: #fff; cursor: default; }
 .act-ready { color: var(--accent-text); cursor: pointer; }
 .act-ready:hover, .act-ready:focus-visible { background: var(--accent); border-color: var(--accent); color: #fff; outline: none; }
-.act-off { color: var(--text-faint); opacity: 0.6; cursor: default; }
+/* Dim the icon, not the box: opacity on the box carried into its .tip and
+   let the card show through it (Philip, 2026-10-25). */
+.act-off { color: var(--text-faint); cursor: default; }
+.act-off > .icon { opacity: 0.6; }
 .act.busy { cursor: progress; }
 .act.busy .icon { animation: act-pulse 1s ease-in-out infinite; }
 @keyframes act-pulse { 50% { opacity: 0.3; } }
@@ -298,6 +301,8 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
     font-size: 12px; font-weight: 400; line-height: 1.45; text-align: left; white-space: normal;
     opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.12s;
 }
+/* On dark pages the tip is near the page colour: a hairline sets it off. */
+[data-theme="dark"] .tip { outline: 1px solid rgba(255, 255, 255, 0.14); }
 .tip strong { display: block; color: #fff; font-weight: 700; margin-bottom: 2px; }
 :hover > .tip, :focus-visible > .tip { opacity: 1; visibility: visible; }
 .tip-above > .tip, .tip-above .tip { right: auto; left: 50%; top: auto; bottom: calc(100% + 8px); transform: translateX(-50%); }

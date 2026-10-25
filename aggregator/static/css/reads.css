@@ -27,7 +27,7 @@
 }
 .hl-read { position: relative; padding: 0; margin: 0; border: 0; background: transparent; cursor: pointer; }
 .hl-analyze:disabled { cursor: progress; }
-.hl-analyze.busy .hl-read-icon { animation: hl-pulse 1.2s ease-in-out infinite; }
+.hl-analyze.busy .hl-read-icon > .icon { animation: hl-pulse 1.2s ease-in-out infinite; }
 @keyframes hl-pulse { 50% { opacity: 0.45; } }
 .hl-read-icon {
     /* Round, the size of the story pages' back button (theme.css .float-back). */
