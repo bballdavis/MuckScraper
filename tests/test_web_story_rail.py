@@ -9,7 +9,7 @@ recreated.
 import os
 import re
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest import mock
 
 TEST_DB = os.environ.get("API_TEST_DATABASE_URL", "")
@@ -38,14 +38,21 @@ class StoryRailTests(unittest.TestCase):
             bare = Story(title="Bare story")
             done = Story(title="Done story", summary="What happened.", deep_report="Left: one view.")
             single = Story(title="Single source")
-            db.session.add_all([editor, reader, outlet, bare, done, single])
+            grew = Story(title="Grew since", summary="What happened.", deep_report="Left: one view.")
+            db.session.add_all([editor, reader, outlet, bare, done, single, grew])
             db.session.flush()
-            for n, story in enumerate([bare, bare, done, done, single]):
+            # Fetched before the summary and analysis were written...
+            for n, story in enumerate([bare, bare, done, done, single, grew, grew]):
                 db.session.add(Article(title=f"A{n}", url=f"https://daily.example/{n}", outlet=outlet,
-                                       date=now, scrape_status="success", story_id=story.id))
+                                       date=now, fetched_at=now - timedelta(hours=1),
+                                       scrape_status="success", story_id=story.id))
+            # ...and one that arrived after them.
+            db.session.add(Article(title="Late", url="https://daily.example/late", outlet=outlet,
+                                   date=now, fetched_at=now + timedelta(hours=1),
+                                   scrape_status="success", story_id=grew.id))
             db.session.commit()
             cls.ids = {"editor": editor.id, "reader": reader.id,
-                       "bare": bare.id, "done": done.id, "single": single.id}
+                       "bare": bare.id, "done": done.id, "single": single.id, "grew": grew.id}
 
     def _rail(self, story_id, user="editor"):
         client = self.web.test_client()
@@ -68,6 +75,12 @@ class StoryRailTests(unittest.TestCase):
         self.assertNotIn("executive summary", rail)
         self.assertNotIn("multi-source analysis", rail)
         self.assertIn("read-toggle", rail)
+
+    def test_regenerate_once_sources_arrive(self):
+        rail = self._rail(self.ids["grew"])
+        self.assertIn('aria-label="Regenerate executive summary"', rail)
+        self.assertIn('aria-label="Regenerate multi-source analysis"', rail)
+        self.assertIn("1 new source since it was written", rail)
 
     def test_no_analysis_button_with_one_source(self):
         rail = self._rail(self.ids["single"])
