@@ -75,11 +75,26 @@
     {%- elif s in [4, 5] %}{% set counts.right = counts.right + 1 %}
     {%- endif -%}
 {%- endfor -%}
-<div class="bias-balance">
-    <div class="bias-col left"><div class="bias-col-label">Left</div><div class="bias-col-count">{{ counts.left }}</div></div>
-    <div class="bias-col center"><div class="bias-col-label">Center</div><div class="bias-col-count">{{ counts.center }}</div></div>
-    <div class="bias-col right"><div class="bias-col-label">Right</div><div class="bias-col-count">{{ counts.right }}</div></div>
+{#- One bar split by share, each side's label and percentage in white
+    inside it, sides with no coverage left out (Philip, 2026-10-25; it was
+    three boxes of counts). The rounding goes to the biggest side so the
+    three add up to 100. Styles: story_card.css .bias-balance. -#}
+{%- set total = counts.left + counts.center + counts.right -%}
+{%- if total -%}
+{%- set pl = (100 * counts.left / total)|round|int -%}
+{%- set pc = (100 * counts.center / total)|round|int -%}
+{%- set pr = (100 * counts.right / total)|round|int -%}
+{%- set off = 100 - pl - pc - pr -%}
+{%- set top = [counts.left, counts.center, counts.right]|max -%}
+{%- if counts.left == top %}{% set pl = pl + off %}{% elif counts.center == top %}{% set pc = pc + off %}{% else %}{% set pr = pr + off %}{% endif -%}
+<div class="bias-balance" role="img" aria-label="Left {{ pl }}%, center {{ pc }}%, right {{ pr }}% of {{ total }} rated article{{ 's' if total != 1 else '' }}">
+    {%- for n, pct, side, label in [(counts.left, pl, 'left', 'Left'), (counts.center, pc, 'center', 'Center'), (counts.right, pr, 'right', 'Right')] if n %}
+    <span class="bias-seg {{ side }}" style="flex-grow: {{ n }}"><span class="bias-seg-label">{{ label }}</span><span class="bias-seg-letter">{{ label[0] }}</span> {{ pct }}%</span>
+    {%- endfor %}
 </div>
+{%- else -%}
+<div class="bias-balance is-unrated"><span class="bias-seg">No rated outlets yet</span></div>
+{%- endif -%}
 {%- endmacro %}
 
 {# Left / Center / Right as one rounded bar for the compact cards: each
