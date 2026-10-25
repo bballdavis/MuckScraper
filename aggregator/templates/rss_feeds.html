@@ -129,14 +129,17 @@
             <tbody>
                 {% for feed in feeds_by_bucket[bucket] %}
                 <tr class="{{ 'disabled' if not feed.enabled else '' }}">
-                    <form method="POST" action="{{ url_for('admin.update_rss_feed', feed_id=feed.id) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <td class="url-cell">{{ feed.url }}
-                            <input type="url" class="fallback-input" name="fallback_url" value="{{ feed.fallback_url or '' }}" placeholder="Fallback feed if this one fails (optional)" aria-label="Fallback feed URL"></td>
-                        <td><input type="text" class="label-input" name="label" value="{{ feed.label or '' }}" placeholder="Label"></td>
-                        <td><input type="checkbox" name="enabled" {{ 'checked' if feed.enabled else '' }}></td>
-                        <td><button type="submit" class="save-btn">Save</button></td>
-                    </form>
+                    <td class="url-cell">{{ feed.url }}
+                            <input form="rss-feed-{{ feed.id }}" type="url" class="fallback-input" name="fallback_url" value="{{ feed.fallback_url or '' }}" placeholder="Fallback feed if this one fails (optional)" aria-label="Fallback feed URL"></td>
+                    <td><input form="rss-feed-{{ feed.id }}" type="text" class="label-input" name="label" value="{{ feed.label or '' }}" placeholder="Label"></td>
+                    <td><input form="rss-feed-{{ feed.id }}" type="checkbox" name="enabled" {{ 'checked' if feed.enabled else '' }}></td>
+                    <td>
+                        <form id="rss-feed-{{ feed.id }}" method="POST" action="{{ url_for('admin.update_rss_feed', feed_id=feed.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button form="rss-feed-{{ feed.id }}" type="submit" class="save-btn">Save</button>
+                        </form>
+                    </td>
+
                     <td>
                         <form method="POST" action="{{ url_for('admin.delete_rss_feed', feed_id=feed.id) }}" style="display:inline;" onsubmit="return confirm('Remove this feed?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
