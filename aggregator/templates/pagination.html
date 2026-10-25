@@ -1,28 +1,58 @@
-{#- Page navigation shared by All/Grouped Stories, Headlines and Search.
+{#- Page navigation shared by All/Grouped Stories, Headlines, Op-Ed, Recently
+    Read and Search.
     Usage: {% from 'pagination.html' import pager %} ... {{ pager(page, total_pages) }}
-    Links and the jump box keep every other query parameter of the current
-    page (filters, sort, search), changing only `page`. Routes clamp an
-    out-of-range page to the nearest real one. Styles live in theme.css. -#}
+    One rounded bar: Previous, the page numbers, Next. The numbers are the
+    first and last page and the ones either side of the current page; a gap
+    is "…", which opens a small box to type a page number (Enter to go).
+    Phones get Previous, "6 of 120" and Next. Links and the jump box keep
+    every other query parameter of the current page (filters, sort, search),
+    changing only `page`. Routes clamp an out-of-range page to the nearest
+    real one. Styles live in theme.css. -#}
 {% macro pager(page, total_pages) -%}
 {%- if total_pages > 1 -%}
 {%- set args = request.args.to_dict() -%}
 {%- set _ = args.pop('page', None) -%}
+{%- set near = range([page - 1, 2]|max, [page + 1, total_pages - 1]|min + 1)|list -%}
+{%- set ns = namespace(pages=[1]) -%}
+{%- if near and near[0] > 3 %}{% set ns.pages = ns.pages + [None] %}{% elif near and near[0] == 3 %}{% set ns.pages = ns.pages + [2] %}{% endif -%}
+{%- set ns.pages = ns.pages + near -%}
+{%- if near and near[-1] < total_pages - 2 %}{% set ns.pages = ns.pages + [None] %}{% elif near and near[-1] == total_pages - 2 %}{% set ns.pages = ns.pages + [total_pages - 1] %}{% endif -%}
+{%- set ns.pages = ns.pages + [total_pages] -%}
+{%- set chevron_left = '<svg class="icon" width="1.1em" height="1.1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>' -%}
+{%- set chevron_right = '<svg class="icon" width="1.1em" height="1.1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>' -%}
 <nav class="pager" aria-label="Pages">
     {%- if page > 1 %}
-    <a class="page-btn" href="{{ url_for(request.endpoint, page=1, **args) }}" aria-label="First page">« First</a>
-    <a class="page-btn" href="{{ url_for(request.endpoint, page=page - 1, **args) }}" rel="prev">← Previous</a>
+    <a class="pg-step" href="{{ url_for(request.endpoint, page=page - 1, **args) }}" rel="prev" aria-label="Previous page">{{ chevron_left|safe }}<span class="pg-step-label">Previous</span></a>
+    {%- else %}
+    <span class="pg-step" aria-disabled="true">{{ chevron_left|safe }}<span class="pg-step-label">Previous</span></span>
     {%- endif %}
-    <form class="page-jump" method="get" action="{{ url_for(request.endpoint) }}">
-        {%- for key, value in args.items() %}
-        <input type="hidden" name="{{ key }}" value="{{ value }}">
+    <ol class="pg-pages">
+        {%- for p in ns.pages %}
+        {%- if p is none %}
+        <li class="pg-gap">
+            <button type="button" class="pg-num pg-more" aria-label="Go to page…" title="Go to page…"
+                    onclick="var f=this.nextElementSibling;this.hidden=true;f.hidden=false;f.querySelector('input[type=number]').focus()">…</button>
+            <form class="pg-jump" method="get" action="{{ url_for(request.endpoint) }}" hidden>
+                {%- for key, value in args.items() %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {%- endfor %}
+                <input type="number" name="page" min="1" max="{{ total_pages }}" inputmode="numeric" placeholder="#"
+                       aria-label="Page number, 1 to {{ total_pages }}, press Enter to go"
+                       onblur="if(!this.value){this.form.hidden=true;this.form.previousElementSibling.hidden=false}">
+            </form>
+        </li>
+        {%- elif p == page %}
+        <li><span class="pg-num is-current" aria-current="page">{{ '{:,}'.format(p) }}</span></li>
+        {%- else %}
+        <li><a class="pg-num" href="{{ url_for(request.endpoint, page=p, **args) }}" aria-label="Page {{ p }}">{{ '{:,}'.format(p) }}</a></li>
+        {%- endif %}
         {%- endfor %}
-        <label>Page <input type="number" name="page" value="{{ page }}" min="1" max="{{ total_pages }}"
-               inputmode="numeric" aria-label="Page number, press Enter to go"
-               onfocus="this.select()"> of {{ '{:,}'.format(total_pages) }}</label>
-    </form>
+    </ol>
+    <span class="pg-compact" aria-hidden="true"><strong>{{ '{:,}'.format(page) }}</strong> of {{ '{:,}'.format(total_pages) }}</span>
     {%- if page < total_pages %}
-    <a class="page-btn" href="{{ url_for(request.endpoint, page=page + 1, **args) }}" rel="next">Next →</a>
-    <a class="page-btn" href="{{ url_for(request.endpoint, page=total_pages, **args) }}" aria-label="Last page">Last »</a>
+    <a class="pg-step" href="{{ url_for(request.endpoint, page=page + 1, **args) }}" rel="next" aria-label="Next page"><span class="pg-step-label">Next</span>{{ chevron_right|safe }}</a>
+    {%- else %}
+    <span class="pg-step" aria-disabled="true"><span class="pg-step-label">Next</span>{{ chevron_right|safe }}</span>
     {%- endif %}
 </nav>
 {%- endif -%}
