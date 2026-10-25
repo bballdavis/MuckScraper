@@ -28,8 +28,10 @@ SCRAPE_JOB = "scrape_feed_entry"
 # admin AI tasks (10).
 SCRAPE_PRIORITY = 8
 
-# How long a headline can count as breaking, from when it was published.
-WINDOW = timedelta(hours=3)
+# How long a headline can count as breaking, from when it was published:
+# how far back the bar and /api/v1/breaking reach. Was 3 hours; the bar sat
+# empty for most of the night (Philip, 2026-10-25).
+WINDOW = timedelta(hours=12)
 BAR_SIZE = 3
 # Entries are kept this long, then deleted.
 KEEP = timedelta(days=3)
