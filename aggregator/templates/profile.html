@@ -110,6 +110,29 @@
                 </div>
                 <noscript><div class="panel-foot"><button type="submit" class="btn">Save</button></div></noscript>
             </form>
+
+            {#- Reading (Philip, 2026-10-25): auto mark-as-read on story and
+                article pages after this long with the tab visible (reading_prefs.py,
+                static/js/reads.js). Saves on change. -#}
+            <form class="panel" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="reading">
+                <div class="panel-head">
+                    <div>
+                        <h2>Reading</h2>
+                        <p>Mark a story or article read once you have had it open for a while. A toast lets you undo it.</p>
+                    </div>
+                </div>
+                <div class="row">
+                    <span><span class="row-label">Auto mark as read</span><span class="row-sub">Time on a story or article page; only counts while the tab is in view</span></span>
+                    <span class="seg" role="radiogroup" aria-label="Auto mark as read">
+                        {%- for value, label in auto_read_delays.items() %}
+                        <label><input type="radio" name="auto_read_seconds" value="{{ value }}"{% if reading.auto_read_seconds == value %} checked{% endif %} onchange="this.form.submit()"><span>{{ label }}</span></label>
+                        {%- endfor %}
+                    </span>
+                </div>
+                <noscript><div class="panel-foot"><button type="submit" class="btn">Save</button></div></noscript>
+            </form>
         </div>
 
         <form class="panel profile-defaults" method="POST">

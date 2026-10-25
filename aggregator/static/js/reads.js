@@ -7,13 +7,18 @@
  * - Recently Read: the Mark unread button takes a row off the list the same
  *   way, with the same Undo.
  * - Story and article pages: .read-toggle flips the read state in place.
+ *   With data-auto-read="<seconds>" on the script tag (the reader's Reading
+ *   choice, aggregator/reading_prefs.py; 0 is off), an unread page is marked
+ *   read once it has been visible that long, with the same toast and Undo.
  *
  * Load with data-read-url (see urlTemplate). Needs <meta name="csrf-token">. Styles: static/css/reads.css.
  */
 (function () {
     const UNDO_MS = 5000;
     // url_for('reading.toggle_read', kind='KIND', item_id=0), from the script tag.
-    const urlTemplate = (document.currentScript && document.currentScript.dataset.readUrl) || '/read/KIND/0';
+    const script = document.currentScript;
+    const urlTemplate = (script && script.dataset.readUrl) || '/read/KIND/0';
+    const autoReadSeconds = parseInt((script && script.dataset.autoRead) || '0', 10) || 0;
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
     function readUrl(kind, id) {
@@ -60,7 +65,10 @@
     // ── Toast ──
     let toast = null;
     let toastTimer = null;
-    let pending = null;   // { el, onExpire } for the row the toast can bring back
+    let pending = null;   // { el, onExpire } for the change the toast can undo; el is the row it brings back, if any
+    const UNDO_ICON = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+        '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>';
 
     function ensureToast() {
         if (toast) return toast;
@@ -69,7 +77,7 @@
         toast.setAttribute('role', 'status');
         toast.setAttribute('aria-live', 'polite');
         toast.innerHTML = '<span class="read-toast-text"></span>' +
-            '<button type="button" class="read-toast-undo">Undo</button>' +
+            '<button type="button" class="read-toast-undo" aria-label="Undo" title="Undo">' + UNDO_ICON + '</button>' +
             '<span class="read-toast-bar" aria-hidden="true"></span>';
         document.body.appendChild(toast);
         return toast;
@@ -80,7 +88,7 @@
         if (pending) {
             const done = pending;
             pending = null;
-            done.el.remove();
+            if (done.el) done.el.remove();
             if (done.onExpire) done.onExpire();
         }
         if (toast) toast.classList.remove('show');
@@ -92,19 +100,20 @@
         t.querySelector('.read-toast-text').textContent = message;
         const button = t.querySelector('.read-toast-undo');
         button.hidden = !undo;
+        const entry = undo ? { el, onExpire } : null;
         button.onclick = async () => {
-            if (!pending || pending.el !== el) return;
+            if (!entry || pending !== entry) return;
             clearTimeout(toastTimer);
             pending = null;
             t.classList.remove('show');
             try {
                 await undo();
-                await slideIn(el);
+                if (el) await slideIn(el);
             } catch (e) {
                 showToast("Couldn't undo. Try again from Recently Read.", null, null, null);
             }
         };
-        pending = el ? { el, onExpire } : null;
+        pending = entry;
         // Restart the countdown bar.
         t.classList.remove('show');
         void t.offsetWidth;
@@ -174,25 +183,75 @@
     });
 
     // ── Story and article pages ──
+    function showToggleState(toggle, read) {
+        toggle.setAttribute('aria-pressed', String(read));
+        toggle.classList.toggle('is-read', read);
+        const title = toggle.querySelector('.tip strong');
+        const body = toggle.querySelector('.tip-body');
+        if (title) title.textContent = read ? toggle.dataset.readTitle : toggle.dataset.unreadTitle;
+        if (body) body.textContent = read ? toggle.dataset.readBody : toggle.dataset.unreadBody;
+        toggle.setAttribute('aria-label', read ? toggle.dataset.readTitle : toggle.dataset.unreadTitle);
+    }
+
     async function flipToggle(toggle) {
         if (toggle.disabled) return;
+        // The reader chose for themselves: the auto timer stands down.
+        stopAutoRead();
         const next = toggle.getAttribute('aria-pressed') !== 'true';
         toggle.disabled = true;
         try {
             await setRead(toggle.dataset.kind, toggle.dataset.id, next);
-            toggle.setAttribute('aria-pressed', String(next));
-            toggle.classList.toggle('is-read', next);
-            const title = toggle.querySelector('.tip strong');
-            const body = toggle.querySelector('.tip-body');
-            if (title) title.textContent = next ? toggle.dataset.readTitle : toggle.dataset.unreadTitle;
-            if (body) body.textContent = next ? toggle.dataset.readBody : toggle.dataset.unreadBody;
-            toggle.setAttribute('aria-label', next ? toggle.dataset.readTitle : toggle.dataset.unreadTitle);
+            showToggleState(toggle, next);
         } catch (e) {
             showToast("Couldn't save that. Try again.", null, null, null);
         } finally {
             toggle.disabled = false;
         }
     }
+
+    // Auto mark-as-read: count the seconds the page is visible (a hidden or
+    // backgrounded tab doesn't count), then mark it read once, with Undo.
+    // Pages that open already read, or with the setting off, never start.
+    let autoTimer = null;
+
+    function stopAutoRead() {
+        clearInterval(autoTimer);
+        autoTimer = null;
+    }
+
+    function startAutoRead() {
+        const toggle = document.querySelector('.read-toggle');
+        if (!autoReadSeconds || !toggle || toggle.getAttribute('aria-pressed') === 'true') return;
+        let visibleMs = 0;
+        let last = document.visibilityState === 'visible' ? Date.now() : null;
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                last = Date.now();
+            } else if (last !== null) {
+                visibleMs += Date.now() - last;
+                last = null;
+            }
+        });
+        autoTimer = setInterval(async () => {
+            const seen = visibleMs + (last !== null ? Date.now() - last : 0);
+            if (seen < autoReadSeconds * 1000) return;
+            stopAutoRead();
+            if (toggle.getAttribute('aria-pressed') === 'true') return;
+            const kind = toggle.dataset.kind, id = toggle.dataset.id;
+            try {
+                await setRead(kind, id, true);
+            } catch (e) {
+                return;   // Quietly: the reader didn't ask for this one.
+            }
+            showToggleState(toggle, true);
+            showToast(kind === 'story' ? 'Story marked as read' : 'Article marked as read', null, async () => {
+                await setRead(kind, id, false);
+                showToggleState(toggle, false);
+            }, null);
+        }, 1000);
+    }
+
+    startAutoRead();
 
     // Leaving the page while a toast is up keeps the change (it is already
     // saved); nothing to flush.

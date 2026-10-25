@@ -147,6 +147,33 @@ class ReadStateTests(unittest.TestCase):
         page = self.client.get(f"/article/{self.ids['article']}").get_data(as_text=True)
         self.assertIn('data-kind="article"', page)
 
+    def test_auto_read_delay_is_a_profile_setting(self):
+        from aggregator import db
+        with self.web.app_context():
+            db.session.execute(db.text("DELETE FROM app_settings WHERE key LIKE 'reading_v1:%'"))
+            db.session.commit()
+        first = self.ids["stories"][0]
+        # 45 seconds until the reader picks something else.
+        self.assertIn('data-auto-read="45"', self.client.get(f"/story/{first}").get_data(as_text=True))
+        profile = self.client.get("/auth/profile").get_data(as_text=True)
+        self.assertIn("Auto mark as read", profile)
+        self.assertIn('name="auto_read_seconds" value="45" checked', profile)
+
+        self.client.post("/auth/profile", data={"action": "reading", "auto_read_seconds": "0"})
+        self.assertIn('data-auto-read="0"', self.client.get(f"/story/{first}").get_data(as_text=True))
+        self.client.post("/auth/profile", data={"action": "reading", "auto_read_seconds": "60"})
+        self.assertIn('data-auto-read="60"',
+                      self.client.get(f"/article/{self.ids['article']}").get_data(as_text=True))
+        # Anything off the list falls back to the default.
+        self.client.post("/auth/profile", data={"action": "reading", "auto_read_seconds": "7"})
+        self.assertIn('data-auto-read="45"', self.client.get(f"/story/{first}").get_data(as_text=True))
+
+        # Per user.
+        self.client.post("/auth/profile", data={"action": "reading", "auto_read_seconds": "0"})
+        other = self.web.test_client()
+        self._login(other, self.ids["other"])
+        self.assertIn('data-auto-read="45"', other.get(f"/story/{first}").get_data(as_text=True))
+
     def test_bad_targets(self):
         self.assertEqual(self.client.post("/read/story/999999").status_code, 404)
         self.assertEqual(self.client.post("/read/topic/1").status_code, 404)
