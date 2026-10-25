@@ -160,7 +160,7 @@ The scheduler reads the general RSS feeds every `BREAKING_POLL_MINUTES`
 (default 5) and stores the headlines without scraping them. A headline is
 breaking when three or more outlets carry the same event within 90 minutes,
 or a feed marks it (BREAKING, LIVE, Developing, Live updates), and no story
-before it already covered the event; it stays in the bar for three hours.
+before it already covered the event; it stays in the bar for twelve hours.
 
 ### Bookmarks
 
