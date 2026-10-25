@@ -662,19 +662,21 @@ class ApiEndToEndTests(unittest.TestCase):
         with mock.patch("news_fetcher.summarizer.check_ollama_status", return_value=True), \
                 mock.patch("news_fetcher.summarizer.summarize_article", return_value="Critics called it costly."):
             article_jobs.run_summary({"article_id": a2.id})
-        with mock.patch("news_fetcher.outlet_bias_llm.get_article_bias_from_llm", return_value=1):
+        with mock.patch("news_fetcher.outlet_bias_llm.get_article_lean_from_llm", return_value=(1, "Only critics quoted.")):
             article_jobs.run_bias({"article_id": a2.id})
         Job.query.delete()
         db.session.commit()
         body = self._get(path, token).get_json()
         self.assertEqual((body["summary"], body["leaning"], body["is_summarizing"]),
                          ("Critics called it costly.", "left", False))
+        self.assertEqual((body["lean_source"], body["lean_reason"]), ("ai", "Only critics quoted."))
         # The story's counts now take the article's own lean.
         story = self._get(f"/api/v1/stories/{self.ids['story']}", token).get_json()
         self.assertEqual((story["coverage"]["left"], story["coverage"]["right"]), (2, 0))
 
         a2 = Article.query.get(a2.id)
         a2.content, a2.summary, a2.bias_score = kept
+        a2.bias_source = None
         db.session.commit()
 
     def test_unrated_outlets_abroad_are_international(self):

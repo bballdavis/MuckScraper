@@ -51,12 +51,12 @@ def run_bias(payload):
     article = Article.query.get(payload.get("article_id"))
     if article is None:
         return
-    from news_fetcher.outlet_bias_llm import get_article_bias_from_llm
-    score = get_article_bias_from_llm(article.title, article.content)
+    from aggregator import article_lean
+    from news_fetcher.outlet_bias_llm import get_article_lean_from_llm
+    score, reason = get_article_lean_from_llm(article.title, article.content)
     if score is None:
         raise RuntimeError("The model couldn't rate this article.")
-    article.bias_score = score
-    db.session.commit()
+    article_lean.apply_ai(article, score, reason)
 
 
 jobs.register(SUMMARY_JOB, run_summary)
