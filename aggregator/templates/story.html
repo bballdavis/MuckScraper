@@ -333,15 +333,10 @@
             {{ story_summary_action(story, can('scraper') and ollama_online) }}
         </div>
         {% if story.summary and analysis_layout != 'sections' %}
-        {#- In the Cards layout the summary sits in the same card as the
-            analysis's The story (Philip, 2026-10-25). -#}
-        <div class="sa sa-cards">
-            <div class="sa-lead sa-summary">
-                <span class="sa-ico">{{ icon('file-text') }}</span>
-                <div>
-                    {% for line in story.summary.split('\n') if line.strip() %}<p>{{ line.strip() }}</p>{% endfor %}
-                </div>
-            </div>
+        {#- In the Cards layout the summary is plain paragraphs, flat like the
+            analysis below it (Philip, 2026-10-25). -#}
+        <div class="sa sa-cards sa-summary">
+            {% for line in story.summary.split('\n') if line.strip() %}<p>{{ line.strip() }}</p>{% endfor %}
         </div>
         {% else %}
         <div class="analysis-box">
