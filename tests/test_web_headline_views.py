@@ -182,6 +182,8 @@ class HeadlineViewTests(unittest.TestCase):
         card = self._card(page, self.ids["broad"])
         # npr (2) is Left and ap (3) Center; the fractional scores aren't counted.
         self.assertIn('aria-label="Left 50%, center 50%, right 0% of 2 rated articles"', card)
-        self.assertIn('class="bias-seg left"', card)
-        self.assertNotIn('class="bias-seg right"', card)
-        self.assertNotIn("bias-col-count", page)
+        bar = card[card.index('class="bias-bar"'):card.index('class="bias-legend"')]
+        self.assertIn('class="left"', bar)
+        self.assertNotIn('class="right"', bar)
+        self.assertIn('bias-key right is-zero', card)
+        self.assertIn("Right <b>0%</b>", card)
