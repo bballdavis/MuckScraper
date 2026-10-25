@@ -39,6 +39,25 @@ class RouteIsolationTests(unittest.TestCase):
             self.assertTrue(methods <= documented[path], f"{rule.rule} {methods}")
 
 
+class HeadlineWhyTests(unittest.TestCase):
+    """The phone's short reason, which sits beside the L/C/R pill."""
+
+    def _entry(self, recent=0, gap=None, opeds=None):
+        from types import SimpleNamespace
+        from aggregator.headline_views import Entry
+        return Entry(1, SimpleNamespace(recent=recent), 0.0, gap, opeds)
+
+    def test_short_why(self):
+        from aggregator.headline_views import short_why
+        self.assertEqual(short_why("trending", self._entry(recent=4)), "4 outlets in 6h")
+        self.assertEqual(short_why("trending", self._entry(recent=1)), "1 outlet in 6h")
+        self.assertIsNone(short_why("trending", self._entry()))
+        self.assertIsNone(short_why("latest", self._entry(recent=4)))
+        self.assertEqual(short_why("controversial", self._entry(gap=0.2, opeds=(2, True))), "High gap · 2 op-eds")
+        self.assertEqual(short_why("controversial", self._entry(gap=0.1, opeds=(1, False))), "Moderate gap · 1 op-ed")
+        self.assertEqual(short_why("controversial", self._entry(opeds=(0, False))), "Both sides")
+
+
 class ScheduleTests(unittest.TestCase):
     def test_next_run_follows_days_and_time_zone(self):
         from aggregator.newsbox import clean_schedule, next_run
@@ -276,6 +295,39 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertEqual(len(self._get("/api/v1/opinion", token).get_json()["items"]), 1)
         hits = self._get("/api/v1/search?q=budget", token).get_json()["items"]
         self.assertEqual(hits[0]["id"], self.ids["story"])
+
+    def test_headline_views(self):
+        token = self._pair()
+        body = self._get("/api/v1/headlines", token).get_json()
+        self.assertEqual(body["view"], "trending")
+        self.assertEqual([v["key"] for v in body["views"]], ["trending", "latest", "controversial"])
+        # Two outlets at most in the seed: below Trending's three, and not
+        # two on each side for Controversial.
+        self.assertEqual(body["items"], [])
+        self.assertEqual(body["hidden_read"], 0)
+
+        latest = self._get("/api/v1/headlines?view=latest", token).get_json()
+        self.assertEqual({c["id"] for c in latest["items"]}, {self.ids["story"], self.ids["lone"]})
+        self.assertEqual(latest["views"][1]["count"], 2)
+        card = next(c for c in latest["items"] if c["id"] == self.ids["story"])
+        self.assertEqual(card["coverage"]["left"], 1)
+        self.assertIn(card["group"], ("Last hour", "Last 6 hours"))
+        self.assertIsNone(card["why"])
+        self.assertTrue(card["newest_at"].endswith("Z"))
+
+        page = self._get("/api/v1/headlines?view=latest&limit=1", token).get_json()
+        self.assertEqual(len(page["items"]), 1)
+        self.assertIsNotNone(page["next_cursor"])
+
+        headers = {"Authorization": f"Bearer {token}"}
+        self.client.put(f"/api/v1/me/read/stories/{self.ids['story']}", headers=headers)
+        try:
+            latest = self._get("/api/v1/headlines?view=latest", token).get_json()
+            self.assertEqual([c["id"] for c in latest["items"]], [self.ids["lone"]])
+            self.assertEqual(latest["hidden_read"], 1)
+        finally:
+            self.client.delete(f"/api/v1/me/read/stories/{self.ids['story']}", headers=headers)
+        self.assertEqual(self._get("/api/v1/headlines?view=hot", token).status_code, 400)
 
     def test_full_text_only_when_allowed(self):
         from aggregator import db
