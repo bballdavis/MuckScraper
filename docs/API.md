@@ -102,6 +102,7 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 | `GET /editions?cursor=&limit=` | Published editions, newest first |
 | `GET /editions/latest`, `/editions/{id}` | An edition and its ranked story cards |
 | `GET /opinion?edition=` | The edition's Opinion page: stories with their columns by leaning |
+| `GET /headlines?view=trending\|latest\|controversial&cursor=&limit=` | Headlines' live views, as on the web page (`aggregator/headline_views.py`). Trending (the default): 3+ outlets in the last 24 hours, by headline score. Latest: every story from the last 24 hours, newest first, each with a `group` (`Last hour`, `Last 6 hours`, `Earlier`). Controversial: 2+ left and 2+ right outlets in the last 48 hours, by framing gap and op-eds. Cards add a short `why` for beside the L/C/R pill, `newest_at`, `framing_gap` and `opeds`. `views` gives each view's label, description and count for the switcher; stories the user read are left out and counted in `hidden_read`. |
 | `GET /stories?topic=&range=&single=&cursor=&limit=` | The story feed, filtered like All Stories. Omitted filters use the user's feed defaults. |
 | `GET /stories/{id}` | Summary, deep report, opinion roundup, articles and columns by leaning. Articles from unrated outlets based outside the US are grouped under `international`, apart from `unrated`. |
 | `GET /articles/{id}` | Title, outlet, leaning, summary, analysis, link, and scraped text when allowed. `is_summarizing` and `is_rating_bias` say whether its summary or lean rating is still being written. |
