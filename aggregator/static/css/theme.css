@@ -121,19 +121,21 @@
 .outlet-flag:hover::after, .outlet-flag:focus-visible::after { opacity: 1; }
 
 /* Reporting grade (story_card_macros.html reporting_tag, 2026-10-23): the
-   word, then five dots filled up to the grade in its colour; "Reporting"
+   word, then five squares filled up to the grade in its colour; "Reporting"
    and the meaning in a dark tip above on hover or focus, like .outlet-flag.
    The tip opens leftward, since the chip sits at the right of its row. */
 .reporting-tag {
     --rep: #2f9e5b; position: relative; display: inline-flex; align-items: center; gap: 6px;
-    font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; cursor: default; outline: none;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.3px; color: var(--text-muted); white-space: nowrap; cursor: default; outline: none;
 }
 .reporting-high { --rep: #4caf50; }
 .reporting-mostly-factual { --rep: #b3a12a; }
 .reporting-mixed { --rep: #e08a1e; }
 .reporting-low { --rep: #d64545; }
-.reporting-dots { display: inline-flex; gap: 2px; }
-.reporting-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+/* Rounded squares the height of the lean chip beside them, and the word in
+   the chip's size and weight (Philip, 2026-10-25). */
+.reporting-dots { display: inline-flex; gap: 3px; }
+.reporting-dots i { width: 18px; height: 18px; border-radius: 3px; background: var(--input-border); }
 .reporting-dots i.on { background: var(--rep); }
 .reporting-tag::after {
     content: attr(data-tip); position: absolute; right: 0; bottom: calc(100% + 7px);
