@@ -693,24 +693,27 @@ Rules:
 Outlet: {outlet_name}
 Rating:"""
 
-PROMPT_OUTLET_BIAS_BY_ARTICLE = """You are a media bias analyst. Read the following news article and rate its political bias on this scale:
+PROMPT_OUTLET_BIAS_BY_ARTICLE = """You are a media bias analyst. Rate the political lean of the news article below on this scale:
 1 = Left
 2 = Lean Left
 3 = Center
 4 = Lean Right
 5 = Right
 
-Consider the language used, framing, and perspective presented in the article itself.
+Judge the article itself, not the outlet that published it. Look at:
+- Framing: whose problem, cause or solution the story is built around
+- Word choice: loaded or charged terms for people, groups or policies
+- Sourcing: whose voices are quoted, how prominently, and who gets the last word
+- Selection: which facts or context are included, played up or left out
 
-Rules:
-- Respond with a single integer between 1 and 5 only
-- No explanation, no punctuation, just the number
-- If you genuinely cannot determine the bias from the content, respond with the single word: unknown
+Center means the piece gives the competing sides comparable, neutral treatment. It is not the safe answer for an article that is merely written in a calm news style: if the framing, sourcing or emphasis favours one side, use 2 or 4, and 1 or 5 when it argues one side outright. Use 3 only when you can point to that balance.
+
+Answer in exactly two lines, with no other text:
+LEAN: <a single number from 1 to 5, or the word unknown if the text is too short or not political>
+WHY: <one sentence naming the specific framing, wording or sourcing behind the rating>
 
 Article:
-{article_text}
-
-Rating:"""
+{article_text}"""
 
 PROMPT_HEADLINE_GENERATOR = """You are a wire service editor writing a single headline.
 
@@ -866,7 +869,7 @@ SEED_PROMPTS = [
     ('article_deep_analysis.default', 'Per-article deep analysis for general news (anything not politics, science, business or sports).', PROMPT_ARTICLE_DEEP_ANALYSIS_DEFAULT),
     ('topic_classifier', 'Topic classification prompt', PROMPT_TOPIC_CLASSIFIER),
     ('outlet_bias.by_name', 'Outlet bias rating by outlet name', PROMPT_OUTLET_BIAS_BY_NAME),
-    ('outlet_bias.by_article', 'Outlet bias rating by article content', PROMPT_OUTLET_BIAS_BY_ARTICLE),
+    ('outlet_bias.by_article', "An article's own lean (1-5) with a one-line reason, for Rate this article's lean. Fast model.", PROMPT_OUTLET_BIAS_BY_ARTICLE),
     ('headline_generator', 'Wire-style headline generation for multi-article stories', PROMPT_HEADLINE_GENERATOR),
     ('opinion_link_check', 'Is this Op/Ed column about this news story? YES/NO, fast model. Used to link Op/Ed pieces to stories.', PROMPT_OPINION_LINK_CHECK),
     ('opinion_roundup', "The story page's opinion roundup: marks each linked column ON/OFF topic with a one-phrase position, then one paragraph.", PROMPT_OPINION_ROUNDUP),
