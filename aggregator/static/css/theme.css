@@ -419,3 +419,12 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
     body .topbar .topbar-title { font-size: 16px; }
     body .topbar .theme-toggle, body .topbar .account-signin { padding-left: 10px; padding-right: 10px; }
 }
+
+/* Phones: pages give the width to their content (Philip, 2026-10-25). Every
+   list page's column, and the app pages', keeps a 10px gutter; body-scoped
+   to win over each page's own .main padding. */
+@media (max-width: 600px) {
+    .page-body .main { padding-left: 10px; padding-right: 10px; }
+    .page-body .app-main { padding-left: 10px; padding-right: 10px; }
+    .page-body .settings { padding-left: 10px; padding-right: 10px; }
+}
