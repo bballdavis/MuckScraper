@@ -280,20 +280,22 @@
 <div class="container">
 {#- Round buttons under the back button: read, then (scrapers) the executive
     summary and the multi-source analysis while each is still to be
-    generated (Philip, 2026-10-23), as on the article page. -#}
-{%- set summary_pending = not (story.summary and story.summary != story.title) -%}
-{%- set analysis_pending = not story.deep_report and story.articles|length >= 2 -%}
+    generated (Philip, 2026-10-23), as on the article page, or can be
+    regenerated because sources have arrived since (2026-10-25). -#}
+{%- set summary_new = story.new_sources_for_summary if can('scraper') else 0 -%}
+{%- set analysis_new = story.new_sources_for_analysis if can('scraper') else 0 -%}
+{%- set summary_pending = not (story.summary and story.summary != story.title) or summary_new -%}
+{%- set analysis_pending = (not story.deep_report or analysis_new) and story.articles|length >= 2 -%}
 {%- set rail_actions = can('scraper') and (summary_pending or analysis_pending) -%}
 {%- set rail -%}
 {%- if current_user.is_authenticated -%}
 {{ read_toggle('story', story.id, read_item) }}
-{%- if can('scraper') and summary_pending -%}{{ story_summary_action(story, ollama_online, 'rail-btn') }}{%- endif -%}
-{%- if can('scraper') and analysis_pending -%}{{ story_analysis_action(story, ollama_online, 'rail-btn') }}{%- endif -%}
+{%- if can('scraper') and summary_pending -%}{{ story_summary_action(story, ollama_online, 'rail-btn', summary_new) }}{%- endif -%}
+{%- if can('scraper') and analysis_pending -%}{{ story_analysis_action(story, ollama_online, 'rail-btn', analysis_new) }}{%- endif -%}
 {%- endif -%}
 {%- endset -%}
 {{ float_back(feed_back_url('story-%d' % story.id), 'Back to Feed', rail, collapse=rail_actions) }}
 <div class="story-card">
-        <div id="ai-task-status" style="display:none; margin-bottom:20px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.03); color:var(--text-muted); font-size:13px;"></div>
         <h1>{{ story.display_headline }}</h1>
 
     {% call title_meta() %}
@@ -330,7 +332,7 @@
 
         <div class="section-head">
             <h2 class="section-label">Executive Summary</h2>
-            {{ story_summary_action(story, can('scraper') and ollama_online) }}
+            {{ story_summary_action(story, can('scraper') and ollama_online, new_sources=summary_new) }}
         </div>
         {% if story.summary and analysis_layout != 'sections' %}
         {#- In the Cards layout the summary is plain paragraphs, flat like the
@@ -354,8 +356,8 @@
                     Summary will be generated when Ollama is back online. This story has been queued for processing.
                 </div>
             {% else %}
-                <div class="status-msg">
-                    No executive summary has been generated yet.{% if can('scraper') %} Use the summarize action to process this story.{% endif %}
+                <div class="status-msg" data-ai-status="story_summary">
+                    No executive summary has been generated yet.{% if can('scraper') %} Generate it with the button beside the heading.{% endif %}
                 </div>
             {% endif %}
         </div>
@@ -363,7 +365,7 @@
 
         <div class="section-head">
             <h2 class="section-label">Multi-Source Analysis</h2>
-            {{ story_analysis_action(story, can('scraper') and ollama_online) }}
+            {{ story_analysis_action(story, can('scraper') and ollama_online, new_sources=analysis_new) }}
         </div>
         {% if analysis.sections %}
         {{ story_analysis(analysis, story, analysis_layout) }}
@@ -374,8 +376,8 @@
                     Analysis will be generated when Ollama is back online. This story has been queued for processing.
                 </div>
             {% else %}
-                <div class="status-msg">
-                    No multi-source analysis has been generated yet. Use the summarize action to process this story.
+                <div class="status-msg" data-ai-status="story_deep_report">
+                    No multi-source analysis has been generated yet.{% if can('scraper') and story.articles|length >= 2 %} Generate it with the button beside the heading.{% endif %}
                 </div>
             {% endif %}
         </div>
@@ -470,17 +472,8 @@
             .replace('999999', String(resourceId));
     }
 
-    function renderAiTaskStatus(status, isError = false) {
-        const box = document.getElementById('ai-task-status');
-        if (!box) return;
-        box.style.display = 'block';
-        box.style.borderColor = isError ? 'rgba(154, 114, 91, 0.22)' : 'var(--border)';
-        box.style.background = isError ? 'rgba(154, 114, 91, 0.08)' : 'rgba(0,0,0,0.03)';
-        box.style.color = isError ? '#9a725b' : 'var(--text-muted)';
-        box.textContent = status.message || 'AI task update received.';
-    }
 
-    async function pollAiTask(taskType, resourceId, button) {
+    async function pollAiTask(taskType, resourceId, buttons) {
         if (activeAiTaskPoll) {
             clearInterval(activeAiTaskPoll);
             activeAiTaskPoll = null;
@@ -490,7 +483,7 @@
         activeAiTaskPoll = setInterval(async () => {
             const response = await fetch(statusUrl);
             const status = await response.json();
-            renderAiTaskStatus(status, status.status === 'error');
+            aiTaskToast(taskType, status, status.status === 'error');
 
             if (status.status === 'success') {
                 clearInterval(activeAiTaskPoll);
@@ -502,22 +495,44 @@
             if (status.status === 'error') {
                 clearInterval(activeAiTaskPoll);
                 activeAiTaskPoll = null;
-                if (button) {
-                    button.disabled = false;
-                    button.classList.remove('busy');
-                    if (button.dataset.originalText) button.textContent = button.dataset.originalText;
-                }
+                setAiTaskBusy(buttons, false);
+                showAiTaskInSection(taskType, status.message || 'It did not finish.');
             }
         }, 2000);
     }
 
-    async function startAiTask(taskType, resourceId, button) {
-        if (button) {
-            button.disabled = true;
+    // Every control that starts this task: the round rail button and the
+    // one beside the section heading run the same task, so they go busy and
+    // come back together (Philip, 2026-10-25: one consistent behaviour).
+    function aiTaskButtons(taskType, resourceId, button) {
+        const call = "startAiTask('" + taskType + "', " + resourceId + ",";
+        const found = [...document.querySelectorAll('button[onclick]')]
+            .filter(b => b.getAttribute('onclick').startsWith(call));
+        if (button && !found.includes(button)) found.push(button);
+        return found;
+    }
+
+    function setAiTaskBusy(buttons, busy) {
+        buttons.forEach(b => {
+            b.disabled = busy;
             // Icon buttons (ai_actions.html) pulse; text buttons say so.
-            if (button.classList.contains('act')) button.classList.add('busy');
-            else { button.dataset.originalText = button.textContent; button.textContent = 'Working...'; }
-        }
+            if (b.classList.contains('act')) b.classList.toggle('busy', busy);
+            else if (busy) { b.dataset.originalText = b.textContent; b.textContent = 'Working...'; }
+            else if (b.dataset.originalText) b.textContent = b.dataset.originalText;
+        });
+    }
+
+    // The section's own "not generated yet" line says it is running too, so
+    // the feedback sits where the result will appear.
+    function showAiTaskInSection(taskType, message) {
+        const line = document.querySelector('[data-ai-status="' + taskType + '"]');
+        if (line) line.textContent = message;
+    }
+
+    async function startAiTask(taskType, resourceId, button) {
+        const buttons = aiTaskButtons(taskType, resourceId, button);
+        setAiTaskBusy(buttons, true);
+        showAiTaskInSection(taskType, 'Generating… the page reloads when it is done.');
 
         const response = await fetch(aiTaskStartUrl, {
             method: 'POST',
@@ -532,23 +547,21 @@
         });
 
         const payload = await response.json();
-        renderAiTaskStatus(payload.status || payload, response.status >= 400);
+        aiTaskToast(taskType, payload.status || payload, response.status >= 400);
 
         if (!response.ok && response.status !== 409) {
-            if (button) {
-                button.disabled = false;
-                button.classList.remove('busy');
-                if (button.dataset.originalText) button.textContent = button.dataset.originalText;
-            }
+            setAiTaskBusy(buttons, false);
+            showAiTaskInSection(taskType, (payload.status || payload).message || 'Could not start it.');
             return;
         }
 
-        await pollAiTask(taskType, resourceId, button);
+        await pollAiTask(taskType, resourceId, buttons);
     }
 
 </script>
 
 <script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
 {% if current_user.is_authenticated %}<script src="{{ url_for('static', filename='js/reads.js') }}" data-read-url="{{ url_for('reading.toggle_read', kind='KIND', item_id=0) }}" data-auto-read="{{ auto_read_seconds }}"></script>{% endif %}
+<script src="{{ url_for('static', filename='js/ai_toast.js') }}"></script>
 </body>
 </html>

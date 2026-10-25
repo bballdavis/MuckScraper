@@ -188,7 +188,6 @@
     </div>
 </div>
 
-<div id="ai-task-status" style="display:none; position:fixed; right:20px; bottom:20px; max-width:320px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); font-size:13px; box-shadow:0 10px 30px rgba(0,0,0,0.08); z-index:1200;"></div>
 
 <script>
     // ── Theme ──
@@ -219,15 +218,6 @@
             .replace('999999', String(resourceId));
     }
 
-    function renderAiTaskStatus(status, isError = false) {
-        const box = document.getElementById('ai-task-status');
-        if (!box) return;
-        box.style.display = 'block';
-        box.style.borderColor = isError ? 'rgba(154, 114, 91, 0.22)' : 'var(--border)';
-        box.style.background = isError ? 'rgba(154, 114, 91, 0.08)' : 'var(--surface)';
-        box.style.color = isError ? '#9a725b' : 'var(--text-muted)';
-        box.textContent = status.message || 'AI task update received.';
-    }
 
     async function pollAiTask(taskType, resourceId, button) {
         if (activeAiTaskPoll) {
@@ -239,7 +229,7 @@
         activeAiTaskPoll = setInterval(async () => {
             const response = await fetch(statusUrl);
             const status = await response.json();
-            renderAiTaskStatus(status, status.status === 'error');
+            aiTaskToast(taskType, status, status.status === 'error');
 
             if (status.status === 'success') {
                 clearInterval(activeAiTaskPoll);
@@ -281,7 +271,7 @@
         });
 
         const payload = await response.json();
-        renderAiTaskStatus(payload.status || payload, response.status >= 400);
+        aiTaskToast(taskType, payload.status || payload, response.status >= 400);
 
         if (!response.ok && response.status !== 409) {
             if (button) {
@@ -335,5 +325,6 @@
 
 <script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
 {% if can('scraper') %}<script src="{{ url_for('static', filename='js/lean_modal.js') }}" data-ai-url="{{ url_for('admin.article_lean_ai', article_id=0) }}" data-save-url="{{ url_for('admin.save_article_lean', article_id=0) }}"></script>{% endif %}
+<script src="{{ url_for('static', filename='js/ai_toast.js') }}"></script>
 </body>
 </html>

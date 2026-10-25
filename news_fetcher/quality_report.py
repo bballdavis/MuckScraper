@@ -272,7 +272,7 @@ def _deep_report_prompts():
 
 def collect_summaries(since, samples):
     from aggregator.models import EditionStory
-    from news_fetcher.summarizer import detect_analysis_type
+    from news_fetcher.summarizer import deep_report_type
 
     prompts = _deep_report_prompts()
     editions = _editions_in_scope(since)
@@ -293,7 +293,7 @@ def collect_summaries(since, samples):
 
             summary = (story.summary or "").strip()
             report = story.deep_report
-            analysis_type = detect_analysis_type(story)
+            analysis_type = deep_report_type(story)
 
             titles = []
             if not summary:
@@ -362,7 +362,7 @@ def collect_summaries(since, samples):
         "findings": _cap(findings),
         "note": (
             "Labels are checked against the live PromptTemplate.current_text for the "
-            "analysis type detect_analysis_type() picks NOW; a story whose topics changed "
+            "analysis type deep_report_type() picks NOW; a story whose topics changed "
             "since generation can be checked against a different variant than wrote it."
         ),
     }

@@ -120,6 +120,10 @@ class Story(db.Model):
     headline_score = db.Column(db.Float, default=0.0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     summary_generated_at = db.Column(db.DateTime, nullable=True)
+    # When `deep_report` was last written (stamped by the listener below, so
+    # every code path that writes it counts). NULL on rows from before
+    # 2026-10-25; new_sources_since() falls back to summary_generated_at.
+    deep_report_generated_at = db.Column(db.DateTime, nullable=True)
     # When `headline` was last written, so the batch headline pass can tell a
     # stale headline (story gained an article since) from a current one. NULL
     # on every pre-existing row, which the pass treats as stale.
@@ -150,6 +154,22 @@ class Story(db.Model):
         from aggregator.article_copies import original_articles
         return original_articles(self.articles)
 
+    def new_sources_since(self, generated_at):
+        """Articles fetched into the story after `generated_at`: the story
+        page offers Regenerate only when this is above zero (Philip,
+        2026-10-25). 0 when the time is unknown."""
+        if not generated_at:
+            return 0
+        return sum(1 for a in self.articles if a.fetched_at and a.fetched_at > generated_at)
+
+    @property
+    def new_sources_for_summary(self):
+        return self.new_sources_since(self.summary_generated_at)
+
+    @property
+    def new_sources_for_analysis(self):
+        return self.new_sources_since(self.deep_report_generated_at or self.summary_generated_at)
+
     @property
     def has_ai_headline(self):
         return len(self.articles) >= 2 and bool((self.headline or "").strip())
@@ -158,6 +178,18 @@ class Story(db.Model):
     def display_headline(self):
         return self.headline if self.has_ai_headline else self.title
 
+
+
+@db.event.listens_for(Story.summary, "set")
+def _stamp_summary(story, value, oldvalue, initiator):
+    if value and value != oldvalue:
+        story.summary_generated_at = datetime.utcnow()
+
+
+@db.event.listens_for(Story.deep_report, "set")
+def _stamp_deep_report(story, value, oldvalue, initiator):
+    if value and value != oldvalue:
+        story.deep_report_generated_at = datetime.utcnow()
 
 class Article(db.Model):
     __tablename__ = "articles"
