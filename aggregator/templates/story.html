@@ -280,20 +280,22 @@
 <div class="container">
 {#- Round buttons under the back button: read, then (scrapers) the executive
     summary and the multi-source analysis while each is still to be
-    generated (Philip, 2026-10-23), as on the article page. -#}
-{%- set summary_pending = not (story.summary and story.summary != story.title) -%}
-{%- set analysis_pending = not story.deep_report and story.articles|length >= 2 -%}
+    generated (Philip, 2026-10-23), as on the article page, or can be
+    regenerated because sources have arrived since (2026-10-25). -#}
+{%- set summary_new = story.new_sources_for_summary if can('scraper') else 0 -%}
+{%- set analysis_new = story.new_sources_for_analysis if can('scraper') else 0 -%}
+{%- set summary_pending = not (story.summary and story.summary != story.title) or summary_new -%}
+{%- set analysis_pending = (not story.deep_report or analysis_new) and story.articles|length >= 2 -%}
 {%- set rail_actions = can('scraper') and (summary_pending or analysis_pending) -%}
 {%- set rail -%}
 {%- if current_user.is_authenticated -%}
 {{ read_toggle('story', story.id, read_item) }}
-{%- if can('scraper') and summary_pending -%}{{ story_summary_action(story, ollama_online, 'rail-btn') }}{%- endif -%}
-{%- if can('scraper') and analysis_pending -%}{{ story_analysis_action(story, ollama_online, 'rail-btn') }}{%- endif -%}
+{%- if can('scraper') and summary_pending -%}{{ story_summary_action(story, ollama_online, 'rail-btn', summary_new) }}{%- endif -%}
+{%- if can('scraper') and analysis_pending -%}{{ story_analysis_action(story, ollama_online, 'rail-btn', analysis_new) }}{%- endif -%}
 {%- endif -%}
 {%- endset -%}
 {{ float_back(feed_back_url('story-%d' % story.id), 'Back to Feed', rail, collapse=rail_actions) }}
 <div class="story-card">
-        <div id="ai-task-status" style="display:none; margin-bottom:20px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.03); color:var(--text-muted); font-size:13px;"></div>
         <h1>{{ story.display_headline }}</h1>
 
     {% call title_meta() %}
@@ -330,7 +332,7 @@
 
         <div class="section-head">
             <h2 class="section-label">Executive Summary</h2>
-            {{ story_summary_action(story, can('scraper') and ollama_online) }}
+            {{ story_summary_action(story, can('scraper') and ollama_online, new_sources=summary_new) }}
         </div>
         {% if story.summary and analysis_layout != 'sections' %}
         {#- In the Cards layout the summary is plain paragraphs, flat like the
@@ -363,7 +365,7 @@
 
         <div class="section-head">
             <h2 class="section-label">Multi-Source Analysis</h2>
-            {{ story_analysis_action(story, can('scraper') and ollama_online) }}
+            {{ story_analysis_action(story, can('scraper') and ollama_online, new_sources=analysis_new) }}
         </div>
         {% if analysis.sections %}
         {{ story_analysis(analysis, story, analysis_layout) }}
@@ -470,15 +472,6 @@
             .replace('999999', String(resourceId));
     }
 
-    function renderAiTaskStatus(status, isError = false) {
-        const box = document.getElementById('ai-task-status');
-        if (!box) return;
-        box.style.display = 'block';
-        box.style.borderColor = isError ? 'rgba(154, 114, 91, 0.22)' : 'var(--border)';
-        box.style.background = isError ? 'rgba(154, 114, 91, 0.08)' : 'rgba(0,0,0,0.03)';
-        box.style.color = isError ? '#9a725b' : 'var(--text-muted)';
-        box.textContent = status.message || 'AI task update received.';
-    }
 
     async function pollAiTask(taskType, resourceId, buttons) {
         if (activeAiTaskPoll) {
@@ -490,7 +483,7 @@
         activeAiTaskPoll = setInterval(async () => {
             const response = await fetch(statusUrl);
             const status = await response.json();
-            renderAiTaskStatus(status, status.status === 'error');
+            aiTaskToast(taskType, status, status.status === 'error');
 
             if (status.status === 'success') {
                 clearInterval(activeAiTaskPoll);
@@ -554,7 +547,7 @@
         });
 
         const payload = await response.json();
-        renderAiTaskStatus(payload.status || payload, response.status >= 400);
+        aiTaskToast(taskType, payload.status || payload, response.status >= 400);
 
         if (!response.ok && response.status !== 409) {
             setAiTaskBusy(buttons, false);
@@ -569,5 +562,6 @@
 
 <script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
 {% if current_user.is_authenticated %}<script src="{{ url_for('static', filename='js/reads.js') }}" data-read-url="{{ url_for('reading.toggle_read', kind='KIND', item_id=0) }}" data-auto-read="{{ auto_read_seconds }}"></script>{% endif %}
+<script src="{{ url_for('static', filename='js/ai_toast.js') }}"></script>
 </body>
 </html>

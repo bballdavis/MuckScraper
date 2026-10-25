@@ -88,6 +88,40 @@ class DeepReportTypeTests(unittest.TestCase):
         self.assertEqual(deep_report_type(self._story("Cup final result", ["Sports"], [3])), "sports")
 
 
+class RegenerateTests(unittest.TestCase):
+    """A generated summary or analysis can be run again only once sources
+    have arrived since it was written (Philip, 2026-10-25)."""
+
+    def _render(self, story, new_sources):
+        from jinja2 import Environment, FileSystemLoader
+        env = Environment(loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), "..", "aggregator", "templates")))
+        env.filters["short_datetime"] = lambda d: ""
+        return env.from_string(
+            "{% from 'ai_actions.html' import story_analysis_action with context %}"
+            "{{ story_analysis_action(s, true, new_sources=n) }}").render(s=story, n=new_sources)
+
+    def test_regenerate_only_with_new_sources(self):
+        from types import SimpleNamespace as NS
+        story = NS(id=5, deep_report="The story: x", articles=[1, 2, 3])
+        self.assertIn("act-done", self._render(story, 0))
+        html = self._render(story, 2)
+        self.assertIn("Regenerate multi-source analysis", html)
+        self.assertIn("2 new sources since it was written", html)
+        self.assertIn("startAiTask('story_deep_report', 5, this)", html)
+
+    def test_new_sources_since(self):
+        from aggregator.models import Article, Story
+        then = datetime(2026, 10, 25, 8, 0)
+        story = Story(title="t")
+        story.articles = [Article(title="a", url="u1", fetched_at=datetime(2026, 10, 25, 7, 0)),
+                          Article(title="b", url="u2", fetched_at=datetime(2026, 10, 25, 9, 0))]
+        self.assertEqual(story.new_sources_since(then), 1)
+        self.assertEqual(story.new_sources_since(None), 0)
+        story.deep_report = "The story: y"
+        self.assertIsNotNone(story.deep_report_generated_at)
+        self.assertEqual(story.new_sources_for_analysis, 0)
+
+
 TEST_DB = os.environ.get("API_TEST_DATABASE_URL", "")
 
 
