@@ -74,7 +74,8 @@ def create_app():
         from aggregator.permissions import can, public_read_enabled
         from aggregator import navigation
         from aggregator.article_copies import copy_label
-        return {"can": can, "copy_label": copy_label, "public_read": public_read_enabled(), "role_labels": ROLE_LABELS,
+        from aggregator.breaking import chip_details
+        return {"can": can, "copy_label": copy_label, "breaking_details": chip_details, "public_read": public_read_enabled(), "role_labels": ROLE_LABELS,
                 "current_back": navigation.current_back, "incoming_back": navigation.incoming_back,
                 "feed_back_url": navigation.feed_back_url,
                 "article_back_anchor": navigation.article_back_anchor, "menu_back": navigation.menu_back,

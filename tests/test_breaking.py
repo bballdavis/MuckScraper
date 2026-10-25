@@ -125,6 +125,44 @@ class BreakingEndToEndTests(unittest.TestCase):
         # Outside the window, nothing is breaking.
         self.assertEqual(breaking.bar_entries(now=now + breaking.WINDOW + timedelta(minutes=31)), [])
 
+    def test_story_from_a_breaking_event_carries_the_chip(self):
+        from aggregator import breaking, db
+        from aggregator.api import serializers as ser
+        from aggregator.models import Article, FeedEntry, Outlet, Story
+        from news_fetcher.breaking_feed import mark_breaking
+        now = datetime.utcnow()
+        self._seed_headlines(now)
+        mark_breaking(now)
+        quake = Story(title=QUAKE[1], created_at=now)
+        bikes = Story(title="City council approves new bike lanes downtown", created_at=now)
+        reuters, cnn = Outlet(name="Reuters", bias_score=3.0), Outlet(name="CNN", bias_score=2.0)
+        articles = [Article(title=QUAKE[1], url="https://reuters.example/quake", outlet=reuters, story=quake),
+                    Article(title=bikes.title, url="https://local.example/bikes", story=bikes)]
+        db.session.add_all([quake, bikes, reuters, cnn, *articles])
+        db.session.commit()
+        # The poller links scraped entries to their articles by URL.
+        breaking.link_scraped(now)
+
+        flags = breaking.story_flags(now=now)
+        # (An earlier test's AP story is in the event too.)
+        self.assertIn(quake.id, flags)
+        self.assertNotIn(bikes.id, flags)
+        chip = flags[quake.id]
+        self.assertEqual((chip["first_outlet"], chip["outlets"], chip["flagged_by_feed"]), ("AP News", 3, False))
+        self.assertEqual([s["name"] for s in chip["sources"]], ["AP News", "Reuters", "CNN"])
+        self.assertEqual(chip["lean"], {"left": 1, "center": 1, "right": 0, "unrated": 1})
+
+        with self.app.test_request_context():
+            self.assertEqual(ser.story_summary(quake)["breaking"]["first_outlet"], "AP News")
+            self.assertIsNone(ser.story_summary(bikes)["breaking"])
+        # Past the window the chip goes.
+        self.assertEqual(breaking.story_flags(now=now + breaking.WINDOW + timedelta(minutes=31)), {})
+        db.session.query(FeedEntry).update({FeedEntry.article_id: None})
+        db.session.query(Article).filter(Article.story_id.in_([quake.id, bikes.id])).delete(synchronize_session=False)
+        db.session.query(Outlet).filter(Outlet.name.in_(["Reuters", "CNN"])).delete(synchronize_session=False)
+        db.session.query(Story).filter(Story.id.in_([quake.id, bikes.id])).delete(synchronize_session=False)
+        db.session.commit()
+
     def test_send_to_newsbox_scrapes_then_summarizes(self):
         from aggregator import breaking, db, jobs
         from aggregator.models import Article, FeedEntry, Job, Outlet, Story
