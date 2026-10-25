@@ -62,17 +62,62 @@ class ArticlePageTests(unittest.TestCase):
         self.assertIn("Generate article summary", self._page(self.ids["plain"]))
         self.assertNotIn("Generate article summary", self._page(self.ids["summarized"]))
 
-    def test_rate_lean_returns_to_the_article_and_shows_the_rating(self):
+    def test_rate_lean_button_opens_the_dialog(self):
+        page = self._page(self.ids["plain"])
+        self.assertIn(f'onclick="openLeanModal({self.ids["plain"]})"', page)
+        self.assertIn("js/lean_modal.js", page)
+
+    def _lean(self, article_id):
+        from aggregator.models import Article
+        with self.web.app_context():
+            a = Article.query.get(article_id)
+            return a.bias_score, a.bias_source
+
+    def test_ai_rating_is_shown_not_applied_and_asked_once(self):
+        article_id = self.ids["summarized"]
+        with mock.patch("news_fetcher.outlet_bias_llm.get_article_lean_from_llm",
+                        return_value=(2, "Quotes only the governor's allies.")) as ask:
+            first = self.client.post(f"/admin/article/{article_id}/lean/ai").get_json()
+            again = self.client.post(f"/admin/article/{article_id}/lean/ai").get_json()
+        self.assertEqual(ask.call_count, 1)
+        self.assertEqual(first["ai"], {"score": 2, "label": "Lean Left", "source": "ai",
+                                       "reason": "Quotes only the governor's allies."})
+        self.assertEqual(again["ai"], first["ai"])
+        self.assertIsNone(first["own"])
+        self.assertEqual(self._lean(article_id), (3, None))
+
+        # Saving the AI's pick with no note applies the AI's rating.
+        r = self.client.post(f"/admin/article/{article_id}/lean", json={"score": 2, "note": ""})
+        self.assertEqual(r.get_json(), {"score": 2, "label": "Lean Left"})
+        self.assertEqual(self._lean(article_id), (2, "ai"))
+
+    def test_reader_override_with_note(self):
         article_id = self.ids["plain"]
-        with mock.patch("news_fetcher.outlet_bias_llm.get_article_bias_from_llm", return_value=5):
-            r = self.client.post(f"/admin/rate-article/{article_id}",
-                                 data={"next": f"/article/{article_id}", "report": "1"})
-        self.assertEqual(r.status_code, 302)
-        self.assertTrue(r.headers["Location"].endswith(f"/article/{article_id}"))
+        with mock.patch("news_fetcher.outlet_bias_llm.get_article_lean_from_llm", return_value=(None, None)):
+            r = self.client.post(f"/admin/article/{article_id}/lean/ai").get_json()
+        self.assertIsNone(r["ai"])
+        self.assertIn("couldn't rate", r["error"])
+
+        self.assertEqual(self.client.post(f"/admin/article/{article_id}/lean", json={"score": 9}).status_code, 400)
+        r = self.client.post(f"/admin/article/{article_id}/lean",
+                             json={"score": 5, "note": "Only one side quoted.", "report": True})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(self._lean(article_id), (5, "reader"))
         page = self._page(article_id)
         self.assertIn("Rated this article Right.", page)
         self.assertIn('bias-tag bias-5', page)
 
+        with mock.patch("news_fetcher.outlet_bias_llm.get_article_lean_from_llm", return_value=(None, None)):
+            r = self.client.post(f"/admin/article/{article_id}/lean/ai").get_json()
+        self.assertEqual(r["own"], {"score": 5, "source": "reader", "note": "Only one side quoted."})
+
+        # An outlet re-rank leaves the article's own rating alone.
+        from aggregator.models import Article
+        with self.web.app_context():
+            outlet_id = Article.query.get(article_id).outlet_id
+        with mock.patch("news_fetcher.outlet_bias_llm.get_outlet_bias_from_llm", return_value=1):
+            self.client.post(f"/admin/rerank-outlet/{outlet_id}")
+        self.assertEqual(self._lean(article_id), (5, "reader"))
 
 if __name__ == "__main__":
     unittest.main()

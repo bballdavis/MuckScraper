@@ -156,7 +156,11 @@ SCHEMAS["ArticleDetail"] = {"allOf": [_ref("ArticleCard"), _obj(
     content_html={"type": ["string", "null"], "description": "Sanitized scraped HTML; null unless the server allows full text."},
     is_read={"type": "boolean", "description": "Marked read by this user"},
     is_summarizing={"type": "boolean", "description": "Its summary is queued or being written"},
-    is_rating_bias={"type": "boolean", "description": "Its lean rating is queued or running"})]}
+    is_rating_bias={"type": "boolean", "description": "Its lean rating is queued or running"},
+    lean_source={"type": "string", "enum": ["outlet", "ai", "reader"],
+                 "description": "Where its leaning comes from: its outlet, the AI's rating of the article, or a reader's"},
+    lean_reason={"type": ["string", "null"],
+                 "description": "The AI's one-line reason, or the reader's note, for an article rated on its own"})]}
 SCHEMAS["ReadItem"] = _obj(
     ["kind", "id", "read_at", "story", "article"],
     kind={"type": "string", "enum": ["story", "article"]}, id=_I, read_at=_DT,
