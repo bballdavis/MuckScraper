@@ -85,29 +85,32 @@
     .read-leaving, .read-collapsing { transition: none; }
 }
 
-/* ── Undo toast ── */
+/* ── Undo toast ──
+   Amber, larger and up for 12 seconds so it gets noticed (Philip,
+   2026-10-25); the same in light and dark themes. */
 .read-toast {
-    position: fixed; left: 50%; bottom: 24px; z-index: 1000;
+    position: fixed; left: 50%; bottom: 28px; z-index: 1000;
     transform: translate(-50%, 16px); opacity: 0; visibility: hidden;
-    display: flex; align-items: center; gap: 14px; overflow: hidden;
-    padding: 10px 12px 10px 16px; border-radius: 3px;
-    background: var(--topbar-bg); color: #e8e8f0; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-    font: inherit; font-size: 14px;
+    display: flex; align-items: center; gap: 16px; overflow: hidden;
+    max-width: calc(100vw - 32px);
+    padding: 14px 14px 14px 20px; border-radius: 6px;
+    background: #f5a524; color: #1f1400; box-shadow: 0 12px 34px rgba(0, 0, 0, 0.3);
+    font: inherit; font-size: 16px; font-weight: 700;
     transition: transform 0.18s ease, opacity 0.18s ease, visibility 0s linear 0.18s;
 }
 .read-toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; transition-delay: 0s; }
 /* Undo is a round icon button (Philip, 2026-10-25). */
 .read-toast-undo {
-    width: 32px; height: 32px; flex: 0 0 auto; padding: 0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
+    width: 40px; height: 40px; flex: 0 0 auto; padding: 0; border: 2px solid rgba(31, 20, 0, 0.55); border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    background: transparent; color: #fff; font: inherit; cursor: pointer;
+    background: transparent; color: #1f1400; font: inherit; cursor: pointer;
 }
 .read-toast-undo[hidden] { display: none; }
 .read-toast-text { white-space: nowrap; }
-.read-toast-undo:hover, .read-toast-undo:focus-visible { background: rgba(255, 255, 255, 0.12); outline: none; }
-/* The five seconds, as a bar along the bottom. */
-.read-toast-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--accent-light); transform-origin: left; transform: scaleX(0); }
-.read-toast.show .read-toast-bar { animation: read-toast-count 5s linear forwards; }
+.read-toast-undo:hover, .read-toast-undo:focus-visible { background: #1f1400; color: #f5a524; border-color: #1f1400; outline: none; }
+/* The twelve seconds (UNDO_MS in reads.js), as a bar along the bottom. */
+.read-toast-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(31, 20, 0, 0.45); transform-origin: left; transform: scaleX(0); }
+.read-toast.show .read-toast-bar { animation: read-toast-count 12s linear forwards; }
 @keyframes read-toast-count { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
 /* ── Story and article pages: read toggle ──
