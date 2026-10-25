@@ -176,11 +176,34 @@ def why_label(view, entry):
     if view == "controversial":
         parts = []
         if entry.gap is not None:
-            parts.append("Framing gap: " + ("high" if entry.gap >= 0.15 else "moderate" if entry.gap >= 0.07 else "low"))
+            parts.append("Framing gap: " + gap_level(entry.gap))
         columns = entry.opeds[0] if entry.opeds else 0
         if columns:
             parts.append(f"{columns} op-ed{'s' if columns != 1 else ''}")
         return " · ".join(parts) or "Covered by both sides"
+    return None
+
+
+def gap_level(gap):
+    if gap is None:
+        return None
+    return "high" if gap >= 0.15 else "moderate" if gap >= 0.07 else "low"
+
+
+def short_why(view, entry):
+    """why_label cut down for a phone row, where it sits beside the L/C/R
+    pill: "4 outlets in 6h", "High gap · 2 op-eds", "Both sides"."""
+    if view == "trending" and entry.signals.recent:
+        return f"{entry.signals.recent} outlet{'s' if entry.signals.recent != 1 else ''} in 6h"
+    if view == "controversial":
+        parts = []
+        level = gap_level(entry.gap)
+        if level:
+            parts.append(f"{level.capitalize()} gap")
+        columns = entry.opeds[0] if entry.opeds else 0
+        if columns:
+            parts.append(f"{columns} op-ed{'s' if columns != 1 else ''}")
+        return " · ".join(parts) or "Both sides"
     return None
 
 
