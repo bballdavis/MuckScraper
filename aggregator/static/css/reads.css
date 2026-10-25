@@ -96,10 +96,14 @@
     transition: transform 0.18s ease, opacity 0.18s ease, visibility 0s linear 0.18s;
 }
 .read-toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; transition-delay: 0s; }
+/* Undo is a round icon button (Philip, 2026-10-25). */
 .read-toast-undo {
-    height: 28px; padding: 0 12px; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 3px;
-    background: transparent; color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+    width: 32px; height: 32px; flex: 0 0 auto; padding: 0; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; color: #fff; font: inherit; cursor: pointer;
 }
+.read-toast-undo[hidden] { display: none; }
+.read-toast-text { white-space: nowrap; }
 .read-toast-undo:hover, .read-toast-undo:focus-visible { background: rgba(255, 255, 255, 0.12); outline: none; }
 /* The five seconds, as a bar along the bottom. */
 .read-toast-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--accent-light); transform-origin: left; transform: scaleX(0); }
