@@ -136,7 +136,7 @@ class HeadlineViewTests(unittest.TestCase):
         page = self._client().get("/headlines").get_data(as_text=True)
         self.assertIn('class="view-switch"', page)
         self.assertIn('view-seg on" href="/headlines?view=trending"', page)
-        self.assertIn("Senate passes stopgap funding bill", page)
+        self.assertIn("Senate passes stopgap funding", page)
         self.assertNotIn("Mayor accused of steering contracts", page)
 
     def test_latest_and_controversial_pages(self):
@@ -187,3 +187,10 @@ class HeadlineViewTests(unittest.TestCase):
         self.assertNotIn('class="right"', bar)
         self.assertIn('bias-key right is-zero', card)
         self.assertIn("Right <b>0%</b>", card)
+
+    def test_ai_headline_is_an_icon_glued_to_the_last_word(self):
+        page = self._client().get("/headlines").get_data(as_text=True)
+        self.assertNotIn('<span class="meta-item">AI headline</span>', page)
+        card = self._card(page, self.ids["broad"])
+        self.assertIn('Senate passes stopgap funding <span class="ai-glue">bill<span class="ai-mark"', card)
+        self.assertIn("<strong>AI headline</strong>", card)
