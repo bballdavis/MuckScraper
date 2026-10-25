@@ -123,10 +123,11 @@
 /* Reporting grade (story_card_macros.html reporting_tag, 2026-10-23): the
    word, then five squares filled up to the grade in its colour; "Reporting"
    and the meaning in a dark tip above on hover or focus, like .outlet-flag.
-   The tip opens leftward, since the chip sits at the right of its row. */
+   The tip opens leftward, since the chip sits at the right of its row.
+   The word uses the lean chip's type exactly, caps and all (Philip, 2026-10-25). */
 .reporting-tag {
     --rep: #2f9e5b; position: relative; display: inline-flex; align-items: center; gap: 6px;
-    font-size: 11px; font-weight: 700; letter-spacing: 0.3px; color: var(--text-muted); white-space: nowrap; cursor: default; outline: none;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; color: var(--text); white-space: nowrap; cursor: default; outline: none;
 }
 .reporting-high { --rep: #4caf50; }
 .reporting-mostly-factual { --rep: #b3a12a; }
