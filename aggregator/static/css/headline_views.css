@@ -74,10 +74,14 @@
     .latest-src { grid-column: 3; grid-row: 1; }
 }
 
-/* The Big Picture, in the story page's card (story_analysis.css .sa-lead),
-   a size down for a card in a list. */
+/* The Big Picture: icon, heading, the summary, in a tinted card. Its own
+   rules since the story page went flat (PR #56) and .sa-lead lost its box. */
 .hl-big-picture { margin-bottom: 16px; }
-.hl-big-picture .sa-lead { padding: 14px 16px; gap: 12px; }
+.hl-big-picture .sa-lead {
+    display: flex; gap: 12px; padding: 14px 16px;
+    background: var(--summary-bg); border: 1px solid var(--border); border-radius: 14px;
+}
+.hl-big-picture .sa-ico { color: var(--accent-text); font-size: 20px; margin-top: 1px; }
 .hl-big-picture .sa-lead p { font-size: 15px; line-height: 1.6; }
 
 /* Where The Big Picture will go while it is written (headlines_feed.html
