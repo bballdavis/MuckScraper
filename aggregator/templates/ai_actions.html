@@ -27,9 +27,16 @@
 {%- endif -%}
 {%- endmacro -%}
 
-{#- The story's two actions, for a story card or the story page. -#}
-{%- macro story_summary_action(story, can_run, extra_class='') -%}
-{%- if story.summary and story.summary != story.title -%}
+{#- The story's two actions, for a story card or the story page. Once one
+    has run it can be run again only when `new_sources` (sources fetched into
+    the story since; the story page passes Story.new_sources_for_*) is above
+    zero (Philip, 2026-10-25). Cards leave it at 0. -#}
+{%- macro _sources(n) -%}{{ n }} new source{{ '' if n == 1 else 's' }}{%- endmacro -%}
+
+{%- macro story_summary_action(story, can_run, extra_class='', new_sources=0) -%}
+{%- if story.summary and story.summary != story.title and can_run and new_sources -%}
+{{ ai_action('summary', 'ready', 'Regenerate executive summary', _sources(new_sources) ~ ' since it was written. Runs in the background; the page reloads when it is done.', "startAiTask('story_summary', %d, this)" % story.id, extra_class) }}
+{%- elif story.summary and story.summary != story.title -%}
 {{ ai_action('summary', 'done', 'Executive summary generated' ~ (' ' ~ (story.summary_generated_at|short_datetime) if story.summary_generated_at else ''), 'Open the story to read it.', extra_class=extra_class) }}
 {%- elif can_run -%}
 {{ ai_action('summary', 'ready', 'Generate executive summary', 'Summarizes what every source in this story reports. Runs in the background; the page reloads when it is done.', "startAiTask('story_summary', %d, this)" % story.id, extra_class) }}
@@ -38,8 +45,10 @@
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro story_analysis_action(story, can_run, extra_class='') -%}
-{%- if story.deep_report -%}
+{%- macro story_analysis_action(story, can_run, extra_class='', new_sources=0) -%}
+{%- if story.deep_report and can_run and new_sources and story.articles|length >= 2 -%}
+{{ ai_action('analysis', 'ready', 'Regenerate multi-source analysis', _sources(new_sources) ~ ' since it was written. Runs in the background; the page reloads when it is done.', "startAiTask('story_deep_report', %d, this)" % story.id, extra_class) }}
+{%- elif story.deep_report -%}
 {{ ai_action('analysis', 'done', 'Multi-source analysis generated', 'Open the story to see how Left, Center and Right outlets cover it.', extra_class=extra_class) }}
 {%- elif story.articles|length < 2 -%}
 {{ ai_action('analysis', 'off', 'Multi-source analysis unavailable', 'It needs two or more sources to compare.', extra_class=extra_class) }}

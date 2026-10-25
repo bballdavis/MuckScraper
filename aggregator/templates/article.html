@@ -312,7 +312,6 @@
 {{ float_back(url_for('public.view_story', story_id=article.story_id, back=incoming_back()) if article.story_id else feed_back_url(article_back_anchor(article)), 'Back to Story' if article.story_id else 'Back to Feed', rail, collapse=can('scraper')) }}
     <div class="article-card">
         {% include '_flashes.html' %}
-        <div id="ai-task-status" style="display:none; margin-bottom:20px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,0.03); color:var(--text-muted); font-size:13px;"></div>
 
         <h1>{{ article.title }}</h1>
         {#- The lean chip is the article's own rating when it has one (Rate
@@ -441,15 +440,6 @@
             .replace('999999', String(resourceId));
     }
 
-    function renderAiTaskStatus(status, isError = false) {
-        const box = document.getElementById('ai-task-status');
-        if (!box) return;
-        box.style.display = 'block';
-        box.style.borderColor = isError ? 'rgba(154, 114, 91, 0.22)' : 'var(--border)';
-        box.style.background = isError ? 'rgba(154, 114, 91, 0.08)' : 'rgba(0,0,0,0.03)';
-        box.style.color = isError ? '#9a725b' : 'var(--text-muted)';
-        box.textContent = status.message || 'AI task update received.';
-    }
 
     async function pollAiTask(taskType, resourceId, button) {
         if (activeAiTaskPoll) {
@@ -461,7 +451,7 @@
         activeAiTaskPoll = setInterval(async () => {
             const response = await fetch(statusUrl);
             const status = await response.json();
-            renderAiTaskStatus(status, status.status === 'error');
+            aiTaskToast(taskType, status, status.status === 'error');
 
             if (status.status === 'success') {
                 clearInterval(activeAiTaskPoll);
@@ -503,7 +493,7 @@
         });
 
         const payload = await response.json();
-        renderAiTaskStatus(payload.status || payload, response.status >= 400);
+        aiTaskToast(taskType, payload.status || payload, response.status >= 400);
 
         if (!response.ok && response.status !== 409) {
             if (button) {
@@ -522,5 +512,6 @@
 <script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
 {% if can('scraper') %}<script src="{{ url_for('static', filename='js/lean_modal.js') }}" data-ai-url="{{ url_for('admin.article_lean_ai', article_id=0) }}" data-save-url="{{ url_for('admin.save_article_lean', article_id=0) }}" data-report="1"></script>{% endif %}
 {% if current_user.is_authenticated %}<script src="{{ url_for('static', filename='js/reads.js') }}" data-read-url="{{ url_for('reading.toggle_read', kind='KIND', item_id=0) }}" data-auto-read="{{ auto_read_seconds }}"></script>{% endif %}
+<script src="{{ url_for('static', filename='js/ai_toast.js') }}"></script>
 </body>
 </html>
