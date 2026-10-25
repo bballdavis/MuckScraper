@@ -64,13 +64,14 @@ class ArticlePageTests(unittest.TestCase):
 
     def test_rate_lean_returns_to_the_article_and_shows_the_rating(self):
         article_id = self.ids["plain"]
-        with mock.patch("news_fetcher.outlet_bias_llm.get_article_bias_from_llm", return_value=5):
+        with mock.patch("news_fetcher.outlet_bias_llm.get_article_lean_from_llm",
+                        return_value=(5, "Quotes only the governor's critics.")):
             r = self.client.post(f"/admin/rate-article/{article_id}",
                                  data={"next": f"/article/{article_id}", "report": "1"})
         self.assertEqual(r.status_code, 302)
         self.assertTrue(r.headers["Location"].endswith(f"/article/{article_id}"))
         page = self._page(article_id)
-        self.assertIn("Rated this article Right.", page)
+        self.assertIn("Rated this article Right. Quotes only the governor&#39;s critics.", page)
         self.assertIn('bias-tag bias-5', page)
 
 

@@ -320,13 +320,14 @@ def rate_article(article_id):
     # list pages don't show flashes, so they don't ask.
     report = request.form.get("report") == "1"
     try:
-        from news_fetcher.outlet_bias_llm import BIAS_LABELS, get_article_bias_from_llm
-        bias_score = get_article_bias_from_llm(article.title, article.content)
+        from news_fetcher.outlet_bias_llm import BIAS_LABELS, get_article_lean_from_llm
+        bias_score, reason = get_article_lean_from_llm(article.title, article.content)
         if bias_score is not None:
             article.bias_score = bias_score
             db.session.commit()
             if report:
-                flash(f"Rated this article {BIAS_LABELS[bias_score]}.", "success")
+                note = f"Rated this article {BIAS_LABELS[bias_score]}."
+                flash(f"{note} {reason}" if reason else note, "success")
         elif report:
             flash("The AI could not rate this article's lean, so it keeps its current rating.", "error")
     except Exception as e:
