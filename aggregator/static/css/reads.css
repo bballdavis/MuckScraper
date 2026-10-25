@@ -12,15 +12,23 @@
    up. Hiding also waits a moment, for a pointer that cuts the corner. */
 .hl-item { position: relative; margin-bottom: 28px; }
 .hl-item > .story { margin-bottom: 0; }
-.hl-read {
+/* .hl-side holds the round buttons in one column, centred on the card:
+   the glasses, then the scales for a story with no summary yet (Philip,
+   2026-10-25). */
+.hl-side {
     position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
-    padding: 12px 0 12px 8px; margin: 0; border: 0; background: transparent; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 12px 0 12px 8px;
     opacity: 0; visibility: hidden;
     transition: opacity 0.15s ease 0.3s, visibility 0s linear 0.45s;
 }
-.hl-item:hover > .hl-read, .hl-read:focus-visible, .hl-read:hover {
+.hl-item:hover > .hl-side, .hl-side:focus-within {
     opacity: 1; visibility: visible; transition-delay: 0s;
 }
+.hl-read { position: relative; padding: 0; margin: 0; border: 0; background: transparent; cursor: pointer; }
+.hl-analyze:disabled { cursor: progress; }
+.hl-analyze.busy .hl-read-icon { animation: hl-pulse 1.2s ease-in-out infinite; }
+@keyframes hl-pulse { 50% { opacity: 0.45; } }
 .hl-read-icon {
     /* Round, the size of the story pages' back button (theme.css .float-back). */
     position: relative; width: 44px; height: 44px;
@@ -36,6 +44,9 @@
 }
 .hl-read:focus-visible { outline: none; }
 .hl-read .tip { left: auto; right: 0; top: auto; bottom: calc(100% + 6px); transform: none; }
+/* The tip of the lower button opens below it. */
+.hl-analyze .tip { top: calc(100% + 6px); bottom: auto; }
+.hl-analyze:hover .tip, .hl-analyze:focus-visible .tip { opacity: 1; visibility: visible; }
 /* The card keeps its hover lift while the pointer is on the button. */
 .hl-item:hover > .story { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.1); }
 .hl-read:hover .tip, .hl-read:focus-visible .tip { opacity: 1; visibility: visible; }
@@ -44,7 +55,7 @@
    windows too narrow for the round button beside the card. */
 .card-actions-row > .act-read { display: none; }
 @media (hover: none), (max-width: 1280px) {
-    .hl-read { display: none; }
+    .hl-side { display: none; }
     .card-actions-row > .act-read { display: inline-flex; }
     /* A fourth square in the row: let the story button give way. */
     .card-actions-row > .btn { min-width: 0; overflow: hidden; }

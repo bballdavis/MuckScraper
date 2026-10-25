@@ -22,8 +22,9 @@
 .view-rule { font-size: 12px; opacity: 0.85; }
 [data-theme="dark"] .view-seg.on { background: var(--accent-light); }
 
-/* Why a card is in the view: "+7 outlets in 6h", "Framing gap: high · 6 op-eds". */
-.why-row { margin: -2px 0 10px; }
+/* Why a card is in the view: "+7 outlets in 6h", "Framing gap: high · 6 op-eds".
+   In the meta row, right of the article count (Philip, 2026-10-25). */
+.card-meta .why { margin: 0 10px; }
 .why {
     display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 99px;
     color: var(--accent-text); background: var(--summary-bg); border: 1px solid var(--input-border);
@@ -72,3 +73,28 @@
     .latest-row .card-bias, .latest-row .latest-single { grid-column: 2; grid-row: 2; }
     .latest-src { grid-column: 3; grid-row: 1; }
 }
+
+/* The Big Picture, in the story page's card (story_analysis.css .sa-lead),
+   a size down for a card in a list. */
+.hl-big-picture { margin-bottom: 16px; }
+.hl-big-picture .sa-lead { padding: 14px 16px; gap: 12px; }
+.hl-big-picture .sa-lead p { font-size: 15px; line-height: 1.6; }
+
+/* Where The Big Picture will go while it is written (headlines_feed.html
+   analyzeStory). The same card, grey bars shimmering. */
+.hl-skeleton {
+    display: flex; gap: 12px; padding: 14px 16px; margin-bottom: 16px;
+    background: var(--summary-bg); border: 1px solid var(--border); border-radius: 14px;
+}
+.hl-skeleton > div { flex: 1; display: flex; flex-direction: column; gap: 8px; padding-top: 2px; }
+.hl-skel-ico, .hl-skel-line {
+    display: block; border-radius: 4px;
+    background: linear-gradient(90deg, var(--border) 25%, var(--btn-muted-bg) 50%, var(--border) 75%);
+    background-size: 200% 100%; animation: hl-shimmer 1.4s linear infinite;
+}
+.hl-skel-ico { width: 20px; height: 20px; flex: 0 0 auto; }
+.hl-skel-line { height: 12px; width: 100%; }
+.hl-skel-line.w30 { width: 30%; height: 10px; margin-bottom: 2px; }
+.hl-skel-line.w60 { width: 60%; }
+@keyframes hl-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .hl-skel-ico, .hl-skel-line { animation: none; } }

@@ -58,6 +58,9 @@ class HeadlineViewTests(unittest.TestCase):
         reader = User(username="reader", email="r@example.com", role="reader")
         reader.set_password("password123")
         db.session.add(reader)
+        scraper = User(username="scraper", email="s@example.com", role="scraper")
+        scraper.set_password("password123")
+        db.session.add(scraper)
         shared = _vector(1)
         single = story("Mayor accused of steering contracts", [("dailywire", 4.6)], 0.2)
         broad = story("Senate passes stopgap funding bill", [("ap", 3), ("npr", 2), ("fox", 4.5), ("wsj", 3.7),
@@ -78,7 +81,9 @@ class HeadlineViewTests(unittest.TestCase):
         db.session.flush()
         db.session.add(EditionStory(edition_id=edition.id, story_id=single.id, rank=1))
         db.session.commit()
-        return {"reader": reader.id, "single": single.id, "broad": broad.id, "small": small.id,
+        small.summary = "The big picture: Crews are evacuating three towns."
+        db.session.commit()
+        return {"reader": reader.id, "scraper": scraper.id, "single": single.id, "broad": broad.id, "small": small.id,
                 "alike": alike.id, "split": split.id, "old": old.id, "edition": edition.id}
 
     def setUp(self):
@@ -116,10 +121,14 @@ class HeadlineViewTests(unittest.TestCase):
     def test_hidden_ids_drop_out(self):
         self.assertNotIn(self.ids["broad"], self._ids("trending", hidden_ids={self.ids["broad"]}))
 
-    def _client(self):
+    def _client(self, user="reader"):
+        from flask import g
+        # Requests share setUp's app context, so Flask-Login's cached user
+        # would carry over from one client to the next.
+        g.pop("_login_user", None)
         client = self.app.test_client()
         with client.session_transaction() as session:
-            session["_user_id"] = str(self.ids["reader"])
+            session["_user_id"] = str(self.ids[user])
             session["_fresh"] = True
         return client
 
@@ -143,3 +152,27 @@ class HeadlineViewTests(unittest.TestCase):
         self.assertNotIn('class="view-switch"', page)
         self.assertIn("Morning Edition", page)
         self.assertIn("Mayor accused of steering contracts", page)
+
+    def _card(self, page, story_id):
+        start = page.index(f'data-story-id="{story_id}"')
+        end = page.find('class="hl-item"', start + 1)
+        return page[start:end if end != -1 else len(page)]
+
+    def test_card_layout_why_in_meta_row_and_no_pending_line(self):
+        page = self._client().get("/headlines").get_data(as_text=True)
+        self.assertNotIn("why-row", page)
+        self.assertNotIn("Analysis pending", page)
+        card = self._card(page, self.ids["broad"])
+        meta = card[card.index('class="card-meta"'):card.index("bias-balance")]
+        self.assertIn("5 articles", meta)
+        self.assertIn("reporting in the last 6h", meta)
+        small = self._card(page, self.ids["small"])
+        self.assertIn("The Big Picture", small)
+        self.assertIn("Crews are evacuating three towns.", small)
+
+    def test_scales_beside_unsummarized_cards_for_scrapers_only(self):
+        reader = self._client().get("/headlines").get_data(as_text=True)
+        self.assertNotIn("hl-analyze", reader)
+        page = self._client("scraper").get("/headlines").get_data(as_text=True)
+        self.assertIn("analyzeStory(%d, true, this)" % self.ids["broad"], page)
+        self.assertNotIn("hl-analyze", self._card(page, self.ids["small"]))
