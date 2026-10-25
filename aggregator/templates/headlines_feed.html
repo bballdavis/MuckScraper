@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/breaking.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reads.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/headline_views.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/story_analysis.css') }}">
     <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -125,19 +126,24 @@
             button beside the card on hover (in the action row on touch
             screens) slides it away, with Undo (static/js/reads.js). -#}
         {% set can_mark_read = current_user.is_authenticated %}
+        {% set can_analyze = can('scraper') %}
         {% for story in stories %}
         {% if can_mark_read %}<div class="hl-item" data-story-id="{{ story.id }}">{% endif %}
-        {% call story_card(story) %}
-            {% if story.why_label %}<div class="why-row"><span class="why{{ ' why-hot' if view == 'controversial' else '' }}">{{ story.why_label }}</span></div>{% endif %}
+        {% call story_card(story, why=story.why_label, why_hot=(view == 'controversial')) %}
             {{ bias_balance(story) }}
 
+            {#- No placeholder line while a story has no summary (Philip,
+                2026-10-25): the scales button beside the card starts it,
+                and a skeleton holds this spot while it is written. -#}
+            {#- The Big Picture in the story page's card (story_analysis.css
+                .sa-lead): icon, heading, the summary (Philip, 2026-10-25). -#}
             {% if story.summary %}
-                <div class="summary">
-                    <div class="summary-label">The Big Picture</div>
-                    {{ story.summary | get_big_picture }}
+                <div class="sa sa-cards hl-big-picture">
+                    <div class="sa-lead">
+                        <span class="sa-ico">{{ icon('file-text') }}</span>
+                        <div><h3>The Big Picture</h3><p>{{ story.summary | get_big_picture }}</p></div>
+                    </div>
                 </div>
-            {% else %}
-                <div class="summary pending">Analysis pending — this story hasn't been summarized yet.</div>
             {% endif %}
 
             {#- The story link, then the summary and analysis indicators
@@ -152,7 +158,15 @@
             </div>
         {% endcall %}
         {% if can_mark_read %}
-        <button type="button" class="hl-read" data-mark-read aria-label="Mark as read"><span class="hl-read-icon">{{ icon('glasses') }}<span class="tip" role="tooltip"><strong>Mark as read</strong> Hides it from Headlines. Find it again under Recently Read.</span></span></button>
+        {#- Beside the card on hover: mark as read, and under it, centred
+            with it, the scales to analyze a story nobody has summarized yet
+            (Philip, 2026-10-25). -#}
+        <div class="hl-side">
+            <button type="button" class="hl-read" data-mark-read aria-label="Mark as read"><span class="hl-read-icon">{{ icon('glasses') }}<span class="tip" role="tooltip"><strong>Mark as read</strong> Hides it from Headlines. Find it again under Recently Read.</span></span></button>
+            {% if can_analyze and not story.summary %}
+            <button type="button" class="hl-read hl-analyze" onclick="analyzeStory({{ story.id }}, {{ 'true' if story.articles|length >= 2 and not story.deep_report else 'false' }}, this)" aria-label="Generate analysis"><span class="hl-read-icon">{{ icon('scale') }}<span class="tip" role="tooltip"><strong>Generate analysis</strong> Writes The Big Picture{% if story.articles|length >= 2 and not story.deep_report %} and the multi-source analysis{% endif %}. Runs in the background.</span></span></button>
+            {% endif %}
+        </div>
         </div>
         {% endif %}
         {% endfor %}
@@ -188,6 +202,67 @@
     applyTheme(savedTheme);
 
     {% include 'sidebar_script.html' %}
+
+    {% if current_user.is_authenticated and can('scraper') %}
+    // The scales beside a card with no summary (Philip, 2026-10-25): starts
+    // the story summary (and the multi-source analysis when the story can
+    // have one), holds a skeleton where The Big Picture goes, then swaps in
+    // the card as the server now renders it.
+    const aiTaskStartUrl = "{{ url_for('admin.start_ai_task') }}";
+    const aiTaskStatusTemplate = "{{ url_for('admin.ai_task_status', task_type='TASK_TYPE', resource_id=999999) }}";
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+    async function startStoryTask(taskType, storyId) {
+        const response = await fetch(aiTaskStartUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ task_type: taskType, resource_id: storyId }),
+        });
+        // 409: already running; poll it like one we started.
+        return response.ok || response.status === 409;
+    }
+
+    async function waitForTask(taskType, storyId) {
+        const url = aiTaskStatusTemplate.replace('TASK_TYPE', taskType).replace('999999', String(storyId));
+        for (;;) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            const response = await fetch(url);
+            if (!response.ok) return false;
+            const status = await response.json();
+            if (status.status === 'success') return true;
+            if (status.status === 'error' || status.status === 'failed') return false;
+        }
+    }
+
+    async function analyzeStory(storyId, withAnalysis, button) {
+        const card = document.getElementById('story-' + storyId);
+        if (!card || button.disabled) return;
+        button.disabled = true;
+        button.classList.add('busy');
+        const skeleton = document.createElement('div');
+        skeleton.className = 'hl-skeleton';
+        skeleton.setAttribute('aria-label', 'Writing The Big Picture');
+        skeleton.innerHTML = '<span class="hl-skel-ico"></span><div><span class="hl-skel-line w30"></span><span class="hl-skel-line"></span><span class="hl-skel-line"></span><span class="hl-skel-line w60"></span></div>';
+        (card.querySelector('.bias-balance') || card.querySelector('.card-meta')).insertAdjacentElement('afterend', skeleton);
+
+        const fail = () => {
+            skeleton.remove();
+            button.disabled = false;
+            button.classList.remove('busy');
+        };
+        if (!await startStoryTask('story_summary', storyId)) return fail();
+        if (withAnalysis) startStoryTask('story_deep_report', storyId);
+        if (!await waitForTask('story_summary', storyId)) return fail();
+
+        // The card as the page renders now: The Big Picture, and the row's
+        // summary/analysis icons as they stand.
+        const html = await (await fetch(location.href)).text();
+        const fresh = new DOMParser().parseFromString(html, 'text/html').getElementById('story-' + storyId);
+        if (fresh) card.replaceWith(fresh);
+        else skeleton.remove();
+        button.remove();
+    }
+    {% endif %}
 
     {% if not is_past_edition %}
     // Breaking News bar (_breaking_bar.html): re-read every 2 minutes, every
