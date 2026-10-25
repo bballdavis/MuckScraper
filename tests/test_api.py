@@ -49,9 +49,8 @@ class HeadlineWhyTests(unittest.TestCase):
 
     def test_short_why(self):
         from aggregator.headline_views import short_why
-        self.assertEqual(short_why("trending", self._entry(recent=4)), "4 outlets in 6h")
-        self.assertEqual(short_why("trending", self._entry(recent=1)), "1 outlet in 6h")
-        self.assertIsNone(short_why("trending", self._entry()))
+        # Trending's outlet count gave way to the Breaking chip.
+        self.assertIsNone(short_why("trending", self._entry(recent=4)))
         self.assertIsNone(short_why("latest", self._entry(recent=4)))
         self.assertEqual(short_why("controversial", self._entry(gap=0.2, opeds=(2, True))), "High gap · 2 op-eds")
         self.assertEqual(short_why("controversial", self._entry(gap=0.1, opeds=(1, False))), "Moderate gap · 1 op-ed")
