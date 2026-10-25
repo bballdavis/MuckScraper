@@ -54,6 +54,20 @@ class ChipTests(unittest.TestCase):
             self.assertEqual(html.count('class="on"'), filled, level)
             self.assertIn("data-tip=", html)
 
+    def test_grade_and_lean_share_one_pill(self):
+        env = Environment(loader=FileSystemLoader(TEMPLATES))
+        env.globals.update(url_for=lambda *a, **k: "/", current_back=lambda: "", can=lambda r: False)
+        tpl = env.from_string(
+            "{% from 'story_card_macros.html' import grade_pill, bias_tag with context %}"
+            "{% call grade_pill(o) %}{{ bias_tag(3, unrated=false) }}{% endcall %}")
+        graded = next(k for k in rep.GRADES)
+        html = tpl.render(o=Outlet(name=graded))
+        self.assertTrue(html.startswith('<span class="grade-pill">'))
+        self.assertLess(html.index("reporting-tag"), html.index("bias-tag"))
+        plain = tpl.render(o=Outlet(name="Some Blog Nobody Graded"))
+        self.assertNotIn("grade-pill", plain)
+        self.assertIn("bias-tag bias-3", plain)
+
     def test_ungraded_outlet_shows_nothing(self):
         self.assertEqual(self._render(Outlet(name="Some Blog Nobody Graded")).strip(), "")
         self.assertEqual(self._render(None).strip(), "")
