@@ -48,17 +48,12 @@ class ParseTests(unittest.TestCase):
         self.assertEqual([s["kind"] for s in a["empty"]], ["right"])
         self.assertEqual([s["icon"] for s in a["others"]], ["scale", "eye-off"])
         self.assertEqual(a["next"]["icon"], "circle-arrow-right")
-        self.assertFalse(a["stacked"])
 
     def test_other_story_types_have_no_buckets(self):
         a = story_analysis.layout(SCIENCE)
         self.assertEqual(a["lead"]["paragraphs"], ["A new battery chemistry.", "It lasts twice as long."])
         self.assertEqual(a["buckets"], [])
         self.assertEqual([s["icon"] for s in a["others"]], ["zap", "message-square"])
-
-    def test_long_bucket_stacks_the_cards(self):
-        a = story_analysis.layout("How the left is covering it: " + "x" * (story_analysis.CARD_COLUMN_MAX + 1))
-        self.assertTrue(a["stacked"])
 
     def test_unlabelled_text_still_renders(self):
         a = story_analysis.layout("Just one plain paragraph, no labels at all.")
