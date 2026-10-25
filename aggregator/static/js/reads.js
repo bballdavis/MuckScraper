@@ -3,7 +3,7 @@
  *
  * - Headlines: the reading-glasses button beside each card (or in its action
  *   row on touch screens) marks the story read. The card slides out, the
- *   ones below slide up, and a toast offers Undo for five seconds.
+ *   ones below slide up, and a toast offers Undo for twelve seconds.
  * - Recently Read: the Mark unread button takes a row off the list the same
  *   way, with the same Undo.
  * - Story and article pages: .read-toggle flips the read state in place.
@@ -14,7 +14,7 @@
  * Load with data-read-url (see urlTemplate). Needs <meta name="csrf-token">. Styles: static/css/reads.css.
  */
 (function () {
-    const UNDO_MS = 5000;
+    const UNDO_MS = 12000;   // keep in step with .read-toast-bar in reads.css
     // url_for('reading.toggle_read', kind='KIND', item_id=0), from the script tag.
     const script = document.currentScript;
     const urlTemplate = (script && script.dataset.readUrl) || '/read/KIND/0';
@@ -66,7 +66,7 @@
     let toast = null;
     let toastTimer = null;
     let pending = null;   // { el, onExpire } for the change the toast can undo; el is the row it brings back, if any
-    const UNDO_ICON = '<svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    const UNDO_ICON = '<svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
         'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
         '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>';
 
