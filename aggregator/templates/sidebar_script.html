@@ -5,19 +5,34 @@
     const sidebarPhoneQuery = window.matchMedia('(max-width: 768px), (max-height: 500px)');
     let sidebarIsPhone = sidebarPhoneQuery.matches;
 
+    function syncSidebarAccess() {
+        const sidebar = document.getElementById('sidebar');
+        const button = document.getElementById('sidebar-toggle');
+        const open = sidebarIsPhone ? sidebar.classList.contains('mobile-open') : !sidebar.classList.contains('collapsed');
+        button.setAttribute('aria-expanded', String(open));
+        button.title = open ? 'Hide navigation' : 'Show navigation';
+        button.setAttribute('aria-label', open ? 'Hide navigation' : 'Show navigation');
+        sidebar.inert = !open;
+        document.querySelector('.sidebar-backdrop').hidden = !(sidebarIsPhone && open);
+        document.body.classList.toggle('sidebar-open', sidebarIsPhone && open);
+    }
+
     function toggleSidebar() {
         const sidebar = document.getElementById('sidebar');
         const btn = document.getElementById('sidebar-toggle');
         if (sidebarIsPhone) {
             const open = sidebar.classList.toggle('mobile-open');
-            btn.textContent = open ? '«' : '»';
+            syncSidebarAccess();
+            if (open) sidebar.querySelector('.sidebar-close').focus();
+            else btn.focus();
             return;
         }
         sidebar.classList.toggle('collapsed');
 
         const isCollapsed = sidebar.classList.contains('collapsed');
-        try { localStorage.setItem('muckscraper-sidebar', isCollapsed ? 'collapsed' : 'expanded'); } catch (e) {}
-        btn.textContent = isCollapsed ? '»' : '«';
+        savedSidebar = isCollapsed ? 'collapsed' : 'expanded';
+        try { localStorage.setItem('muckscraper-sidebar', savedSidebar); } catch (e) {}
+        syncSidebarAccess();
     }
 
     let savedSidebar = null;
@@ -28,34 +43,32 @@
         sidebar.classList.remove('mobile-open');
         if (sidebarIsPhone) {
             sidebar.classList.remove('collapsed');
-            btn.textContent = '»';
         } else {
             const collapsed = savedSidebar === 'collapsed';
             sidebar.classList.toggle('collapsed', collapsed);
-            btn.textContent = collapsed ? '»' : '«';
         }
+        syncSidebarAccess();
     }
-    // On phones the button sits just below the page's top bar instead of on
-    // top of it (it hid the "M" of MuckScraper). The bars differ in height
-    // per page and wrap on narrow screens, so measure rather than hard-code.
+    // Every header gets the same normal-flow slot, on desktop and mobile.
     function placeSidebarToggle() {
-        const btn = document.getElementById('sidebar-toggle');
-        if (!sidebarIsPhone) { btn.style.top = ''; return; }
+        const button = document.getElementById('sidebar-toggle');
         const bar = document.querySelector('.topbar') || document.querySelector('.main-header');
-        // Bottom edge, not height: on All/Grouped/Search the bar starts a little
-        // below the top until it sticks, so follow it while scrolling.
-        const bottom = bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
-        btn.style.top = (bottom + 8) + 'px';
+        if (bar && button.parentNode !== bar) bar.prepend(button);
     }
 
     applySidebarMode();
     placeSidebarToggle();
+    document.addEventListener('keydown', event => {
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebarIsPhone || !sidebar.classList.contains('mobile-open')) return;
+        if (event.key === 'Escape') { event.preventDefault(); toggleSidebar(); return; }
+        if (event.key !== 'Tab') return;
+        const items = [...sidebar.querySelectorAll('a[href], button')].filter(item => item.getClientRects().length);
+        const first = items[0], last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    });
     window.addEventListener('resize', placeSidebarToggle);
-    let sidebarToggleFrame = 0;
-    window.addEventListener('scroll', () => {
-        if (!sidebarIsPhone || sidebarToggleFrame) return;
-        sidebarToggleFrame = requestAnimationFrame(() => { sidebarToggleFrame = 0; placeSidebarToggle(); });
-    }, { passive: true });
     // Rotating a phone can cross the query (portrait 390x844 is a phone by
     // width, landscape 844x390 by height), so re-apply when it changes.
     sidebarPhoneQuery.addEventListener('change', (e) => {

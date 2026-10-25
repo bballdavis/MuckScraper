@@ -1,8 +1,9 @@
 {#- Signed-out visitors (PUBLIC_READ_ACCESS) get Headlines, the two story
     lists, Op/Ed and the topic filters; Search needs an account and Fetch Articles
     the Scraper role. -#}
-    <div class="sidebar" id="sidebar">
+    <nav class="sidebar" id="sidebar" aria-label="Main navigation">
         <div class="sidebar-inner">
+            <button type="button" class="sidebar-close" onclick="toggleSidebar()" aria-label="Close navigation">×</button>
             <div class="sidebar-content">
                 <div class="topic-block {% if active_nav == 'headlines' %}active{% endif %}">
                     <a href="{{ url_for('public.headlines_feed') }}">
@@ -74,5 +75,8 @@
             </div>
             {% endif %}
         </div>
-    </div>
-    <button class="sidebar-toggle-btn" id="sidebar-toggle" onclick="toggleSidebar()">«</button>
+    </nav>
+    <button type="button" class="sidebar-toggle-btn" id="sidebar-toggle" onclick="toggleSidebar()" aria-controls="sidebar" aria-expanded="true" aria-label="Hide navigation">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <button type="button" class="sidebar-backdrop" hidden onclick="toggleSidebar()" tabindex="-1" aria-label="Close navigation"></button>
