@@ -176,3 +176,12 @@ class HeadlineViewTests(unittest.TestCase):
         page = self._client("scraper").get("/headlines").get_data(as_text=True)
         self.assertIn("analyzeStory(%d, true, this)" % self.ids["broad"], page)
         self.assertNotIn("hl-analyze", self._card(page, self.ids["small"]))
+
+    def test_bias_balance_shows_shares_as_percentages(self):
+        page = self._client().get("/headlines").get_data(as_text=True)
+        card = self._card(page, self.ids["broad"])
+        # npr (2) is Left and ap (3) Center; the fractional scores aren't counted.
+        self.assertIn('aria-label="Left 50%, center 50%, right 0% of 2 rated articles"', card)
+        self.assertIn('class="bias-seg left"', card)
+        self.assertNotIn('class="bias-seg right"', card)
+        self.assertNotIn("bias-col-count", page)
