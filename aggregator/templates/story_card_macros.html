@@ -183,6 +183,21 @@
    rest through `{% call story_card(story) %} ... {% endcall %}`.
    compact=true (All / Grouped Stories): see the comment in that branch;
    there the call block holds the ⋯ menu's actions (.card-menu-item). #}
+{# The card's headline. An AI-written one ends in a grey sparkles icon with
+   a rich tooltip, in place of the "AI headline" chip in the meta row
+   (Philip, 2026-10-25). The icon is glued to the last word so it never
+   wraps onto a line of its own. Styles: story_card.css .ai-mark. #}
+{% macro headline_text(story) -%}
+{%- set text = story.display_headline or '' -%}
+{%- if story.has_ai_headline and text -%}
+{%- set parts = text.rsplit(' ', 1) -%}
+{%- if parts|length == 2 %}{{ parts[0] }} {% endif -%}
+<span class="ai-glue">{{ parts[-1] }}<span class="ai-mark" tabindex="0" aria-label="AI-written headline">{{ icon('sparkles') }}<span class="tip" role="tooltip"><strong>AI headline</strong> MuckScraper's AI wrote this from the {{ story.articles|length }} articles in the story, so it gets one plain title instead of a single outlet's. Open the story to see each outlet's own headline.</span></span></span>
+{%- else -%}
+{{ text }}
+{%- endif -%}
+{%- endmacro %}
+
 {% macro story_card(story, compact=false, why=none, why_hot=false) -%}
 {%- if compact %}
 {#- Compact (All / Grouped Stories): the image, the headline, one meta row
@@ -200,12 +215,11 @@
     <div class="story-layout">
         {{ card_image(story) }}
         <div class="story-content">
-            <h2><a class="story-link" href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ story.display_headline }}</a></h2>
+            <h2><a class="story-link" href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ headline_text(story) }}</a></h2>
             <div class="card-meta">
                 {% if single and single.outlet %}<span class="meta-item">{{ single.outlet.name }}{{ outlet_flag(single.outlet) }}</span>{% endif %}
                 {% if story.last_updated %}<span class="meta-item meta-date">{{ story.last_updated|short_datetime }}</span>{% endif %}
                 {% if not single %}<span class="meta-item">{{ article_count }} article{{ 's' if article_count != 1 else '' }}{% if story.source_count is defined %} · {{ story.source_count }} outlet{{ 's' if story.source_count != 1 else '' }}{% endif %}</span>{% endif %}
-                {% if story.has_ai_headline %}<span class="meta-item">AI headline</span>{% endif %}
                 {% if story.edition_has_updates %}<span class="chip chip-new">New updates</span>{% endif %}
             </div>
             <div class="card-bottom">
@@ -255,7 +269,7 @@
         {{ card_image(story) }}
 
         <div class="story-content">
-            <h2><a href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ story.display_headline }}</a></h2>
+            <h2><a href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ headline_text(story) }}</a></h2>
 
             {% set article_count = story.articles|length %}
             <div class="card-meta">
@@ -266,7 +280,6 @@
                 {#- Headlines: why the card is in the view, on the count's
                     right rather than a row of its own (Philip, 2026-10-25). -#}
                 {% if why %}<span class="why{{ ' why-hot' if why_hot else '' }}">{{ why }}</span>{% endif %}
-                {% if story.has_ai_headline %}<span class="meta-item">AI headline</span>{% endif %}
                 {% if story.edition_has_updates %}<span class="card-flag flag-new">New updates</span>{% endif %}
             </div>
 

@@ -77,6 +77,22 @@
 .story h2 { font-size: var(--fs-card-title); font-weight: 800; color: var(--text); line-height: 1.3; letter-spacing: -0.3px; margin-bottom: 8px; }
 .story h2 a { color: inherit; text-decoration: none; }
 .story h2 a:hover { color: var(--accent-text); text-decoration: underline; }
+/* AI-written headline: a grey sparkles icon after the last word, glued to
+   it (headline_text in story_card_macros.html), the meaning in a tip
+   below. It sits above the compact card's stretched link. */
+.ai-glue { white-space: nowrap; }
+.ai-mark {
+    position: relative; z-index: 2; display: inline-flex; vertical-align: -0.08em;
+    margin-left: 0.3em; color: var(--text-faint); cursor: help; outline: none;
+}
+.ai-mark .icon { width: 0.8em; height: 0.8em; }
+.ai-mark:hover, .ai-mark:focus-visible { color: var(--accent-text); }
+.ai-mark .tip {
+    left: 50%; right: auto; top: calc(100% + 8px); transform: translateX(-50%);
+    width: max-content; max-width: 260px; white-space: normal;
+    font-size: 12px; font-weight: 500; letter-spacing: normal; line-height: 1.45; text-align: left;
+}
+.ai-mark:hover > .tip, .ai-mark:focus-visible > .tip { opacity: 1; visibility: visible; }
 
 /* One muted row: "Updated 3 hours ago · 7 articles · AI headline", plus flags. */
 .card-meta {
