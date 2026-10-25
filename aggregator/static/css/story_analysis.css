@@ -40,6 +40,8 @@
 }
 .sa-cards .sa-lead .sa-ico { color: var(--accent-text); font-size: 20px; margin-top: 1px; }
 .sa-cards .sa-lead p { font-size: 16px; line-height: 1.65; }
+/* The executive summary (story.html) uses the same card as The story. */
+.sa-summary { margin: 0; }
 
 .sa-spec-head { display: flex; align-items: center; gap: 12px; margin: 24px 0 10px; }
 .sa-spec-head h3 { color: var(--text-muted); margin: 0; white-space: nowrap; }
@@ -48,22 +50,19 @@
 .sa-bar .seg-c { background: #8c8c8c; }
 .sa-bar .seg-r { background: var(--bias-5-bg); }
 
-/* Three columns while every bucket is short enough; .is-stacked (set by
-   story_analysis.layout() when one runs long) puts them full width. */
+/* Always side by side on desktop, however long the text (Philip,
+   2026-10-25); they stack only on narrow screens. */
 .sa-buckets { display: grid; grid-template-columns: repeat(var(--sa-cols, 3), minmax(0, 1fr)); gap: 12px; }
-.sa-buckets.is-stacked { grid-template-columns: minmax(0, 1fr); }
 .sa-bucket {
     padding: 14px 16px; border: 1px solid var(--border); border-top: 4px solid var(--sa-side);
     border-radius: 12px; background: var(--sa-tint);
 }
-.sa-buckets.is-stacked .sa-bucket { border-top-width: 1px; border-left: 4px solid var(--sa-side); }
 .sa-bucket-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .sa-bucket-head h4 {
     font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
     color: var(--sa-side-text); margin: 0;
 }
 .sa-bucket p { font-size: 14px; }
-.sa-buckets.is-stacked .sa-bucket p { font-size: 15px; }
 .sa-empty {
     display: flex; align-items: center; gap: 8px; margin: 8px 0 0 !important;
     font-size: 13px; color: var(--text-faint);
@@ -71,7 +70,6 @@
 .sa-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sa-side); flex: 0 0 auto; opacity: 0.7; }
 
 .sa-callouts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
-.sa-callouts.is-stacked { grid-template-columns: minmax(0, 1fr); }
 .sa-callout.is-wide { grid-column: 1 / -1; }
 .sa-callout { display: flex; gap: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; }
 .sa-callout .sa-ico { font-size: 18px; margin-top: 1px; color: var(--accent-text); }
@@ -111,7 +109,7 @@
 .sa-group .is-empty .sa-body { color: var(--text-faint); font-size: 14px; border-left-style: dashed; }
 
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
     .sa-buckets, .sa-callouts { grid-template-columns: minmax(0, 1fr); }
     .sa-buckets .sa-bucket { border-top-width: 1px; border-left: 4px solid var(--sa-side); }
     .sa-cards .sa-next { flex-wrap: wrap; }

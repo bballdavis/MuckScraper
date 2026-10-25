@@ -45,9 +45,10 @@
 {%- endmacro %}
 
 {# The outlet's reporting grade from aggregator/outlet_reporting.py, beside
-   its lean: "Reporting", five dots filled up to the grade and coloured by
-   it, and the word, with what it means on hover (Philip, 2026-10-23). Nothing for an
-   outlet with no grade. Styles: theme.css .reporting-tag. #}
+   its lean: the word, then five dots filled up to the grade and coloured by
+   it. "Reporting" and what the grade means are in the tooltip (Philip,
+   2026-10-25). Nothing for an outlet with no grade. Styles: theme.css
+   .reporting-tag. #}
 {% set reporting_grades = {
     'very_high': (5, 'Very high', 'Consistently factual, well sourced, corrects quickly'),
     'high': (4, 'High', 'Factual and sourced, with rare failed fact checks'),
@@ -58,8 +59,8 @@
 {%- set grade = outlet.reporting if outlet else none -%}
 {%- if grade in reporting_grades -%}
 {%- set n, label, tip = reporting_grades[grade] -%}
-<span class="reporting-tag reporting-{{ grade|replace('_', '-') }}" tabindex="0" aria-label="Reporting: {{ label }}" data-tip="{{ tip }}. Our grade, from Media Bias/Fact Check and Ad Fontes Media.">
-    <span class="reporting-label" aria-hidden="true">Reporting</span><span class="reporting-dots" aria-hidden="true">{% for i in range(5) %}<i{% if i < n %} class="on"{% endif %}></i>{% endfor %}</span><span class="reporting-word">{{ label }}</span></span>
+<span class="reporting-tag reporting-{{ grade|replace('_', '-') }}" tabindex="0" aria-label="Reporting: {{ label }}" data-tip="Reporting: {{ label }} ({{ n }} of 5). {{ tip }}. Our grade, from Media Bias/Fact Check and Ad Fontes Media.">
+    <span class="reporting-word" aria-hidden="true">{{ label }}</span><span class="reporting-dots" aria-hidden="true">{% for i in range(5) %}<i{% if i < n %} class="on"{% endif %}></i>{% endfor %}</span></span>
 {%- endif -%}
 {%- endmacro %}
 
