@@ -57,14 +57,27 @@ SCHEMAS = {
                               "separate from its lean; null when not graded."}),
     "StorySummary": _obj(
         ["id", "section", "headline", "dek", "image_url", "logo_url", "coverage", "source_count", "updated_at",
-         "is_summarized", "has_analysis", "has_ai_headline", "has_updates"],
+         "is_summarized", "has_analysis", "has_ai_headline", "has_updates", "breaking"],
         id=_I, section=_S, headline=_S, dek=_NS, image_url=_URL, logo_url=_LOGO, coverage=_ref("Coverage"),
         source_count=_I, updated_at=_DT, is_summarized=_B, has_analysis=_B, has_ai_headline=_B, has_updates=_B,
+        breaking={"oneOf": [_ref("BreakingChip"), {"type": "null"}],
+                  "description": "Set while the story is breaking: show the Breaking chip, with these details "
+                  "in its tooltip"},
         is_read={"type": "boolean", "description": "Marked read by this user (editions, /stories, /stories/{id})"}),
+    "BreakingChip": _obj(
+        ["first_outlet", "first_at", "outlets", "flagged_by_feed", "sources", "lean"],
+        first_outlet={"type": "string", "description": "The outlet that reported it first"},
+        first_at=_DT,
+        outlets={"type": "integer", "description": "Outlets that carried it in its first 90 minutes"},
+        flagged_by_feed={"type": "boolean", "description": "Too few outlets yet; a feed marked it BREAKING or LIVE"},
+        sources={"type": "array", "items": _obj(["name", "leaning"], name=_S, leaning=_LEANING),
+                 "description": "Those outlets, first reporter first (at most 8)"},
+        lean=_obj(["left", "center", "right", "unrated"], left=_I, center=_I, right=_I, unrated=_I)),
     "HeadlineCard": {"allOf": [_ref("StorySummary"), _obj(
         ["why", "newest_at", "group", "framing_gap", "opeds"],
         why={"type": ["string", "null"], "description": "Short reason the story is in the view, for beside the "
-             "L/C/R pill: \"4 outlets in 6h\" (Trending), \"High gap · 2 op-eds\" (Controversial); null on Latest"},
+             "L/C/R pill: \"High gap · 2 op-eds\" (Controversial); null on Trending and Latest, where the "
+             "Breaking chip says what's new"},
         newest_at=_NDT,
         group={"type": ["string", "null"], "enum": ["Last hour", "Last 6 hours", "Earlier", None],
                "description": "Latest only: the section header the story falls under"},

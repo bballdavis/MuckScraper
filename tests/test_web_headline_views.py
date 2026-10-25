@@ -126,6 +126,7 @@ class HeadlineViewTests(unittest.TestCase):
         # Requests share setUp's app context, so Flask-Login's cached user
         # would carry over from one client to the next.
         g.pop("_login_user", None)
+        g.pop("breaking_story_flags", None)
         client = self.app.test_client()
         with client.session_transaction() as session:
             session["_user_id"] = str(self.ids[user])
@@ -165,10 +166,54 @@ class HeadlineViewTests(unittest.TestCase):
         card = self._card(page, self.ids["broad"])
         meta = card[card.index('class="card-meta"'):card.index("bias-balance")]
         self.assertIn("5 articles", meta)
-        self.assertIn("reporting in the last 6h", meta)
+        self.assertNotIn("reporting in the last 6h", meta)
         small = self._card(page, self.ids["small"])
         self.assertIn("The Big Picture", small)
         self.assertIn("Crews are evacuating three towns.", small)
+
+    def test_breaking_chip_on_a_story_from_a_breaking_event(self):
+        from aggregator import db
+        from aggregator.models import Article, FeedEntry
+        now = datetime.utcnow()
+        article = Article.query.filter_by(story_id=self.ids["small"]).order_by(Article.id).first()
+        head = FeedEntry(url="https://ap.example/fire", link="https://ap.example/fire", title="Wildfire forces evacuations",
+                         source_name="ap", published_at=now - timedelta(minutes=42), first_seen_at=now,
+                         is_breaking=True, outlet_count=3, article_id=article.id)
+        db.session.add(head)
+        db.session.flush()
+        others = [FeedEntry(url=f"https://{name}.example/fire", link=f"https://{name}.example/fire",
+                            title="Wildfire forces evacuations", source_name=name, first_seen_at=now,
+                            published_at=now - timedelta(minutes=30), cluster_id=head.id, outlet_count=3)
+                  for name in ("latimes", "reuters")]
+        head.cluster_id = head.id
+        db.session.add_all(others)
+        db.session.commit()
+        try:
+            page = self._client().get("/headlines").get_data(as_text=True)
+            card = self._card(page, self.ids["small"])
+            self.assertIn('class="breaking-chip"', card)
+            self.assertIn("First reported by <b>ap</b> 42 min ago. <b>3&nbsp;outlets</b> carried it", card)
+            self.assertIn("ap, latimes, reuters", card)
+            # The tag sits on the image corner, not in the meta row; the lean
+            # is the card's own bar, not the tag's tip.
+            meta = card[card.index('class="card-meta"'):card.index("bias-balance")]
+            self.assertNotIn("breaking-chip", meta)
+            tag = card[card.index('class="breaking-chip"'):card.index('class="story-content"')]
+            self.assertNotIn("bk-tip-lean", tag)
+            self.assertNotIn("breaking-chip", self._card(page, self.ids["broad"]))
+        finally:
+            FeedEntry.query.delete()
+            db.session.commit()
+
+    def test_bias_legend_shows_counts_and_each_side_has_a_tip(self):
+        page = self._client().get("/headlines").get_data(as_text=True)
+        card = self._card(page, self.ids["broad"])
+        legend = card[card.index('class="bias-legend"'):]
+        # ap 3, npr 2, fox 4.5, wsj 3.7, nyt 1.8: bias_balance counts whole
+        # ratings only, so npr is Left, ap Center.
+        self.assertIn('Left <b>1</b><span class="bias-pct">50%</span>', legend)
+        self.assertIn("<strong>Left: 1 article · 50%</strong>npr", card)
+        self.assertIn("<strong>Center: 1 article · 50%</strong>ap", card)
 
     def test_scales_beside_unsummarized_cards_for_scrapers_only(self):
         reader = self._client().get("/headlines").get_data(as_text=True)
@@ -186,8 +231,8 @@ class HeadlineViewTests(unittest.TestCase):
         self.assertIn('class="left"', bar)
         self.assertNotIn('class="right"', bar)
         self.assertIn('bias-key right is-zero', card)
-        self.assertIn("Left <b>1</b><small>50%</small>", card)
-        self.assertIn("Right <b>0</b><small>0%</small>", card)
+        self.assertIn('Left <b>1</b><span class="bias-pct">50%</span>', card)
+        self.assertIn('Right <b>0</b><span class="bias-pct">0%</span>', card)
 
     def test_ai_headline_is_an_icon_glued_to_the_last_word(self):
         page = self._client().get("/headlines").get_data(as_text=True)

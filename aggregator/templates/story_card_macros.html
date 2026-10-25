@@ -77,24 +77,33 @@
 {%- endif -%}
 {%- endmacro %}
 
+{# One side's tip on the Headlines L/C/R bar: count, share, outlets. #}
+{% macro bias_tip(label, n, pct, names) -%}
+<span class="tip" role="tooltip"><strong>{{ label }}: {{ n }} article{{ 's' if n != 1 else '' }} · {{ pct }}%</strong>{{ names|join(', ') }}</span>
+{%- endmacro %}
+
 {# Left / Center / Right counts from each article's outlet rating
    (1-2 Left, 3 Center, 4-5 Right). #}
 {% macro bias_balance(story) -%}
 {%- set counts = namespace(left=0, center=0, right=0) -%}
+{%- set outlets = {'left': [], 'center': [], 'right': []} -%}
 {%- for art in story.articles -%}
     {%- set s = art.outlet.bias_score if art.outlet else none -%}
-    {%- if s in [1, 2] %}{% set counts.left = counts.left + 1 %}
-    {%- elif s == 3 %}{% set counts.center = counts.center + 1 %}
-    {%- elif s in [4, 5] %}{% set counts.right = counts.right + 1 %}
+    {%- set side = 'left' if s in [1, 2] else 'center' if s == 3 else 'right' if s in [4, 5] else none -%}
+    {%- if side == 'left' %}{% set counts.left = counts.left + 1 %}
+    {%- elif side == 'center' %}{% set counts.center = counts.center + 1 %}
+    {%- elif side == 'right' %}{% set counts.right = counts.right + 1 %}
     {%- endif -%}
+    {%- if side and art.outlet.name not in outlets[side] %}{% set _ = outlets[side].append(art.outlet.name) %}{% endif -%}
 {%- endfor -%}
-{#- A thin bar split by share, with "● Left 12 76%" for each side under it
-    (the article count first, the share after it, Philip 2026-10-25),
+{#- A thin bar split by share, with "● Left 3 · 76%" for each side under it,
     so no text sits inside the bar where a narrow side would clip it
     (Philip, 2026-10-25: option C, after the solid bar of #63 read as too
     much). A side with no coverage is left out of the bar and dimmed in the
     legend. The rounding goes to the biggest side so the three add up to
-    100. Styles: story_card.css .bias-balance. -#}
+    100. Hovering a segment or its legend key shows that side's count,
+    share and outlets (Philip, 2026-10-25). Styles: story_card.css
+    .bias-balance. -#}
 {%- set total = counts.left + counts.center + counts.right -%}
 {%- if total -%}
 {%- set pl = (100 * counts.left / total)|round|int -%}
@@ -106,11 +115,11 @@
 {%- set sides = [(counts.left, pl, 'left', 'Left'), (counts.center, pc, 'center', 'Center'), (counts.right, pr, 'right', 'Right')] -%}
 <div class="bias-balance" role="img" aria-label="Left {{ pl }}%, center {{ pc }}%, right {{ pr }}% of {{ total }} rated article{{ 's' if total != 1 else '' }}">
     <div class="bias-bar">
-        {%- for n, pct, side, label in sides if n %}<span class="{{ side }}" style="flex-grow: {{ n }}"></span>{% endfor -%}
+        {%- for n, pct, side, label in sides if n %}<span class="{{ side }}" style="flex-grow: {{ n }}">{{ bias_tip(label, n, pct, outlets[side]) }}</span>{% endfor -%}
     </div>
     <div class="bias-legend">
         {%- for n, pct, side, label in sides %}
-        <span class="bias-key {{ side }}{{ ' is-zero' if not n else '' }}"><i class="bias-dot"></i>{{ label }} <b>{{ n }}</b><small>{{ pct }}%</small></span>
+        <span class="bias-key {{ side }}{{ ' is-zero' if not n else '' }}"{% if n %} tabindex="0"{% endif %}><i class="bias-dot"></i>{{ label }} <b>{{ n }}</b><span class="bias-pct">{{ pct }}%</span>{% if n %}{{ bias_tip(label, n, pct, outlets[side]) }}{% endif %}</span>
         {%- endfor %}
     </div>
 </div>
@@ -199,6 +208,24 @@
 {%- endif -%}
 {%- endmacro %}
 
+{# The Breaking tag: a story that grew out of an event the Breaking poller
+   flagged (aggregator/breaking.py story_flags), on the image's top-left
+   corner, in place of Trending's "N reporting in the last 6h" (Philip,
+   2026-10-25: mock C). The tip says who had it first, how many outlets
+   carried it and which; the card's own L/C/R bar has the lean.
+   Styles: story_card.css .breaking-chip. #}
+{% macro breaking_chip(story) -%}
+{%- set b = breaking_details(story) -%}
+{%- if b -%}
+<span class="breaking-chip" tabindex="0" aria-label="Breaking: first reported by {{ b.first_outlet }} {{ b.ago }}">{{ icon('zap') }}Breaking<span class="tip" role="tooltip"><strong>Breaking</strong><span class="bk-tip-line">
+{%- if b.flagged_by_feed -%}<b>{{ b.first_outlet }}</b> flagged it as breaking {{ b.ago }}.
+{%- else -%}First reported by <b>{{ b.first_outlet }}</b> {{ b.ago }}. <b>{{ b.outlets }}&nbsp;outlets</b> carried it within 90 minutes.{%- endif -%}
+</span>
+{%- if b.sources %}<span class="bk-tip-outlets">{{ b.sources|map(attribute='name')|join(', ') }}</span>{% endif -%}
+</span></span>
+{%- endif -%}
+{%- endmacro %}
+
 {% macro story_card(story, compact=false, why=none, why_hot=false) -%}
 {%- if compact %}
 {#- Compact (All / Grouped Stories): the image, the headline, one meta row
@@ -215,6 +242,7 @@
 <div class="story compact" id="story-{{ story.id }}">
     <div class="story-layout">
         {{ card_image(story) }}
+        {{ breaking_chip(story) }}
         <div class="story-content">
             <h2><a class="story-link" href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ headline_text(story) }}</a></h2>
             <div class="card-meta">
@@ -268,6 +296,7 @@
 <div class="story" id="story-{{ story.id }}">
     <div class="story-layout">
         {{ card_image(story) }}
+        {{ breaking_chip(story) }}
 
         <div class="story-content">
             <h2><a href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ headline_text(story) }}</a></h2>
