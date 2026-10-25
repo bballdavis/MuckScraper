@@ -250,6 +250,33 @@ def detect_analysis_type(obj):
     return 'default'
 
 
+def _has_rated_source(story):
+    for article in story.articles:
+        score = article.bias_score
+        if score is None and article.outlet:
+            score = article.outlet.bias_score
+        if score is not None:
+            return True
+    return False
+
+
+def deep_report_type(story):
+    """Which deep_report prompt a story's multi-source analysis uses.
+
+    detect_analysis_type(), except that a general story ('default') with at
+    least one bias-rated source gets the politics prompt's left / center /
+    right breakdown too (Philip, 2026-10-25: a West Bank story came out as
+    Why it matters / Key details / Different perspectives instead of the
+    L/C/R the story page is built around). Science, sports and business keep
+    their own formats; a story with no rated sources keeps the general one,
+    since all three buckets would be empty.
+    """
+    analysis_type = detect_analysis_type(story)
+    if analysis_type == 'default' and _has_rated_source(story):
+        return 'politics'
+    return analysis_type
+
+
 def get_persona(analysis_type):
     """Return the specialized journalist persona for a given analysis type."""
     mapping = {
@@ -432,7 +459,7 @@ def generate_deep_report(story):
         )
         return None
 
-    analysis_type = detect_analysis_type(story)
+    analysis_type = deep_report_type(story)
 
     # Group articles by bias category
     left_articles = []
