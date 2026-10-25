@@ -147,7 +147,7 @@
    rest through `{% call story_card(story) %} ... {% endcall %}`.
    compact=true (All / Grouped Stories): see the comment in that branch;
    there the call block holds the ⋯ menu's actions (.card-menu-item). #}
-{% macro story_card(story, compact=false) -%}
+{% macro story_card(story, compact=false, why=none, why_hot=false) -%}
 {%- if compact %}
 {#- Compact (All / Grouped Stories): the image, the headline, one meta row
     (date, counts, flags), then the bottom row: the Left/Center/Right bar for
@@ -227,6 +227,9 @@
                     <span class="meta-item">Updated <span class="local-date" data-utc="{{ story.last_updated.isoformat() }}Z">{{ story.last_updated.strftime('%Y-%m-%d %H:%M') }} UTC</span></span>
                 {% endif %}
                 <span class="meta-item">{{ article_count }} article{{ 's' if article_count != 1 else '' }}</span>
+                {#- Headlines: why the card is in the view, on the count's
+                    right rather than a row of its own (Philip, 2026-10-25). -#}
+                {% if why %}<span class="why{{ ' why-hot' if why_hot else '' }}">{{ why }}</span>{% endif %}
                 {% if story.has_ai_headline %}<span class="meta-item">AI headline</span>{% endif %}
                 {% if story.edition_has_updates %}<span class="card-flag flag-new">New updates</span>{% endif %}
             </div>
