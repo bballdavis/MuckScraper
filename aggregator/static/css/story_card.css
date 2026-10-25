@@ -94,43 +94,29 @@
 }
 .ai-mark:hover > .tip, .ai-mark:focus-visible > .tip { opacity: 1; visibility: visible; }
 
-/* Breaking chip (story_card_macros.html breaking_chip): a solid accent pill
-   in the meta row, its details in a tip below. Above the compact card's
-   stretched link, like .ai-mark. */
+/* Breaking tag (story_card_macros.html breaking_chip): a solid accent tag
+   on the image's top-left corner, its details in a tip below. Placed on
+   .story-layout so the image's overflow doesn't clip the tip; above the
+   compact card's stretched link. */
+.story-layout { position: relative; }
 .breaking-chip {
-    position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 4px;
-    margin: 0 10px; padding: 2px 9px 2px 7px; border-radius: 99px;
-    background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+    position: absolute; z-index: 3; left: 12px; top: 12px;
+    display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px 4px 7px; border-radius: 6px;
+    background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+    font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
     cursor: help; outline: none;
 }
-.breaking-chip .icon { width: 12px; height: 12px; fill: currentColor; stroke: none; }
+.breaking-chip .icon { width: 11px; height: 11px; fill: currentColor; stroke: none; }
 .breaking-chip:focus-visible { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent-light); }
 [data-theme="dark"] .breaking-chip { background: var(--accent-light); }
 .breaking-chip .tip {
     left: 0; right: auto; top: calc(100% + 8px); transform: none;
-    width: 280px; max-width: 280px; font-size: 12.5px; font-weight: 400; letter-spacing: normal;
+    width: 260px; max-width: 260px; font-size: 12.5px; font-weight: 400; letter-spacing: normal; text-transform: none;
 }
 .breaking-chip .tip > span { display: block; margin-top: 7px; }
 .breaking-chip .tip b { color: #fff; }
-.bk-tip-bar { display: flex !important; gap: 2px; height: 6px; border-radius: 99px; overflow: hidden; }
-.bk-tip-lean { display: flex !important; gap: 12px; font-weight: 700; }
 .bk-tip-outlets { color: #b8bccc; font-size: 12px; }
-/* Phones: the chip can sit near the right edge, so the tip spans the meta
-   row instead of hanging off the chip. */
-@media (max-width: 600px) {
-    .card-meta { position: relative; }
-    .card-meta:has(.breaking-chip) { z-index: 2; }
-    .breaking-chip { position: static; }
-    .breaking-chip .tip { left: 0; right: 0; width: auto; max-width: none; }
-}
-.bk-tip-bar .bk-left { background: #5b9be0; }
-.bk-tip-bar .bk-center { background: #a0aec0; }
-.bk-tip-bar .bk-right { background: #ef6b6b; }
-.bk-tip-bar .bk-unrated { background: #64748b; }
-.bk-tip-lean .bk-left { color: #8fbcf0; }
-.bk-tip-lean .bk-center { color: #c8d0dc; }
-.bk-tip-lean .bk-right { color: #f39a9a; }
-.bk-tip-lean .bk-unrated { color: #a6adc8; }
+.story.compact .breaking-chip { left: 8px; top: 8px; padding: 3px 7px 3px 5px; font-size: 10px; }
 
 /* One muted row: "Updated 3 hours ago · 7 articles · AI headline", plus flags. */
 .card-meta {
@@ -151,13 +137,29 @@
    legend under it, the label the size of its percentage (Philip,
    2026-10-25). */
 .bias-balance { margin-bottom: 16px; }
-.bias-bar { display: flex; gap: 2px; height: 8px; border-radius: 99px; overflow: hidden; background: var(--border); }
+.bias-bar { display: flex; gap: 2px; height: 8px; border-radius: 99px; background: var(--border); }
+/* No overflow clip, so each segment's tip can open: the ends round instead. */
+.bias-bar > span { position: relative; cursor: help; }
+.bias-bar > span:first-child { border-radius: 99px 0 0 99px; }
+.bias-bar > span:last-child { border-radius: 0 99px 99px 0; }
+.bias-bar > span:only-child { border-radius: 99px; }
+/* A taller hover target than the 8px bar. */
+.bias-bar > span::before { content: ""; position: absolute; inset: -8px 0; }
+.bias-bar .tip, .bias-key .tip {
+    left: 50%; right: auto; top: auto; bottom: calc(100% + 10px); transform: translateX(-50%);
+    width: max-content; max-width: 240px; font-size: 12.5px; font-weight: 400; color: #b8bccc;
+}
+.bias-bar .tip strong, .bias-key .tip strong { margin-bottom: 4px; }
+.bias-bar > span:first-child .tip, .bias-key.left .tip { left: 0; transform: none; }
+.bias-bar > span:last-child .tip, .bias-key.right .tip { left: auto; right: 0; transform: none; }
 .bias-bar .left   { background: var(--bias-1-bg); }
 .bias-bar .center { background: #8c8c8c; }
 .bias-bar .right  { background: var(--bias-5-bg); }
 .bias-legend { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 15px; }
-.bias-key { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.bias-key { position: relative; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-muted); white-space: nowrap; outline: none; }
+.bias-key[tabindex] { cursor: help; }
 .bias-key b { font-weight: 800; color: var(--text); }
+.bias-pct { font-weight: 600; color: var(--text-faint); }
 .bias-key.is-zero { opacity: 0.45; }
 .bias-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
 .bias-key.left .bias-dot   { background: var(--bias-1-bg); }
