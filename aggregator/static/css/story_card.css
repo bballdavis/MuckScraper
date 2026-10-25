@@ -271,6 +271,9 @@
 /* Phones: the date gets its own line so "8 articles · 8 outlets · AI
    headline" fits on the one row below it. */
 @media (max-width: 600px) {
+    /* Less padding inside the card, so its contents use the width. */
+    .story-content { padding: 16px 14px; }
+    .story.compact .story-content { padding: 10px 10px 10px 12px; }
     .story.compact .card-meta .meta-date { flex-basis: 100%; }
     .story.compact .card-meta .meta-date + .meta-item::before { content: none; margin: 0; }
     .story.compact .card-meta .meta-item { white-space: nowrap; }
