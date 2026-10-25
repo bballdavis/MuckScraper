@@ -344,6 +344,9 @@ def store_articles(articles_data, topic_name, provider=None):
     # is tested against these, so load them once rather than per article.
     blocked_sources, blocked_title_keywords = get_ingestion_blocks()
     opinion_urls_seen = set()
+    # Bylines that are just an outlet's name ("Washington Post" on a Toronto
+    # Sun reprint) are dropped; loaded once per batch.
+    outlet_names = {name.lower() for (name,) in db.session.query(Outlet.name) if name}
 
     for article in articles_data:
         # Some outlets (National Review's culture pieces, e.g. "Not Ready for
@@ -358,7 +361,7 @@ def store_articles(articles_data, topic_name, provider=None):
         source_name  = source_name_from_url(raw_url) or normalize_source_name(article.get("source_name", "Unknown"))
         published_at = article.get("published_at", datetime.utcnow())
         image_url    = article.get("image_url")
-        author       = clean_byline(article.get("author"), source_name)
+        author       = clean_byline(article.get("author"), source_name, outlet_names)
 
         if not title or not raw_url:
             metrics["skipped"]["missing_required"] += 1
@@ -496,7 +499,7 @@ def store_articles(articles_data, topic_name, provider=None):
             title=title,
             content=final_content,
             source=source_name,
-            author=author or clean_byline(scrape_result.author, source_name),
+            author=author or clean_byline(scrape_result.author, source_name, outlet_names),
             outlet_id=outlet.id,
             # story_id is deliberately NOT set here -- the append below establishes
             # it. Setting the FK here as well makes the collection's first lazy

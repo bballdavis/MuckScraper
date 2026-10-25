@@ -818,7 +818,9 @@ def scrape_article(url, fallback_content=None, force=False):
         try:
             response = _fetch_html(candidate_url, headers=headers)
             http_status = response.status_code
-            if candidate_url == url and headers == HEADERS_DEFAULT:
+            # try_bs4(url) passes headers=None, which _fetch_html turns into
+            # HEADERS_DEFAULT; comparing to HEADERS_DEFAULT alone never matched.
+            if candidate_url == url and headers in (None, HEADERS_DEFAULT):
                 initial_html = response.text
             content = extract_with_readability(response.text, candidate_url)
             if content:

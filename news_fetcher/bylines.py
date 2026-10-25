@@ -34,12 +34,14 @@ _NOT_A_PERSON = {
 }
 
 
-def clean_byline(raw, source_name=None):
+def clean_byline(raw, source_name=None, outlet_names=()):
     """A display byline from whatever a feed, API or page gave, or None.
 
     "By Jane Doe" -> "Jane Doe"; "jdoe@x.com (Jane Doe)" -> "Jane Doe";
     "Jane Doe, CNN" -> "Jane Doe"; "Jane Doe and John Roe" stays as it is.
     URLs, e-mail addresses alone, outlet names and "Staff" give None.
+    `outlet_names` (lowercase) are other outlets' names: a syndicated piece
+    credited "Washington Post" names no person either.
     """
     if not raw or not isinstance(raw, str):
         return None
@@ -58,7 +60,7 @@ def clean_byline(raw, source_name=None):
     # The Guardian's "Jane Doe in Nairobi and agencies"; The Hill's
     # "Jane Doe, opinion contributor".
     text = re.sub(r"\s+and\s+agencies$", "", text, flags=re.I)
-    text = re.sub(r"\s+in\s+[A-Z][\w.'-]*(?:\s+[A-Z][\w.'-]*)*$", "", text)
+    text = re.sub(r"\s+in\s+[A-Z][\w.'-]*(?:\s+(?:(?:de|da|do|dos|das|del|la|le|el|al)\s+)?[A-Z][\w.'-]*)*(?=\s+and\s|$)", "", text)
     text = _ROLE_SUFFIX_RE.sub("", text)
 
     own_outlet = (source_name or "").strip().lower()
@@ -72,7 +74,7 @@ def clean_byline(raw, source_name=None):
     text = _SPACE_RE.sub(" ", text).strip(" ,|;-–—")
     lowered = text.lower()
     if (not text or lowered in _NOT_A_PERSON or lowered in _TRAILING_OUTLETS
-            or lowered == own_outlet or "://" in text or lowered.startswith("www.")
+            or lowered == own_outlet or lowered in outlet_names or "://" in text or lowered.startswith("www.")
             or not re.search(r"[A-Za-z]", text) or re.search(r"\d", text)
             or re.search(r"\bstaff(?:\s+(?:writers?|reports?))?$", lowered)):
         return None
