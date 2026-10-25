@@ -7,6 +7,17 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Changed
+- **Multi-source analysis is Left / Center / Right for general stories too.**
+  A general story (not science, sports or business) with at least one
+  bias-rated source now gets the left / center / right breakdown instead
+  of Why it matters / Key details / Different perspectives. Stories with no
+  rated sources keep the general format. Existing analyses are unchanged
+  until they are regenerated.
+- **Story page generate buttons act as one.** The round rail button and the
+  button beside the section heading start the same task, so both go busy
+  together and come back together. The section's "not generated yet" line
+  changes to "Generating…" so the feedback sits where the result will
+  appear.
 - **Breaking News reaches back 12 hours.** The bar (and `/api/v1/breaking`)
   shows the newest breaking headlines from the last 12 hours instead of 3,
   so it no longer sits empty for most of the night.
