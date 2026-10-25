@@ -54,7 +54,8 @@ def retry_unrated_outlets():
             outlet.bias_source = "allsides"
             outlet.bias_retry_count = 0
             for article in outlet.articles:
-                article.bias_score = as_score
+                if article.bias_source is None:  # rated on its own: keep it
+                    article.bias_score = as_score
             continue
 
         # Fall back to Ollama
@@ -67,7 +68,8 @@ def retry_unrated_outlets():
             outlet.bias_source = "ai"
             outlet.bias_retry_count = 0
             for article in outlet.articles:
-                article.bias_score = bias_score
+                if article.bias_source is None:  # rated on its own: keep it
+                    article.bias_score = bias_score
         else:
             outlet.bias_retry_count = (outlet.bias_retry_count or 0) + 1
             logger.warning(
@@ -115,7 +117,7 @@ def apply_outlet_origins():
         outlet.bias_source = source
         outlet.bias_retry_count = 0
         db.session.execute(
-            db.text("UPDATE articles SET bias_score = :score WHERE outlet_id = :id AND "
+            db.text("UPDATE articles SET bias_score = :score WHERE outlet_id = :id AND bias_source IS NULL AND "
                     + ("bias_score IS NULL" if old_score is None else "bias_score = :old")),
             {"id": outlet.id, "score": score, "old": old_score},
         )
@@ -406,7 +408,7 @@ def merge_duplicate_outlets():
                 db.session.execute(
                     db.text(
                         "UPDATE articles SET bias_score = :score "
-                        "WHERE outlet_id = :canonical_id"
+                        "WHERE outlet_id = :canonical_id AND bias_source IS NULL"
                     ),
                     {"score": canonical.bias_score, "canonical_id": canonical.id}
                 )
@@ -482,7 +484,8 @@ def sync_allsides_ratings():
             outlet.bias_retry_count = 0
 
             for article in outlet.articles:
-                article.bias_score = as_score
+                if article.bias_source is None:  # rated on its own: keep it
+                    article.bias_score = as_score
 
             logger.info(
                 f"  [AllSides Sync] {outlet.name}: "
