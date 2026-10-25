@@ -62,6 +62,32 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(story_analysis.layout("  \n ")["sections"], [])
 
 
+class DeepReportTypeTests(unittest.TestCase):
+    """Which prompt writes the analysis (news_fetcher.summarizer.deep_report_type):
+    general stories with rated sources get the left/center/right breakdown
+    (Philip, 2026-10-25), the specialist types keep their own."""
+
+    def _story(self, title, topics, scores):
+        from types import SimpleNamespace as NS
+        arts = [NS(title=title, bias_score=None, outlet=NS(bias_score=s)) for s in scores]
+        return NS(title=title, headline=None, topics=[NS(name=t) for t in topics], articles=arts)
+
+    def test_general_story_with_rated_sources_gets_lcr(self):
+        from news_fetcher.summarizer import deep_report_type
+        story = self._story("Two soldiers killed at West Bank checkpoint", ["International News"], [2, 3, None])
+        self.assertEqual(deep_report_type(story), "politics")
+
+    def test_general_story_without_rated_sources_stays_general(self):
+        from news_fetcher.summarizer import deep_report_type
+        story = self._story("Two soldiers killed at West Bank checkpoint", ["International News"], [None, None])
+        self.assertEqual(deep_report_type(story), "default")
+
+    def test_specialist_types_keep_their_format(self):
+        from news_fetcher.summarizer import deep_report_type
+        self.assertEqual(deep_report_type(self._story("New battery chemistry", ["Sci/Tech"], [3])), "science")
+        self.assertEqual(deep_report_type(self._story("Cup final result", ["Sports"], [3])), "sports")
+
+
 TEST_DB = os.environ.get("API_TEST_DATABASE_URL", "")
 
 

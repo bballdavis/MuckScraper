@@ -354,8 +354,8 @@
                     Summary will be generated when Ollama is back online. This story has been queued for processing.
                 </div>
             {% else %}
-                <div class="status-msg">
-                    No executive summary has been generated yet.{% if can('scraper') %} Use the summarize action to process this story.{% endif %}
+                <div class="status-msg" data-ai-status="story_summary">
+                    No executive summary has been generated yet.{% if can('scraper') %} Generate it with the button beside the heading.{% endif %}
                 </div>
             {% endif %}
         </div>
@@ -374,8 +374,8 @@
                     Analysis will be generated when Ollama is back online. This story has been queued for processing.
                 </div>
             {% else %}
-                <div class="status-msg">
-                    No multi-source analysis has been generated yet. Use the summarize action to process this story.
+                <div class="status-msg" data-ai-status="story_deep_report">
+                    No multi-source analysis has been generated yet.{% if can('scraper') and story.articles|length >= 2 %} Generate it with the button beside the heading.{% endif %}
                 </div>
             {% endif %}
         </div>
@@ -480,7 +480,7 @@
         box.textContent = status.message || 'AI task update received.';
     }
 
-    async function pollAiTask(taskType, resourceId, button) {
+    async function pollAiTask(taskType, resourceId, buttons) {
         if (activeAiTaskPoll) {
             clearInterval(activeAiTaskPoll);
             activeAiTaskPoll = null;
@@ -502,22 +502,44 @@
             if (status.status === 'error') {
                 clearInterval(activeAiTaskPoll);
                 activeAiTaskPoll = null;
-                if (button) {
-                    button.disabled = false;
-                    button.classList.remove('busy');
-                    if (button.dataset.originalText) button.textContent = button.dataset.originalText;
-                }
+                setAiTaskBusy(buttons, false);
+                showAiTaskInSection(taskType, status.message || 'It did not finish.');
             }
         }, 2000);
     }
 
-    async function startAiTask(taskType, resourceId, button) {
-        if (button) {
-            button.disabled = true;
+    // Every control that starts this task: the round rail button and the
+    // one beside the section heading run the same task, so they go busy and
+    // come back together (Philip, 2026-10-25: one consistent behaviour).
+    function aiTaskButtons(taskType, resourceId, button) {
+        const call = "startAiTask('" + taskType + "', " + resourceId + ",";
+        const found = [...document.querySelectorAll('button[onclick]')]
+            .filter(b => b.getAttribute('onclick').startsWith(call));
+        if (button && !found.includes(button)) found.push(button);
+        return found;
+    }
+
+    function setAiTaskBusy(buttons, busy) {
+        buttons.forEach(b => {
+            b.disabled = busy;
             // Icon buttons (ai_actions.html) pulse; text buttons say so.
-            if (button.classList.contains('act')) button.classList.add('busy');
-            else { button.dataset.originalText = button.textContent; button.textContent = 'Working...'; }
-        }
+            if (b.classList.contains('act')) b.classList.toggle('busy', busy);
+            else if (busy) { b.dataset.originalText = b.textContent; b.textContent = 'Working...'; }
+            else if (b.dataset.originalText) b.textContent = b.dataset.originalText;
+        });
+    }
+
+    // The section's own "not generated yet" line says it is running too, so
+    // the feedback sits where the result will appear.
+    function showAiTaskInSection(taskType, message) {
+        const line = document.querySelector('[data-ai-status="' + taskType + '"]');
+        if (line) line.textContent = message;
+    }
+
+    async function startAiTask(taskType, resourceId, button) {
+        const buttons = aiTaskButtons(taskType, resourceId, button);
+        setAiTaskBusy(buttons, true);
+        showAiTaskInSection(taskType, 'Generating… the page reloads when it is done.');
 
         const response = await fetch(aiTaskStartUrl, {
             method: 'POST',
@@ -535,15 +557,12 @@
         renderAiTaskStatus(payload.status || payload, response.status >= 400);
 
         if (!response.ok && response.status !== 409) {
-            if (button) {
-                button.disabled = false;
-                button.classList.remove('busy');
-                if (button.dataset.originalText) button.textContent = button.dataset.originalText;
-            }
+            setAiTaskBusy(buttons, false);
+            showAiTaskInSection(taskType, (payload.status || payload).message || 'Could not start it.');
             return;
         }
 
-        await pollAiTask(taskType, resourceId, button);
+        await pollAiTask(taskType, resourceId, buttons);
     }
 
 </script>
