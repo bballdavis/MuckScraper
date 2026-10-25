@@ -116,7 +116,18 @@ def story_summary(story, edition_story=None):
         "has_analysis": bool((story.deep_report or "").strip()),
         "has_ai_headline": bool(story.has_ai_headline),
         "has_updates": bool(getattr(edition_story, "has_updates", False)),
+        "breaking": breaking_chip(story),
     }
+
+
+def breaking_chip(story):
+    """The Breaking chip's tooltip details (aggregator/breaking.py
+    story_flags), or null when the story isn't breaking."""
+    from aggregator import breaking
+    details = breaking.story_breaking(story)
+    if details is None:
+        return None
+    return {**details, "first_at": iso(details["first_at"])}
 
 
 def outlet(o, fallback_name=None):

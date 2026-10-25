@@ -139,6 +139,90 @@ def bar_entries(limit=BAR_SIZE, now=None):
             .limit(limit).all())
 
 
+# Breaking stories (the chip on story cards) ---------------------------
+
+# Outlets the chip's tooltip names, at most.
+CHIP_OUTLETS = 8
+
+
+def story_flags(now=None):
+    """{story_id: chip details} for stories that grew out of a breaking event:
+    one of the story's articles was scraped from an entry in an event the
+    poller flagged in the last WINDOW. The details are what the chip's
+    tooltip says: who reported it first and when, how many outlets carried
+    it, and those outlets with their lean. Read once per request (g)."""
+    from flask import g, has_request_context
+    if now is None and has_request_context() and "breaking_story_flags" in g:
+        return g.breaking_story_flags
+    flags = _story_flags(now or datetime.utcnow())
+    if now is None and has_request_context():
+        g.breaking_story_flags = flags
+    return flags
+
+
+def _story_flags(now):
+    from aggregator.models import Outlet
+    from aggregator.opinion import leaning
+    heads = {e.id: e for e in FeedEntry.query.filter(FeedEntry.is_breaking.is_(True),
+                                                     FeedEntry.published_at >= now - WINDOW)}
+    if not heads:
+        return {}
+    rows = (db.session.query(FeedEntry.cluster_id, FeedEntry.source_name, FeedEntry.published_at, Article.story_id)
+            .outerjoin(Article, Article.id == FeedEntry.article_id)
+            .filter(FeedEntry.cluster_id.in_(list(heads)))
+            .order_by(FeedEntry.published_at, FeedEntry.id).all())
+    names = {r.source_name.lower() for r in rows}
+    leans = {o.name.lower(): leaning(o.bias_score)
+             for o in Outlet.query.filter(db.func.lower(Outlet.name).in_(names))}
+    events = {}
+    for cluster_id, source, _published, story_id in rows:
+        event = events.setdefault(cluster_id, {"sources": {}, "stories": set()})
+        event["sources"].setdefault(source, leans.get(source.lower(), "unrated"))
+        if story_id is not None:
+            event["stories"].add(story_id)
+    flags = {}
+    # Oldest first, so a story in two events keeps the newer one.
+    for head in sorted(heads.values(), key=lambda e: e.published_at):
+        event = events.get(head.id)
+        if not event or not event["stories"]:
+            continue
+        sources = event["sources"]
+        lean = {side: 0 for side in ("left", "center", "right", "unrated")}
+        for side in sources.values():
+            lean[side] += 1
+        details = {
+            "first_outlet": head.source_name,
+            "first_at": head.published_at,
+            "outlets": max(head.outlet_count or 1, len(sources)),
+            # Under the outlet threshold it was flagged by its feed
+            # ("BREAKING:", "Live updates").
+            "flagged_by_feed": (head.outlet_count or 1) < 3,
+            "sources": [{"name": n, "leaning": side} for n, side in list(sources.items())[:CHIP_OUTLETS]],
+            "lean": lean,
+        }
+        for story_id in event["stories"]:
+            flags[story_id] = details
+    return flags
+
+
+def story_breaking(story):
+    """The chip details for one story, or None."""
+    return story_flags().get(story.id) if story is not None and story.id else None
+
+
+def chip_details(story, now=None):
+    """story_breaking plus what the web chip's tooltip prints: "42 min ago"
+    and the lean shares in percent for its bar."""
+    details = story_breaking(story)
+    if details is None:
+        return None
+    minutes = max(1, int(((now or datetime.utcnow()) - details["first_at"]).total_seconds() // 60))
+    ago = f"{minutes} min ago" if minutes < 60 else f"{minutes // 60} hr ago"
+    total = sum(details["lean"].values()) or 1
+    shares = [(side, round(100 * n / total)) for side, n in details["lean"].items() if n]
+    return {**details, "ago": ago, "shares": shares}
+
+
 def story_of(entry):
     return entry.article.story if entry.article is not None else None
 
