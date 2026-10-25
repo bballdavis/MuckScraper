@@ -6,6 +6,11 @@ All notable changes to MuckScraper are documented here.
 
 ## [Unreleased]
 
+### Changed
+- **Breaking News reaches back 12 hours.** The bar (and `/api/v1/breaking`)
+  shows the newest breaking headlines from the last 12 hours instead of 3,
+  so it no longer sits empty for most of the night.
+
 ### Added
 - **Headlines views: Trending, Latest and Controversial.** Headlines now opens
   on a live view, picked with a chip as wide as the column under Breaking
