@@ -2,7 +2,7 @@
 // local date and time on hover, in the aggregator's DISPLAY_TIMEZONE (passed as
 // data-timezone on the script tag; the browser's own zone if missing). Markup: <span class="local-date"
 // data-utc="2026-10-04T14:06:00Z">fallback text</span>. Times older than a
-// week show the date instead. Refreshes every minute so "just now" ages.
+// week show the date instead. Refreshes every minute so "Just now" ages.
 (function () {
     const script = document.currentScript;
     const timeZone = (script && script.dataset.timezone) || undefined;
@@ -12,10 +12,11 @@
 
     function relative(date, now) {
         const ago = now - date;
-        if (ago < MINUTE) return 'just now';
+        // Capitalised, since they mostly stand alone in a row (Philip, 2026-10-25).
+        if (ago < MINUTE) return 'Just now';
         if (ago < HOUR) { const m = Math.floor(ago / MINUTE); return m + (m === 1 ? ' minute ago' : ' minutes ago'); }
         if (ago < DAY) { const h = Math.floor(ago / HOUR); return h + (h === 1 ? ' hour ago' : ' hours ago'); }
-        if (ago < 2 * DAY) return 'yesterday';
+        if (ago < 2 * DAY) return 'Yesterday';
         if (ago < 7 * DAY) return Math.floor(ago / DAY) + ' days ago';
         return date.toLocaleDateString(undefined, dateOnly);
     }
