@@ -295,6 +295,9 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
 .act-off { color: var(--text-faint); cursor: default; }
 .act-off > .icon { opacity: 0.6; }
 .act.busy { cursor: progress; }
+/* Running: filled like a hover, so the rail button and the one by the
+   heading both read as working (Philip, 2026-10-25). */
+.act-ready.busy { background: var(--accent); border-color: var(--accent); color: #fff; }
 .act.busy .icon { animation: act-pulse 1s ease-in-out infinite; }
 @keyframes act-pulse { 50% { opacity: 0.3; } }
 
@@ -341,6 +344,20 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
     .float-back { position: fixed; left: 16px; top: auto; bottom: 16px; }
     .float-back::after { display: none; }
 }
+
+/* AI task progress (static/js/ai_toast.js): a toast at the bottom like the
+   read Undo toast in reads.css, same size and type, in the theme's dark bar
+   colour; amber when something went wrong (Philip, 2026-10-25). */
+.ai-toast {
+    position: fixed; left: 50%; bottom: 28px; z-index: 1000;
+    transform: translate(-50%, 16px); opacity: 0; visibility: hidden;
+    max-width: calc(100vw - 32px); padding: 14px 20px; border-radius: 6px;
+    background: var(--topbar-bg); color: #fff; box-shadow: 0 12px 34px rgba(0, 0, 0, 0.3);
+    font-size: 16px; font-weight: 700;
+    transition: transform 0.18s ease, opacity 0.18s ease, visibility 0s linear 0.18s;
+}
+.ai-toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; transition-delay: 0s; }
+.ai-toast.is-error { background: #f5a524; color: #1f1400; }
 
 /* Round buttons under the back button (float_back's `below`): the read
    toggle, and on the article page the summary and lean buttons. Same shape
