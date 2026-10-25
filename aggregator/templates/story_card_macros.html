@@ -88,10 +88,12 @@
     {%- elif s in [4, 5] %}{% set counts.right = counts.right + 1 %}
     {%- endif -%}
 {%- endfor -%}
-{#- One bar split by share, each side's label and percentage in white
-    inside it, sides with no coverage left out (Philip, 2026-10-25; it was
-    three boxes of counts). The rounding goes to the biggest side so the
-    three add up to 100. Styles: story_card.css .bias-balance. -#}
+{#- A thin bar split by share, with "● Left 76%" for each side under it,
+    so no text sits inside the bar where a narrow side would clip it
+    (Philip, 2026-10-25: option C, after the solid bar of #63 read as too
+    much). A side with no coverage is left out of the bar and dimmed in the
+    legend. The rounding goes to the biggest side so the three add up to
+    100. Styles: story_card.css .bias-balance. -#}
 {%- set total = counts.left + counts.center + counts.right -%}
 {%- if total -%}
 {%- set pl = (100 * counts.left / total)|round|int -%}
@@ -100,13 +102,19 @@
 {%- set off = 100 - pl - pc - pr -%}
 {%- set top = [counts.left, counts.center, counts.right]|max -%}
 {%- if counts.left == top %}{% set pl = pl + off %}{% elif counts.center == top %}{% set pc = pc + off %}{% else %}{% set pr = pr + off %}{% endif -%}
+{%- set sides = [(counts.left, pl, 'left', 'Left'), (counts.center, pc, 'center', 'Center'), (counts.right, pr, 'right', 'Right')] -%}
 <div class="bias-balance" role="img" aria-label="Left {{ pl }}%, center {{ pc }}%, right {{ pr }}% of {{ total }} rated article{{ 's' if total != 1 else '' }}">
-    {%- for n, pct, side, label in [(counts.left, pl, 'left', 'Left'), (counts.center, pc, 'center', 'Center'), (counts.right, pr, 'right', 'Right')] if n %}
-    <span class="bias-seg {{ side }}" style="flex-grow: {{ n }}"><span class="bias-seg-label">{{ label }}</span><span class="bias-seg-letter">{{ label[0] }}</span> {{ pct }}%</span>
-    {%- endfor %}
+    <div class="bias-bar">
+        {%- for n, pct, side, label in sides if n %}<span class="{{ side }}" style="flex-grow: {{ n }}"></span>{% endfor -%}
+    </div>
+    <div class="bias-legend">
+        {%- for n, pct, side, label in sides %}
+        <span class="bias-key {{ side }}{{ ' is-zero' if not n else '' }}"><i class="bias-dot"></i>{{ label }} <b>{{ pct }}%</b></span>
+        {%- endfor %}
+    </div>
 </div>
 {%- else -%}
-<div class="bias-balance is-unrated"><span class="bias-seg">No rated outlets yet</span></div>
+<div class="bias-balance is-unrated"><div class="bias-bar"></div><div class="bias-legend"><span class="bias-key">No rated outlets yet</span></div></div>
 {%- endif -%}
 {%- endmacro %}
 
