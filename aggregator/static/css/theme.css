@@ -137,15 +137,15 @@
 .reporting-dots i { width: 4px; height: 10px; border-radius: 1px; background: var(--input-border); }
 .reporting-dots i.on { background: var(--rep); }
 /* Grade and lean as one split pill (story_card_macros.html grade_pill;
-   Philip, 2026-10-25): the grade on the left, the lean chip filling the
-   right end to the pill's edges. No overflow:hidden, so the grade's tip
-   can still open above. */
-.grade-pill {
-    display: inline-flex; align-items: stretch; height: 20px; box-sizing: border-box;
-    border: 1px solid var(--input-border); border-radius: 4px; white-space: nowrap;
+   Philip, 2026-10-25): the grade on the left in an outlined half, the lean
+   chip as the whole right half, its colour running to the pill's outer
+   edge. No overflow:hidden, so the grade's tip can still open above. */
+.grade-pill { display: inline-flex; align-items: stretch; height: 20px; white-space: nowrap; }
+.grade-pill .reporting-tag {
+    padding: 0 7px; box-sizing: border-box;
+    border: 1px solid var(--input-border); border-right: none; border-radius: 4px 0 0 4px;
 }
-.grade-pill .reporting-tag { padding: 0 7px; }
-.grade-pill .bias-tag { height: auto; margin: 0; border-radius: 0 3px 3px 0; }
+.grade-pill .bias-tag { height: 20px; box-sizing: border-box; margin: 0; border-radius: 0 4px 4px 0; }
 .reporting-tag::after {
     content: attr(data-tip); position: absolute; right: 0; bottom: calc(100% + 7px);
     width: max-content; max-width: 280px; white-space: normal;
