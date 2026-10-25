@@ -30,14 +30,14 @@ All notable changes to MuckScraper are documented here.
   targeted second enrichment passes, which pick stories by score, run again.
 - **Story analysis layouts.** The story page's multi-source analysis is no
   longer one block of text. It is split into its labelled sections
-  (`aggregator/story_analysis.py`) and shown as Cards (default): the story
-  as a lead callout, left/center/right side by side under a bar sized by
-  source count, the other sections as callouts and What's next as a
-  banner. Sections is the alternative: each section under its own icon and
-  title, with the coverage buckets in their bias colours. Pick one under
-  Appearance on your profile. The cards stay side by side on desktop
-  whatever the text length (the story page is wider for it) and stack only
-  on narrow screens; in Cards the executive summary sits in the same card.
+  (`aggregator/story_analysis.py`) and shown as Cards (default) or
+  Sections, picked under Appearance on your profile. Cards is flat, with no
+  boxes inside the story card: left, center and right stack full width
+  under a bar sized by source count, each with a coloured rule; the other
+  sections sit side by side under a hairline; What's next is one line. The
+  story section is left out because the executive summary, also plain
+  paragraphs now, covers it. Sections gives each section an icon and title,
+  with the coverage buckets in their bias colours.
 - **Story source rows.** The reporting grade sits at the right beside the
   lean chip, as the word then its dots, with "Reporting" and the meaning in
   the tooltip. The Source button's border is darker. Relative times are
