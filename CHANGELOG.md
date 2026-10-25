@@ -43,11 +43,12 @@ All notable changes to MuckScraper are documented here.
   story section is left out because the executive summary, also plain
   paragraphs now, covers it. Sections gives each section an icon and title,
   with the coverage buckets in their bias colours.
-- **Story source rows.** The reporting grade sits at the right beside the
-  lean chip, as the word then five rounded squares the chip's height (the
-  word in the chip's type: same size, weight, caps and colour), with "Reporting" and the meaning in
-  the tooltip. The Source button's border is darker. Relative times are
-  capitalised ("Yesterday", "Just now").
+- **Story source rows.** The reporting grade and the lean chip are one split
+  pill at the right: the grade word and five small bars on the left, the
+  lean filling the right end. "Reporting" and the meaning are in the
+  tooltip, and the article page header uses the same pill. The Source
+  button's border is darker. Relative times are capitalised ("Yesterday",
+  "Just now").
 - **Reporting grade.** Outlets get a five-level grade of how reliable their
   reporting is (Very high, High, Mostly factual, Mixed, Low), kept by hand in
   `aggregator/outlet_reporting.py` from Media Bias/Fact Check's factual
