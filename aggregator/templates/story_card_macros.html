@@ -88,7 +88,8 @@
     {%- elif s in [4, 5] %}{% set counts.right = counts.right + 1 %}
     {%- endif -%}
 {%- endfor -%}
-{#- A thin bar split by share, with "● Left 76%" for each side under it,
+{#- A thin bar split by share, with "● Left 12 76%" for each side under it
+    (the article count first, the share after it, Philip 2026-10-25),
     so no text sits inside the bar where a narrow side would clip it
     (Philip, 2026-10-25: option C, after the solid bar of #63 read as too
     much). A side with no coverage is left out of the bar and dimmed in the
@@ -109,7 +110,7 @@
     </div>
     <div class="bias-legend">
         {%- for n, pct, side, label in sides %}
-        <span class="bias-key {{ side }}{{ ' is-zero' if not n else '' }}"><i class="bias-dot"></i>{{ label }} <b>{{ pct }}%</b></span>
+        <span class="bias-key {{ side }}{{ ' is-zero' if not n else '' }}"><i class="bias-dot"></i>{{ label }} <b>{{ n }}</b><small>{{ pct }}%</small></span>
         {%- endfor %}
     </div>
 </div>
