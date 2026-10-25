@@ -295,6 +295,9 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
 .act-off { color: var(--text-faint); cursor: default; }
 .act-off > .icon { opacity: 0.6; }
 .act.busy { cursor: progress; }
+/* Running: filled like a hover, so the rail button and the one by the
+   heading both read as working (Philip, 2026-10-25). */
+.act-ready.busy { background: var(--accent); border-color: var(--accent); color: #fff; }
 .act.busy .icon { animation: act-pulse 1s ease-in-out infinite; }
 @keyframes act-pulse { 50% { opacity: 0.3; } }
 
