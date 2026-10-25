@@ -94,6 +94,44 @@
 }
 .ai-mark:hover > .tip, .ai-mark:focus-visible > .tip { opacity: 1; visibility: visible; }
 
+/* Breaking chip (story_card_macros.html breaking_chip): a solid accent pill
+   in the meta row, its details in a tip below. Above the compact card's
+   stretched link, like .ai-mark. */
+.breaking-chip {
+    position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 4px;
+    margin: 0 10px; padding: 2px 9px 2px 7px; border-radius: 99px;
+    background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+    cursor: help; outline: none;
+}
+.breaking-chip .icon { width: 12px; height: 12px; fill: currentColor; stroke: none; }
+.breaking-chip:focus-visible { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent-light); }
+[data-theme="dark"] .breaking-chip { background: var(--accent-light); }
+.breaking-chip .tip {
+    left: 0; right: auto; top: calc(100% + 8px); transform: none;
+    width: 280px; max-width: 280px; font-size: 12.5px; font-weight: 400; letter-spacing: normal;
+}
+.breaking-chip .tip > span { display: block; margin-top: 7px; }
+.breaking-chip .tip b { color: #fff; }
+.bk-tip-bar { display: flex !important; gap: 2px; height: 6px; border-radius: 99px; overflow: hidden; }
+.bk-tip-lean { display: flex !important; gap: 12px; font-weight: 700; }
+.bk-tip-outlets { color: #b8bccc; font-size: 12px; }
+/* Phones: the chip can sit near the right edge, so the tip spans the meta
+   row instead of hanging off the chip. */
+@media (max-width: 600px) {
+    .card-meta { position: relative; }
+    .card-meta:has(.breaking-chip) { z-index: 2; }
+    .breaking-chip { position: static; }
+    .breaking-chip .tip { left: 0; right: 0; width: auto; max-width: none; }
+}
+.bk-tip-bar .bk-left { background: #5b9be0; }
+.bk-tip-bar .bk-center { background: #a0aec0; }
+.bk-tip-bar .bk-right { background: #ef6b6b; }
+.bk-tip-bar .bk-unrated { background: #64748b; }
+.bk-tip-lean .bk-left { color: #8fbcf0; }
+.bk-tip-lean .bk-center { color: #c8d0dc; }
+.bk-tip-lean .bk-right { color: #f39a9a; }
+.bk-tip-lean .bk-unrated { color: #a6adc8; }
+
 /* One muted row: "Updated 3 hours ago · 7 articles · AI headline", plus flags. */
 .card-meta {
     display: flex; align-items: center; flex-wrap: wrap; gap: 6px 0;

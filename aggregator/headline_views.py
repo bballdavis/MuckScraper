@@ -170,9 +170,9 @@ def load_stories(entries):
 
 
 def why_label(view, entry):
-    """The short chip a card shows for why it is in the view, or None."""
-    if view == "trending" and entry.signals.recent:
-        return f"{entry.signals.recent} reporting in the last 6h"
+    """The short chip a card shows for why it is in the view, or None.
+    Trending's "N reporting in the last 6h" gave way to the Breaking chip
+    (Philip, 2026-10-25)."""
     if view == "controversial":
         parts = []
         if entry.gap is not None:
@@ -192,9 +192,7 @@ def gap_level(gap):
 
 def short_why(view, entry):
     """why_label cut down for a phone row, where it sits beside the L/C/R
-    pill: "4 outlets in 6h", "High gap · 2 op-eds", "Both sides"."""
-    if view == "trending" and entry.signals.recent:
-        return f"{entry.signals.recent} outlet{'s' if entry.signals.recent != 1 else ''} in 6h"
+    pill: "High gap · 2 op-eds", "Both sides"."""
     if view == "controversial":
         parts = []
         level = gap_level(entry.gap)
