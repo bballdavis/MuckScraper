@@ -40,7 +40,7 @@
         {%- endif %}
     </div>
     {%- if a.buckets %}
-    <div class="sa-buckets{% if a.stacked %} is-stacked{% endif %}" style="--sa-cols: {{ a.buckets|length }}">
+    <div class="sa-buckets" style="--sa-cols: {{ a.buckets|length }}">
         {%- for s in a.buckets %}
         <section class="sa-bucket sa-{{ s.kind }}">
             <div class="sa-bucket-head"><h4>{{ s.kind|capitalize }}</h4><span class="sa-count">{{ _count(story, s.kind) }}</span></div>
@@ -55,7 +55,7 @@
     {%- endif %}
 
     {%- if a.others %}
-    <div class="sa-callouts{% if a.pair_stacked %} is-stacked{% endif %}">
+    <div class="sa-callouts">
         {%- for s in a.others %}
         <section class="sa-callout sa-icon-{{ s.icon }}{% if loop.last and loop.length is odd %} is-wide{% endif %}">
             <span class="sa-ico">{{ icon(s.icon) }}</span>

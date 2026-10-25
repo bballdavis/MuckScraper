@@ -18,13 +18,6 @@ import re
 # a sentence, not a label.
 MAX_LABEL = 35
 
-# Longest L/C/R text, in characters, that still fits the three-column cards.
-# Longer than this and the cards stack full width, so a long bucket doesn't
-# leave a narrow column towering over the other two.
-CARD_COLUMN_MAX = 650
-# The same for the pair of callouts under them.
-CALLOUT_PAIR_MAX = 900
-
 _BUCKETS = (
     ("left", re.compile(r"\bthe left\b|\bleft[- ]leaning\b")),
     ("center", re.compile(r"\bthe cent(er|re)\b")),
@@ -113,10 +106,6 @@ def parse(text):
     return out
 
 
-def _length(section):
-    return sum(len(p) for p in section["paragraphs"])
-
-
 def layout(text):
     """What the story page needs to lay the report out:
 
@@ -126,8 +115,6 @@ def layout(text):
     empty     the L/C/R sections whose bucket had no sources
     others    every other section but What's next, in order
     next      the What's next section, if any
-    stacked   True when a bucket is too long for the three-column cards
-    pair_stacked  True when the callouts are too long to sit side by side
     """
     sections = parse(text)
     lead = sections[0] if sections and sections[0]["kind"] == "lead" else None
@@ -143,6 +130,4 @@ def layout(text):
         "empty": [s for s in lcr if s["empty"]],
         "others": others,
         "next": nxt,
-        "stacked": any(_length(s) > CARD_COLUMN_MAX for s in buckets),
-        "pair_stacked": any(_length(s) > CALLOUT_PAIR_MAX for s in others),
     }

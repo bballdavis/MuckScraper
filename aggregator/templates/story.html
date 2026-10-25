@@ -42,7 +42,11 @@
 
 
 
-        .container { max-width: var(--width-read); margin: 28px auto; padding: 0 20px; }
+        /* Wider than other reading pages so the analysis cards get three real
+           columns (Philip, 2026-10-25), leaving room on the left for the
+           round rail buttons where they float beside the card. */
+        .container { max-width: min(1060px, calc(100% - 128px)); margin: 28px auto; padding: 0 20px; }
+        @media (max-width: 1280px) { .container { max-width: 1060px; } }
 
         .story-card {
             background: var(--surface);
@@ -96,8 +100,11 @@
 
         .article-meta { display: flex; align-items: baseline; gap: 10px; font-size: 12px; font-weight: 500; color: var(--text-faint); }
         .article-outlet { font-size: 14px; font-weight: 700; color: var(--text-muted); }
+        /* The reporting grade and the lean chip sit together at the right
+           (Philip, 2026-10-25); whichever comes first takes the push. */
         .article-meta .bias-tag { margin-left: auto; align-self: center; }
-        .article-meta .reporting-tag { align-self: center; }
+        .article-meta .reporting-tag { margin-left: auto; align-self: center; }
+        .article-meta .reporting-tag + .bias-tag { margin-left: 0; }
         .article-meta .outlet-flag { margin-left: -4px; }
 
         .bias-tag {
@@ -147,11 +154,15 @@
         .pill {
             height: 30px; min-width: 104px; padding: 0 12px;
             display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-            border: 1px solid var(--border); border-radius: 8px; background: transparent;
+            /* --border was near invisible on the Source button; a grey that
+               reads in both themes (Philip, 2026-10-25). */
+            border: 1px solid var(--pill-border); border-radius: 8px; background: transparent;
             color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 700;
             text-decoration: none; cursor: pointer; white-space: nowrap;
             transition: background 0.15s, color 0.15s, border-color 0.15s;
         }
+        :root { --pill-border: #b4bac4; }
+        [data-theme="dark"] { --pill-border: #5a5a78; }
         .pill .icon { font-size: 14px; }
         .pill:hover { border-color: var(--text-faint); color: var(--text); }
         .pill-primary { border-color: var(--accent); color: var(--accent-text); }
@@ -321,6 +332,18 @@
             <h2 class="section-label">Executive Summary</h2>
             {{ story_summary_action(story, can('scraper') and ollama_online) }}
         </div>
+        {% if story.summary and analysis_layout != 'sections' %}
+        {#- In the Cards layout the summary sits in the same card as the
+            analysis's The story (Philip, 2026-10-25). -#}
+        <div class="sa sa-cards">
+            <div class="sa-lead sa-summary">
+                <span class="sa-ico">{{ icon('file-text') }}</span>
+                <div>
+                    {% for line in story.summary.split('\n') if line.strip() %}<p>{{ line.strip() }}</p>{% endfor %}
+                </div>
+            </div>
+        </div>
+        {% else %}
         <div class="analysis-box">
             {% if story.summary %}
                 <div class="analysis-content">
@@ -341,6 +364,7 @@
                 </div>
             {% endif %}
         </div>
+        {% endif %}
 
         <div class="section-head">
             <h2 class="section-label">Multi-Source Analysis</h2>
