@@ -96,21 +96,24 @@
 /* Left / Center / Right as one bar split by share of articles, the
    label and percentage in white inside each side (Philip, 2026-10-25). */
 .bias-balance {
-    display: flex; height: 34px; margin-bottom: 16px;
-    border-radius: 10px; overflow: hidden; background: var(--border);
-    font-size: 13px; font-weight: 800; color: #fff;
+    /* Close to the old boxes' height, so it reads apart from the button
+       row under it (Philip, 2026-10-25). */
+    display: flex; height: 52px; margin-bottom: 18px;
+    border-radius: 12px; overflow: hidden; background: var(--border);
+    font-size: 18px; font-weight: 800; color: #fff;
 }
 .bias-seg {
     flex: 1 0 0%; min-width: 84px; display: flex; align-items: center; justify-content: center;
-    gap: 6px; white-space: nowrap; overflow: hidden;
+    gap: 8px; white-space: nowrap; overflow: hidden;
 }
-.bias-seg-label { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.85; }
+.bias-seg-label { font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.85; }
 .bias-seg-letter { display: none; }
 .bias-seg.left   { background: var(--bias-1-bg); }
 .bias-seg.center { background: #8c8c8c; }
 .bias-seg.right  { background: var(--bias-5-bg); }
 .bias-balance.is-unrated .bias-seg { color: var(--text-muted); font-size: 12px; font-weight: 600; }
 @media (max-width: 480px) {
+    .bias-balance { height: 44px; font-size: 16px; }
     .bias-seg { min-width: 56px; }
     .bias-seg-label { display: none; }
     .bias-seg-letter { display: inline; font-size: 11px; opacity: 0.85; }
