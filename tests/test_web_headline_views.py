@@ -231,6 +231,7 @@ class HeadlineViewTests(unittest.TestCase):
         self.assertIn('class="left"', bar)
         self.assertNotIn('class="right"', bar)
         self.assertIn('bias-key right is-zero', card)
+        self.assertIn('Left <b>1</b><span class="bias-pct">50%</span>', card)
         self.assertIn('Right <b>0</b><span class="bias-pct">0%</span>', card)
 
     def test_ai_headline_is_an_icon_glued_to_the_last_word(self):
