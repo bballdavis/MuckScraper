@@ -10,7 +10,7 @@ from flask import g, jsonify, request
 from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload, selectinload
 
-from aggregator import article_jobs, db, feed_prefs, reads, skips
+from aggregator import article_jobs, article_lean, db, feed_prefs, reads, skips
 from aggregator.models import Article, Edition, EditionStory, OpinionPiece, Story, Topic
 from aggregator.opinion import published_edition_opinion_cards
 from aggregator.search import SearchUnavailableError, search_article_ids, search_story_ids
@@ -265,6 +265,9 @@ def article_payload(row):
     waiting = article_jobs.pending(row.id)
     out["is_summarizing"] = article_jobs.SUMMARY_JOB in waiting
     out["is_rating_bias"] = article_jobs.BIAS_JOB in waiting
+    own = article_lean.latest(row.id, row.bias_source) if row.bias_source else None
+    out["lean_source"] = row.bias_source or "outlet"
+    out["lean_reason"] = own.reason if own is not None else None
     return out
 
 

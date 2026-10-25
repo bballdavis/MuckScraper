@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/feed_header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reads.css') }}">
+    {% if can('scraper') %}<link rel="stylesheet" href="{{ url_for('static', filename='css/lean_modal.css') }}">{% endif %}
     <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
     <style>
         :root {
@@ -304,12 +305,7 @@
 {%- endif -%}
 {%- endif -%}
 {%- if can('scraper') -%}
-<form method="POST" action="{{ url_for('admin.rate_article', article_id=article.id) }}" onsubmit="var b = this.querySelector('button'); b.disabled = true; b.classList.add('busy');">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="next" value="{{ request.full_path }}">
-    <input type="hidden" name="report" value="1">
-    <button type="submit" class="act act-ready rail-btn" aria-label="Rate this article's lean">{{ icon('gauge') }}<span class="tip" role="tooltip"><strong>Rate this article's lean</strong> Asks the AI to rate this article's own Left/Right lean from its text, in place of the outlet's rating. Updates the lean chip and the story's Left, Center and Right counts.</span></button>
-</form>
+<button type="button" class="act act-ready rail-btn" aria-label="Rate this article's lean" aria-haspopup="dialog" onclick="openLeanModal({{ article.id }})">{{ icon('gauge') }}<span class="tip" role="tooltip"><strong>Rate this article's lean</strong> Shows the AI's Left/Right rating of this article with its reason, and lets you pick another. Saving replaces the outlet's rating for this article, in its lean chip and the story's Left, Center and Right counts.</span></button>
 {%- endif -%}
 {%- endif -%}
 {%- endset -%}
@@ -524,6 +520,7 @@
 </script>
 
 <script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
+{% if can('scraper') %}<script src="{{ url_for('static', filename='js/lean_modal.js') }}" data-ai-url="{{ url_for('admin.article_lean_ai', article_id=0) }}" data-save-url="{{ url_for('admin.save_article_lean', article_id=0) }}" data-report="1"></script>{% endif %}
 {% if current_user.is_authenticated %}<script src="{{ url_for('static', filename='js/reads.js') }}" data-read-url="{{ url_for('reading.toggle_read', kind='KIND', item_id=0) }}" data-auto-read="{{ auto_read_seconds }}"></script>{% endif %}
 </body>
 </html>
