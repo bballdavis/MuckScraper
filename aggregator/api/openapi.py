@@ -61,6 +61,16 @@ SCHEMAS = {
         id=_I, section=_S, headline=_S, dek=_NS, image_url=_URL, logo_url=_LOGO, coverage=_ref("Coverage"),
         source_count=_I, updated_at=_DT, is_summarized=_B, has_analysis=_B, has_ai_headline=_B, has_updates=_B,
         is_read={"type": "boolean", "description": "Marked read by this user (editions, /stories, /stories/{id})"}),
+    "HeadlineCard": {"allOf": [_ref("StorySummary"), _obj(
+        ["why", "newest_at", "group", "framing_gap", "opeds"],
+        why={"type": ["string", "null"], "description": "Short reason the story is in the view, for beside the "
+             "L/C/R pill: \"4 outlets in 6h\" (Trending), \"High gap · 2 op-eds\" (Controversial); null on Latest"},
+        newest_at=_NDT,
+        group={"type": ["string", "null"], "enum": ["Last hour", "Last 6 hours", "Earlier", None],
+               "description": "Latest only: the section header the story falls under"},
+        framing_gap={"type": ["string", "null"], "enum": ["high", "moderate", "low", None],
+                     "description": "Controversial only: how differently left and right outlets write it up"},
+        opeds={"type": "integer", "description": "Linked op-eds (Controversial only; 0 elsewhere)"})]},
     "ArticleCard": _obj(
         ["id", "story_id", "title", "outlet", "leaning", "url", "published_at", "image_url", "summary", "copy_of"],
         id=_I, story_id=_NI, title=_S, outlet=_ref("Outlet"), leaning=_LEANING, url=_URL,
@@ -222,6 +232,15 @@ PATHS = {
     "/stories": _get("stories", _json(_page(_ref("StorySummary"))),
                      [_q("topic", _S), _RANGE, _q("single", _B, "Include single-article stories"), _CURSOR, _LIMIT],
                      _NOT_FOUND),
+    "/headlines": _get("headlines", _json(_obj(
+        ["view", "views", "hidden_read", "items", "next_cursor"],
+        view={"type": "string", "enum": ["trending", "latest", "controversial"]},
+        views={"type": "array", "items": _obj(["key", "label", "description", "count"], key=_S, label=_S,
+                                              description=_S, count=_I)},
+        hidden_read={"type": "integer", "description": "Stories in this view left out because the user read them"},
+        items={"type": "array", "items": _ref("HeadlineCard")}, next_cursor=_NS)),
+        [_q("view", {"type": "string", "enum": ["trending", "latest", "controversial"]}, "Defaults to trending"),
+         _CURSOR, _LIMIT]),
     "/stories/{story_id}": _get("story", _json(_ref("StoryDetail")), [_path_id("story_id")], _NOT_FOUND),
     "/articles/{article_id}": _get("article", _json(_ref("ArticleDetail")), [_path_id("article_id")], _NOT_FOUND),
     "/search": _get("search", _json(_obj(["items"], items={"type": "array", "items": _ref("SearchHit")})),
