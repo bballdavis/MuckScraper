@@ -126,6 +126,7 @@ class HeadlineViewTests(unittest.TestCase):
         # Requests share setUp's app context, so Flask-Login's cached user
         # would carry over from one client to the next.
         g.pop("_login_user", None)
+        g.pop("breaking_story_flags", None)
         client = self.app.test_client()
         with client.session_transaction() as session:
             session["_user_id"] = str(self.ids[user])
@@ -165,10 +166,40 @@ class HeadlineViewTests(unittest.TestCase):
         card = self._card(page, self.ids["broad"])
         meta = card[card.index('class="card-meta"'):card.index("bias-balance")]
         self.assertIn("5 articles", meta)
-        self.assertIn("reporting in the last 6h", meta)
+        self.assertNotIn("reporting in the last 6h", meta)
         small = self._card(page, self.ids["small"])
         self.assertIn("The Big Picture", small)
         self.assertIn("Crews are evacuating three towns.", small)
+
+    def test_breaking_chip_on_a_story_from_a_breaking_event(self):
+        from aggregator import db
+        from aggregator.models import Article, FeedEntry
+        now = datetime.utcnow()
+        article = Article.query.filter_by(story_id=self.ids["small"]).order_by(Article.id).first()
+        head = FeedEntry(url="https://ap.example/fire", link="https://ap.example/fire", title="Wildfire forces evacuations",
+                         source_name="ap", published_at=now - timedelta(minutes=42), first_seen_at=now,
+                         is_breaking=True, outlet_count=3, article_id=article.id)
+        db.session.add(head)
+        db.session.flush()
+        others = [FeedEntry(url=f"https://{name}.example/fire", link=f"https://{name}.example/fire",
+                            title="Wildfire forces evacuations", source_name=name, first_seen_at=now,
+                            published_at=now - timedelta(minutes=30), cluster_id=head.id, outlet_count=3)
+                  for name in ("latimes", "reuters")]
+        head.cluster_id = head.id
+        db.session.add_all(others)
+        db.session.commit()
+        try:
+            page = self._client().get("/headlines").get_data(as_text=True)
+            card = self._card(page, self.ids["small"])
+            self.assertIn('class="breaking-chip"', card)
+            self.assertIn("First reported by <b>ap</b> 42 min ago. <b>3&nbsp;outlets</b> carried it", card)
+            self.assertIn("Left 1", card)
+            self.assertIn("Center 2", card)
+            self.assertIn("ap, latimes, reuters", card)
+            self.assertNotIn("breaking-chip", self._card(page, self.ids["broad"]))
+        finally:
+            FeedEntry.query.delete()
+            db.session.commit()
 
     def test_scales_beside_unsummarized_cards_for_scrapers_only(self):
         reader = self._client().get("/headlines").get_data(as_text=True)

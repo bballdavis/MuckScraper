@@ -198,6 +198,25 @@
 {%- endif -%}
 {%- endmacro %}
 
+{# The Breaking chip: a story that grew out of an event the Breaking poller
+   flagged (aggregator/breaking.py story_flags), in the meta row where
+   Trending's "N reporting in the last 6h" was (Philip, 2026-10-25). The tip
+   says who had it first, how many outlets carried it and their lean.
+   Styles: story_card.css .breaking-chip. #}
+{% macro breaking_chip(story) -%}
+{%- set b = breaking_details(story) -%}
+{%- if b -%}
+<span class="breaking-chip" tabindex="0" aria-label="Breaking: first reported by {{ b.first_outlet }} {{ b.ago }}">{{ icon('zap') }}Breaking<span class="tip" role="tooltip"><strong>Breaking</strong><span class="bk-tip-line">
+{%- if b.flagged_by_feed -%}<b>{{ b.first_outlet }}</b> flagged it as breaking {{ b.ago }}.
+{%- else -%}First reported by <b>{{ b.first_outlet }}</b> {{ b.ago }}. <b>{{ b.outlets }}&nbsp;outlets</b> carried it within 90 minutes.{%- endif -%}
+</span>
+{%- if b.shares %}<span class="bk-tip-bar">{% for side, pct in b.shares %}<span class="bk-{{ side }}" style="flex: {{ pct }}"></span>{% endfor %}</span>
+<span class="bk-tip-lean">{% for side in ('left', 'center', 'right', 'unrated') %}{% if b.lean[side] or side != 'unrated' %}<span class="bk-{{ side }}">{{ side|title }} {{ b.lean[side] }}</span>{% endif %}{% endfor %}</span>{% endif %}
+{%- if b.sources %}<span class="bk-tip-outlets">{{ b.sources|map(attribute='name')|join(', ') }}</span>{% endif -%}
+</span></span>
+{%- endif -%}
+{%- endmacro %}
+
 {% macro story_card(story, compact=false, why=none, why_hot=false) -%}
 {%- if compact %}
 {#- Compact (All / Grouped Stories): the image, the headline, one meta row
@@ -220,6 +239,7 @@
                 {% if single and single.outlet %}<span class="meta-item">{{ single.outlet.name }}{{ outlet_flag(single.outlet) }}</span>{% endif %}
                 {% if story.last_updated %}<span class="meta-item meta-date">{{ story.last_updated|short_datetime }}</span>{% endif %}
                 {% if not single %}<span class="meta-item">{{ article_count }} article{{ 's' if article_count != 1 else '' }}{% if story.source_count is defined %} · {{ story.source_count }} outlet{{ 's' if story.source_count != 1 else '' }}{% endif %}</span>{% endif %}
+                {{ breaking_chip(story) }}
                 {% if story.edition_has_updates %}<span class="chip chip-new">New updates</span>{% endif %}
             </div>
             <div class="card-bottom">
@@ -277,6 +297,7 @@
                     <span class="meta-item">Updated <span class="local-date" data-utc="{{ story.last_updated.isoformat() }}Z">{{ story.last_updated.strftime('%Y-%m-%d %H:%M') }} UTC</span></span>
                 {% endif %}
                 <span class="meta-item">{{ article_count }} article{{ 's' if article_count != 1 else '' }}</span>
+                {{ breaking_chip(story) }}
                 {#- Headlines: why the card is in the view, on the count's
                     right rather than a row of its own (Philip, 2026-10-25). -#}
                 {% if why %}<span class="why{{ ' why-hot' if why_hot else '' }}">{{ why }}</span>{% endif %}
