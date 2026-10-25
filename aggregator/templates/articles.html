@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/story_card.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/feed_header.css') }}">
+    {% if can('scraper') %}<link rel="stylesheet" href="{{ url_for('static', filename='css/lean_modal.css') }}">{% endif %}
     <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
     <style>
         :root {
@@ -170,13 +171,7 @@
                     <a class="card-menu-item" role="menuitem" href="{{ url_for('public.view_article', article_id=article.id, back=current_back()) }}">{{ 'Read full summary and text' if current_user.is_authenticated else 'Read summary' }}</a>
                     {% if can('scraper') %}
                     <button type="button" class="card-menu-item" role="menuitem" onclick="startAiTask('article_summary', {{ article.id }}, this)">{{ 'Regenerate AI summary' if article.summary else 'AI summary' }}</button>
-                    <form method="POST" action="{{ url_for('admin.rate_article', article_id=article.id) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="label" value="{{ active_label or '' }}">
-                        <input type="hidden" name="scrape_status" value="{{ active_scrape_status or '' }}">
-                        <input type="hidden" name="next" value="{{ next_url }}">
-                        <button type="submit" class="card-menu-item" role="menuitem">Rate bias</button>
-                    </form>
+                    <button type="button" class="card-menu-item" role="menuitem" aria-haspopup="dialog" onclick="openLeanModal({{ article.id }})">Rate bias</button>
                     {% endif %}
                 {%- endif %}
             {% endcall %}
@@ -339,5 +334,6 @@
 </script>
 
 <script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
+{% if can('scraper') %}<script src="{{ url_for('static', filename='js/lean_modal.js') }}" data-ai-url="{{ url_for('admin.article_lean_ai', article_id=0) }}" data-save-url="{{ url_for('admin.save_article_lean', article_id=0) }}"></script>{% endif %}
 </body>
 </html>

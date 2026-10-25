@@ -4,7 +4,7 @@ from flask import flash, render_template, request, redirect, url_for, jsonify
 from flask_login import current_user
 from aggregator.permissions import ROLE_ADMIN, ROLE_SCRAPER, public_or_login, role_required
 from sqlalchemy import case, func, or_
-from aggregator import db, feed_prefs
+from aggregator import article_lean, db, feed_prefs
 from aggregator.models import Article, Outlet, Story, Topic
 from aggregator.search import SearchUnavailableError, search_story_ids
 from aggregator.story_view import apply_aggregator_filter
@@ -303,37 +303,50 @@ def rerank_outlet(outlet_id):
         if bias_score is not None:
             outlet.bias_score = bias_score
             for article in outlet.articles:
-                article.bias_score = bias_score
+                if article.bias_source is None:  # rated on its own: keep it
+                    article.bias_score = bias_score
             db.session.commit()
     except Exception as e:
         logger.error(f"Re-rank error: {e}")
     return redirect_to_articles(label, scrape_status)
 
 
-@admin.route("/rate-article/<int:article_id>", methods=["POST"])
+# The Rate lean dialog (static/js/lean_modal.js): ask for the AI's rating,
+# shown without applying it, then save the lean the reader settles on.
+@admin.route("/article/<int:article_id>/lean/ai", methods=["POST"])
 @role_required(ROLE_SCRAPER)
-def rate_article(article_id):
+def article_lean_ai(article_id):
     article = Article.query.get_or_404(article_id)
-    label = request.form.get("label", "")
-    scrape_status = request.form.get("scrape_status", "").strip() or None
-    # The article page asks for a note saying how it went (report=1); the
-    # list pages don't show flashes, so they don't ask.
-    report = request.form.get("report") == "1"
+    own = article_lean.own_rating(article)
     try:
-        from news_fetcher.outlet_bias_llm import BIAS_LABELS, get_article_bias_from_llm
-        bias_score = get_article_bias_from_llm(article.title, article.content)
-        if bias_score is not None:
-            article.bias_score = bias_score
-            db.session.commit()
-            if report:
-                flash(f"Rated this article {BIAS_LABELS[bias_score]}.", "success")
-        elif report:
-            flash("The AI could not rate this article's lean, so it keeps its current rating.", "error")
+        row = article_lean.ask_ai(article)
+    except article_lean.RatingUnavailable:
+        return jsonify({"ai": None, "own": own,
+                        "error": "The AI couldn't rate this article. You can still pick a lean."}), 200
     except Exception as e:
-        logger.error(f"Article rating error: {e}")
-        if report:
-            flash("Rating this article's lean failed. Check that the AI provider is online.", "error")
-    return redirect_to_articles(label, scrape_status)
+        logger.error(f"Article lean AI error: {e}")
+        return jsonify({"ai": None, "own": own,
+                        "error": "The AI provider didn't answer. You can still pick a lean."}), 200
+    return jsonify({"ai": article_lean.as_json(row), "own": own})
+
+
+@admin.route("/article/<int:article_id>/lean", methods=["POST"])
+@role_required(ROLE_SCRAPER)
+def save_article_lean(article_id):
+    article = Article.query.get_or_404(article_id)
+    payload = request.get_json(silent=True) or request.form
+    try:
+        score = int(payload.get("score"))
+    except (TypeError, ValueError):
+        score = None
+    if score not in article_lean.LABELS:
+        return jsonify({"error": "Pick a lean from Left to Right."}), 400
+    article_lean.save_reader(article, current_user, score, payload.get("note"))
+    # The article page shows a note after it reloads; the Articles list
+    # shows no flashes, so it doesn't ask for one.
+    if payload.get("report"):
+        flash(f"Rated this article {article_lean.LABELS[score]}.", "success")
+    return jsonify({"score": score, "label": article_lean.LABELS[score]})
 
 
 @admin.route("/scrape-article/<int:article_id>", methods=["POST"])

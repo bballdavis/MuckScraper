@@ -184,6 +184,10 @@ class Article(db.Model):
     date       = db.Column(db.DateTime, default=datetime.utcnow) # This is Published Date
     fetched_at = db.Column(db.DateTime, default=datetime.utcnow) # When we actually scraped it
     bias_score = db.Column(db.Float)
+    # Where bias_score came from: None while it is a copy of the outlet's,
+    # "ai" or "reader" once the article was rated on its own
+    # (aggregator/article_lean.py). Outlet re-syncs leave rated articles alone.
+    bias_source = db.Column(db.String(16), nullable=True)
     image_url  = db.Column(db.String)
     embedding  = db.Column(Vector(768))
     summary    = db.Column(db.Text)
@@ -785,6 +789,29 @@ class FeedEntry(db.Model):
     cluster_id    = db.Column(db.Integer, nullable=True)
 
     article = db.relationship("Article")
+
+
+class ArticleLeanRating(db.Model):
+    """One rating of an article's own lean (aggregator/article_lean.py): the
+    AI's, with its one-line reason, or a reader's from the Rate lean dialog,
+    with an optional note. The newest applied one is the article's
+    bias_score; AI ratings the dialog showed but nobody saved stay unapplied
+    and are reused next time instead of asking the model again."""
+    __tablename__ = "article_lean_ratings"
+    __table_args__ = (
+        db.Index("ix_lean_article_created", "article_id", "created_at"),
+    )
+
+    id         = db.Column(db.Integer, primary_key=True)
+    article_id = db.Column(db.Integer, db.ForeignKey("articles.id", ondelete="CASCADE"), nullable=False)
+    user_id    = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    source     = db.Column(db.String(16), nullable=False)  # "ai" or "reader"
+    score      = db.Column(db.Integer, nullable=False)
+    reason     = db.Column(db.Text, nullable=True)  # the AI's WHY line, or the reader's note
+    applied    = db.Column(db.Boolean, nullable=False, default=False, server_default="false")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    user = db.relationship("User")
 
 
 class ReadItem(db.Model):
