@@ -3,7 +3,7 @@ from collections import OrderedDict
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify
 from flask_login import current_user
-from aggregator import appearance_prefs, breaking, feed_prefs, headline_views, reads, story_analysis
+from aggregator import appearance_prefs, breaking, feed_prefs, headline_views, reading_prefs, reads, story_analysis
 from aggregator.models import FeedEntry
 from aggregator.permissions import ROLE_SCRAPER, public_or_login, public_read_enabled, role_required
 from aggregator.models import Article, Story, Topic, RawArticlePayload, Edition, EditionStory
@@ -271,6 +271,7 @@ def view_story(story_id):
         opinion=opinion_for_story(story.id),
         ollama_online=ollama_online,
         read_item=reads.get(current_user.id, "story", story.id) if current_user.is_authenticated else None,
+        auto_read_seconds=reading_prefs.load(current_user)["auto_read_seconds"],
         topics=Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all(),
     )
 
@@ -286,6 +287,7 @@ def view_article(article_id):
         article=article,
         ollama_online=ollama_online,
         read_item=reads.get(current_user.id, "article", article.id) if current_user.is_authenticated else None,
+        auto_read_seconds=reading_prefs.load(current_user)["auto_read_seconds"],
         topics=Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all(),
     )
 
