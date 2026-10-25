@@ -29,62 +29,55 @@
 .sa-center { --sa-side: var(--bias-3-bg); --sa-side-text: var(--bias-center-text); --sa-tint: var(--sa-c-tint); }
 .sa-right  { --sa-side: var(--bias-5-bg); --sa-side-text: var(--bias-right-text);  --sa-tint: var(--sa-r-tint); }
 
-/* ---- Cards ---- */
+/* ---- Cards ----
+   Flat (Philip, 2026-10-25: option A of the flat mocks): no boxes inside
+   the story card, only rules and type. The executive summary above uses the
+   same plain paragraphs. Left, center and right stack full width with a
+   coloured rule; the other sections sit side by side under a hairline. */
 .sa-cards h3 {
     font-size: var(--fs-label); font-weight: 800; letter-spacing: 1.5px;
     text-transform: uppercase; color: var(--accent-text); margin: 0 0 6px;
 }
-.sa-cards .sa-lead {
-    display: flex; gap: 14px; padding: 18px 20px;
-    background: var(--summary-bg); border: 1px solid var(--border); border-radius: 14px;
-}
-.sa-cards .sa-lead .sa-ico { color: var(--accent-text); font-size: 20px; margin-top: 1px; }
-.sa-cards .sa-lead p { font-size: 16px; line-height: 1.65; }
-/* The executive summary (story.html) uses the same card as The story. */
-.sa-summary { margin: 0; }
+.sa-cards .sa-lead p, .sa-summary p { font-size: 16px; line-height: 1.65; }
 
-.sa-spec-head { display: flex; align-items: center; gap: 12px; margin: 24px 0 10px; }
+.sa-spec-head { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
 .sa-spec-head h3 { color: var(--text-muted); margin: 0; white-space: nowrap; }
 .sa-bar { flex: 1; display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; }
 .sa-bar .seg-l { background: var(--bias-1-bg); }
 .sa-bar .seg-c { background: #8c8c8c; }
 .sa-bar .seg-r { background: var(--bias-5-bg); }
 
-/* Always side by side on desktop, however long the text (Philip,
-   2026-10-25); they stack only on narrow screens. */
-.sa-buckets { display: grid; grid-template-columns: repeat(var(--sa-cols, 3), minmax(0, 1fr)); gap: 12px; }
-.sa-bucket {
-    padding: 14px 16px; border: 1px solid var(--border); border-top: 4px solid var(--sa-side);
-    border-radius: 12px; background: var(--sa-tint);
-}
-.sa-bucket-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.sa-buckets { display: flex; flex-direction: column; gap: 18px; }
+.sa-bucket { border-left: 3px solid var(--sa-side); padding: 2px 0 2px 16px; }
+.sa-bucket-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
 .sa-bucket-head h4 {
     font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
     color: var(--sa-side-text); margin: 0;
 }
-.sa-bucket p { font-size: 14px; }
 .sa-empty {
-    display: flex; align-items: center; gap: 8px; margin: 8px 0 0 !important;
+    display: flex; align-items: center; gap: 8px; margin: 12px 0 0 !important;
     font-size: 13px; color: var(--text-faint);
 }
 .sa-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sa-side); flex: 0 0 auto; opacity: 0.7; }
 
-.sa-callouts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.sa-callouts {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px;
+    margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);
+}
+.sa-callouts:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 .sa-callout.is-wide { grid-column: 1 / -1; }
-.sa-callout { display: flex; gap: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; }
+.sa-callout { display: flex; gap: 12px; }
 .sa-callout .sa-ico { font-size: 18px; margin-top: 1px; color: var(--accent-text); }
-.sa-callout p { font-size: 14px; }
-.sa-callout.sa-icon-scale { background: var(--sa-contest-tint); }
 .sa-callout.sa-icon-scale .sa-ico, .sa-callout.sa-icon-scale h3 { color: var(--sa-contest); }
 .sa-callout.sa-icon-eye-off .sa-ico, .sa-callout.sa-icon-eye-off h3 { color: var(--text-muted); }
 
 .sa-cards .sa-next {
-    display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 16px;
-    border-radius: 12px; background: var(--accent); color: #fff;
+    display: flex; align-items: baseline; gap: 12px;
+    margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
 }
-.sa-cards .sa-next .sa-ico { font-size: 18px; }
-.sa-cards .sa-next h3 { color: #fff; opacity: 0.85; margin: 0; white-space: nowrap; }
-.sa-cards .sa-next p { font-size: 14.5px; line-height: 1.5; }
+.sa-cards .sa-next:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.sa-cards .sa-next .sa-ico { font-size: 18px; color: var(--accent-text); align-self: center; }
+.sa-cards .sa-next h3 { margin: 0; white-space: nowrap; }
 
 /* ---- Sections ---- */
 .sa-sec { padding: 18px 0; border-top: 1px solid var(--border); }
@@ -110,8 +103,7 @@
 
 
 @media (max-width: 900px) {
-    .sa-buckets, .sa-callouts { grid-template-columns: minmax(0, 1fr); }
-    .sa-buckets .sa-bucket { border-top-width: 1px; border-left: 4px solid var(--sa-side); }
+    .sa-callouts { grid-template-columns: minmax(0, 1fr); }
     .sa-cards .sa-next { flex-wrap: wrap; }
     .sa-body { padding-left: 0; }
     .sa-group .sa-body { margin-left: 0; padding-left: 14px; }
