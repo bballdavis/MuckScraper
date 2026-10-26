@@ -22,8 +22,9 @@ _B = {"type": "boolean"}
 _DT = {"type": "string", "format": "date-time"}
 _NDT = {"type": ["string", "null"], "format": "date-time"}
 _URL = {"type": ["string", "null"], "format": "uri"}
-# A card's image chain: `image_url` (the story's newest article image, or
-# this article's), then the outlet logo, then the app's own placeholder.
+# A card's image chain: `image_url` (the photo of the story's article that
+# best matches its headline, aggregator/story_image.py, or this article's),
+# then the outlet logo, then the app's own placeholder.
 # Logos are square icons: draw them fitted on a tile, not cropped.
 _LOGO = {"type": ["string", "null"], "format": "uri",
          "description": "Outlet logo for when image_url is null; fit it, don't crop it"}

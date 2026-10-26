@@ -164,13 +164,14 @@
 {%- endmacro %}
 
 {# The card's image box, a chain of fallbacks (Philip, 2026-10-22): an
-   article image from the story (any of its articles, roundups aside), else
+   article image from the story (the article whose title best matches the
+   story, aggregator/story_image.py; roundups aside), else
    the newest outlet's logo on a tile with the outlet's name, else the name
    alone, else a plain icon. A photo or logo that fails to load drops to the
    next step. Logos come from news_fetcher/outlet_logos.py; /api/v1 serves
    the same chain as image_url then logo_url. #}
 {% macro card_image(story) -%}
-{%- set photo = story.articles|selectattr('image_url')|rejectattr('is_roundup')|map(attribute='image_url')|first %}
+{%- set photo = story.lead_image_url %}
 {%- set lead = (story.display_articles if story.display_articles is defined else story.articles)|map(attribute='outlet')|select|list %}
 {%- set logo_outlet = lead|selectattr('logo_url')|first %}
 {%- set source = logo_outlet or lead|first %}

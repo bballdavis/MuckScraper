@@ -30,6 +30,7 @@ def _story_load():
     (A function: Article.outlet is a backref, defined once mappers configure.)"""
     return (
         selectinload(Story.articles).joinedload(Article.outlet),
+        selectinload(Story.articles).selectinload(Article.topics),
         selectinload(Story.topics),
     )
 

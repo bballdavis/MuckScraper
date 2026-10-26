@@ -178,6 +178,13 @@ class Story(db.Model):
     def display_headline(self):
         return self.headline if self.has_ai_headline else self.title
 
+    @property
+    def lead_image_url(self):
+        """The card photo: the article whose title best matches the story,
+        not just the newest (aggregator/story_image.py)."""
+        from aggregator.story_image import lead_image
+        return lead_image(self.site_articles, self.display_headline)
+
 
 
 @db.event.listens_for(Story.summary, "set")
