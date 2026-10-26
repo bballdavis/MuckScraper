@@ -15,14 +15,26 @@
 {% block nav %}settings{% endblock %}
 {% block body_class %}settings-page{% endblock %}
 {% block body %}
+{%- set groups = settings_sections(self.settings_key()|trim) %}
+{%- set current = namespace(group=None, item=None) %}
+{%- for group in groups %}{% for item in group['items'] if item.current %}{% set current.group = group.name %}{% set current.item = item.label %}{% endfor %}{% endfor %}
 <div class="settings">
-    <nav class="settings-nav" aria-label="Settings sections">
+    <div class="settings-side">
+    {#- Phones: the section list folds into a dropdown behind this button. #}
+    <button type="button" class="settings-picker" aria-expanded="false" aria-controls="settings-nav">
+        <span class="settings-picker-text">
+            {%- if current.group %}<span class="settings-picker-group">{{ current.group }}</span>{% endif %}
+            <span class="settings-picker-label">{{ current.item or 'Settings' }}</span>
+        </span>
+        {{ icon('chevron-down') }}
+    </button>
+    <nav class="settings-nav" id="settings-nav" aria-label="Settings sections">
         <label class="settings-find">
             <span class="visually-hidden">Find a setting</span>
             {{ icon('search') }}
             <input type="search" id="settings-find" placeholder="Find a setting" autocomplete="off">
         </label>
-        {%- for group in settings_sections(self.settings_key()|trim) %}
+        {%- for group in groups %}
         <div class="settings-group">
             <div class="settings-group-name">{{ group.name }}</div>
             {%- for item in group['items'] %}
@@ -35,6 +47,7 @@
         </div>
         {%- endfor %}
     </nav>
+    </div>
     <main class="settings-main">
         <div class="settings-content">
             {% block settings_body %}{% endblock %}
@@ -58,6 +71,22 @@
             if (e.key !== 'Enter') return;
             const first = links.find((a) => !a.hidden);
             if (first) { e.preventDefault(); location.href = first.href; }
+        });
+    })();
+
+    // Phones: open and close the section dropdown.
+    (function () {
+        const side = document.querySelector('.settings-side');
+        const button = side && side.querySelector('.settings-picker');
+        if (!button) return;
+        const setOpen = (open) => {
+            side.classList.toggle('is-open', open);
+            button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        };
+        button.addEventListener('click', () => setOpen(!side.classList.contains('is-open')));
+        document.addEventListener('click', (e) => { if (!side.contains(e.target)) setOpen(false); });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && side.classList.contains('is-open')) { setOpen(false); button.focus(); }
         });
     })();
 </script>

@@ -647,6 +647,40 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertIn(story, [s.id for s in newsbox.pick_stories(self.ids["reader"], settings)])
         self._clear_newsbox()
 
+
+    def test_swipe_deck_most_sources_first(self):
+        from aggregator import db
+        from aggregator.models import Article, Outlet, Story
+        self._clear_newsbox()
+        token = self._pair(scopes=("read", "summarize"))
+        now = datetime.utcnow().replace(microsecond=0)
+        left, right = Outlet.query.filter_by(name="Left Daily").one(), Outlet.query.filter_by(name="Right Times").one()
+        reuters = Outlet(name="Reuters", bias_score=3.0)
+        wide = Story(title="Wide story", created_at=now - timedelta(days=2))
+        graded = Story(title="Graded story", created_at=now - timedelta(days=1))
+        db.session.add_all([reuters, wide, graded])
+        db.session.flush()
+        db.session.add_all([
+            Article(title="w1", url="https://left.example/w1", outlet=left, story=wide, date=now - timedelta(days=2)),
+            Article(title="w2", url="https://right.example/w2", outlet=right, story=wide, date=now - timedelta(days=2)),
+            Article(title="w3", url="https://reuters.example/w3", outlet=reuters, story=wide, date=now - timedelta(days=2)),
+            Article(title="g1", url="https://reuters.example/g1", outlet=reuters, story=graded, date=now - timedelta(days=1)),
+        ])
+        Story.query.get(self.ids["story"]).deep_report = None
+        Story.query.get(self.ids["lone"]).summary = None
+        db.session.commit()
+        try:
+            items = self._get("/api/v1/me/deck", token).get_json()["items"]
+            # Three outlets beat the two-outlet headline; among one-outlet
+            # stories Reuters' grade beats the newer, ungraded lone story.
+            self.assertEqual([(c["id"], c["source_count"]) for c in items],
+                             [(wide.id, 3), (self.ids["story"], 2), (graded.id, 1), (self.ids["lone"], 1)])
+            self.assertEqual([c["tier"] for c in items], ["more", "headlines", "more", "more"])
+        finally:
+            for row in [*wide.articles, *graded.articles, wide, graded, reuters]:
+                db.session.delete(row)
+            Story.query.get(self.ids["story"]).deep_report = "The story: long report."
+            db.session.commit()
     def test_article_summary_and_lean_rating(self):
         from unittest import mock
         from aggregator import article_jobs, db

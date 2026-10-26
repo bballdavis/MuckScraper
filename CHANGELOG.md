@@ -11,6 +11,12 @@ All notable changes to MuckScraper are documented here.
   cards carry `why`, Trending's "4 outlets in 6h", or null when no outlet
   reported the story in the last 6 hours, so the iOS app shows it on every
   section list as it does on Headlines.
+- **Swipe deck: most sources first.** The app's Swipe deck
+  (`GET /api/v1/me/deck`) now puts the stories covered by the most outlets
+  first and works down, with better-graded outlets (reporting grade)
+  breaking ties. Before, the edition's headlines came first and then the
+  week's other stories newest first, so once the headlines were summarized
+  the deck was mostly fresh one-article stories.
 - **Multi-source analysis is Left / Center / Right for general stories too.**
   A general story (not science, sports or business) with at least one
   bias-rated source now gets the left / center / right breakdown instead
