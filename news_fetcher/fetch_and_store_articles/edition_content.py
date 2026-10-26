@@ -139,6 +139,38 @@ def _fill_story_content(story, metrics):
             metrics["stable_stories_skipped"] += 1
             return changed
 
+        # Article summaries and analyses first: the deep report reads them for
+        # long articles (summarizer.article_digest). This is also critical for
+        # the static site links.
+        for article in story.articles:
+            if not article.summary and article.content:
+                summary = summarize_article(article)
+                if summary:
+                    article.summary = summary
+                    metrics["child_article_summaries_generated"] += 1
+                    changed = True
+                    logger.info(f"    [Processor] Child article summary: {article.title[:60]}")
+        db.session.commit()
+
+        # Per-article deep analysis for every article in an edition story (this
+        # function only runs for edition stories). Any topic qualifies; the
+        # only filter is enough real article text to analyse. Off by default
+        # for new installs -- see _auto_article_deep_analysis_enabled(). Measured
+        # 2026-10-07 on gemma4-12b: ~3.7 s per article.
+        if _auto_article_deep_analysis_enabled():
+            for article in story.articles:
+                if (
+                    not article.deep_analysis
+                    and article_has_analysable_content(article)
+                ):
+                    analysis = generate_article_deep_analysis(article)
+                    if analysis:
+                        article.deep_analysis = analysis
+                        metrics["child_article_analyses_generated"] += 1
+                        changed = True
+                        logger.info(f"    [Processor] Child article deep analysis: {article.title[:60]}")
+            db.session.commit()
+
         # 1. Process Story-level Summaries
         if article_count >= 2:
             if not story.summary:
@@ -176,35 +208,6 @@ def _fill_story_content(story, metrics):
             story.deep_report = None
 
         db.session.commit()
-        # This is critical for the static site links
-        for article in story.articles:
-            if not article.summary and article.content:
-                summary = summarize_article(article)
-                if summary:
-                    article.summary = summary
-                    metrics["child_article_summaries_generated"] += 1
-                    changed = True
-                    logger.info(f"    [Processor] Child article summary: {article.title[:60]}")
-        db.session.commit()
-
-        # Per-article deep analysis for every article in an edition story (this
-        # function only runs for edition stories). Any topic qualifies; the
-        # only filter is enough real article text to analyse. Off by default
-        # for new installs -- see _auto_article_deep_analysis_enabled(). Measured
-        # 2026-10-07 on gemma4-12b: ~3.7 s per article.
-        if _auto_article_deep_analysis_enabled():
-            for article in story.articles:
-                if (
-                    not article.deep_analysis
-                    and article_has_analysable_content(article)
-                ):
-                    analysis = generate_article_deep_analysis(article)
-                    if analysis:
-                        article.deep_analysis = analysis
-                        metrics["child_article_analyses_generated"] += 1
-                        changed = True
-                        logger.info(f"    [Processor] Child article deep analysis: {article.title[:60]}")
-            db.session.commit()
 
     except Exception as e:
         logger.error(f"  [Processor] Error processing story {story.id}: {e}")

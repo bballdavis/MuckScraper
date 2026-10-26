@@ -14,6 +14,14 @@ All notable changes to MuckScraper are documented here.
   long article. Needs a model context of at least ~8k tokens: raise
   `OLLAMA_CONTEXT_LENGTH` on the Ollama server, or set
   `ARTICLE_CONTENT_LIMIT=3000` in `.env` to keep the old length.
+- **Story summaries and deep analyses read more of each article.** The story
+  summary takes up to 20,000 characters across its articles (was 9,000) and
+  3,000 per article (was 1,500); the deep analysis up to 24,000 (was 13,500)
+  and 3,000 per article, plus, for each article longer than its excerpt, that
+  article's own analysis (or summary), up to 16,000 more. Article summaries
+  and analyses are now written before the story's, so they are there to use.
+  The biggest prompts are under 10k tokens; with Ollama's old 4k default
+  context, raise `OLLAMA_CONTEXT_LENGTH` (16k is enough).
 
 ## [1.0.2] - 2026-10-26
 

@@ -295,15 +295,43 @@ def _story_summary_rejection(summary):
     return looks_truncated(text)
 
 
-# Total article text in one story_summary prompt. Prompts over ~13k chars
-# overflowed Ollama's default ~4k-token context (2026-10-02 scan: 6 of 8
-# prompts >= 15k came back empty or cut off, 0 of 215 under 13k), leaving
-# the output no room. 9k of content keeps the whole prompt near 11k.
-STORY_SUMMARY_CONTENT_BUDGET = 9000
-STORY_SUMMARY_EXCERPT_MAX = 1500
+# Total article text in one story_summary prompt. Was 9,000 (1,500 each)
+# while the context was Ollama's ~4k default (2026-10-02 scan: 6 of 8
+# prompts >= 15k came back empty or cut off, 0 of 215 under 13k). The model
+# now runs with a 16k-token context (~55k chars for prompt plus answer), so
+# 20,000 / 3,000 each (Regis, 2026-10-26).
+STORY_SUMMARY_CONTENT_BUDGET = 20000
+STORY_SUMMARY_EXCERPT_MAX = 3000
 # Deep reports take up to 15 articles. Was a flat 300 chars each until
-# 2026-10-08; the 64k context leaves plenty of room for this.
-DEEP_REPORT_CONTENT_BUDGET = 13500
+# 2026-10-08, then 13,500 / 1,500 each until 2026-10-26.
+DEEP_REPORT_CONTENT_BUDGET = 24000
+DEEP_REPORT_EXCERPT_MAX = 3000
+# An article longer than its excerpt also brings its own analysis (or its
+# summary when it has none), both written from up to 24,000 chars of it, so
+# the report sees how long pieces end, not just how they open (Regis,
+# 2026-10-26). Shared out like the excerpts; with both budgets full the
+# prompt is ~43k chars (~11k tokens), inside the 16k context with room for
+# the answer.
+DEEP_REPORT_DIGEST_BUDGET = 16000
+DEEP_REPORT_DIGEST_MAX = 2500
+
+
+def article_digest(article):
+    """The most in-depth text already written about an article: its deep
+    analysis, else its summary, else ''."""
+    return (getattr(article, "deep_analysis", None) or article.summary or "").strip()
+
+
+def deep_report_digest_limits(articles, excerpt_limits, budget=DEEP_REPORT_DIGEST_BUDGET,
+                              per_article_max=DEEP_REPORT_DIGEST_MAX):
+    """{article id: chars of digest to include}, only for articles whose text
+    was cut by the excerpt and that have a digest."""
+    cut = [a for a in articles
+           if article_digest(a)
+           and len(strip_html(a.content or "").strip()) > excerpt_limits.get(a.id, 0)]
+    lengths = [len(article_digest(a)) for a in cut]
+    return dict(zip((a.id for a in cut),
+                    _story_summary_excerpt_limits(lengths, budget=budget, per_article_max=per_article_max)))
 
 
 def _story_summary_excerpt_limits(content_lengths, budget=STORY_SUMMARY_CONTENT_BUDGET,
@@ -464,11 +492,21 @@ def generate_deep_report(story):
     contents = [strip_html(a.content or "").strip() for a in prompt_articles]
     excerpt_limits = dict(zip(
         (a.id for a in prompt_articles),
-        _story_summary_excerpt_limits([len(c) for c in contents], budget=DEEP_REPORT_CONTENT_BUDGET),
+        _story_summary_excerpt_limits([len(c) for c in contents], budget=DEEP_REPORT_CONTENT_BUDGET,
+                                      per_article_max=DEEP_REPORT_EXCERPT_MAX),
     ))
 
     def excerpt(a):
         return strip_html(a.content or "")[:excerpt_limits.get(a.id, 300)].strip()
+
+    digest_limits = deep_report_digest_limits(prompt_articles, excerpt_limits)
+
+    def digest(a):
+        limit = digest_limits.get(a.id)
+        if not limit:
+            return ""
+        text = " ".join(article_digest(a).split())
+        return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0] + " ..."
 
     for article in prompt_articles:
         score = article.bias_score
@@ -493,6 +531,9 @@ def generate_deep_report(story):
             snippet = excerpt(a)
             if snippet:
                 lines.append(f"  Excerpt: {snippet}")
+            whole = digest(a)
+            if whole:
+                lines.append(f"  Analysis of the whole article: {whole}")
         return "\n".join(lines)
 
     def format_all_articles(articles):
@@ -504,6 +545,9 @@ def generate_deep_report(story):
             snippet = excerpt(a)
             if snippet:
                 lines.append(f"  Excerpt: {snippet}")
+            whole = digest(a)
+            if whole:
+                lines.append(f"  Analysis of the whole article: {whole}")
         return "\n".join(lines)
 
     # Build prompt based on analysis type
@@ -574,6 +618,7 @@ def generate_deep_report(story):
             "analysis_type": analysis_type,
             "prompt_articles": len(prompt_articles),
             "excluded_prompt_articles": len(excluded_articles),
+            "articles_with_digest": len(digest_limits),
         }
     )
 
