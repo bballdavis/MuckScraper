@@ -299,6 +299,8 @@ class ApiEndToEndTests(unittest.TestCase):
         detail = self._get(f"/api/v1/stories/{self.ids['story']}", token).get_json()
         self.assertEqual(len(detail["articles"]["left"]), 1)
         self.assertEqual(detail["opinion"]["right"][0]["stance"], "Too much spending")
+        self.assertEqual(detail["analysis_sections"],
+                         [{"label": "The story", "kind": "lead", "paragraphs": ["long report."], "empty": False}])
         body = str(detail)
         for internal in ("scrape_status", "secret reason", "grouping", "embedding"):
             self.assertNotIn(internal, body)

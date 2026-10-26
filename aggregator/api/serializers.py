@@ -14,6 +14,7 @@ from aggregator.html_safety import sanitize_html
 from aggregator.opinion import leaning
 from aggregator.outlet_origins import is_international
 from aggregator.outlet_reporting import reporting_for
+from aggregator.story_analysis import parse as parse_analysis
 
 DEK_MAX_CHARS = 280
 
@@ -35,6 +36,14 @@ def _http_url(url):
 
 def _paragraphs(text):
     return [line.strip() for line in (text or "").splitlines() if line.strip()]
+
+
+def analysis_sections(text):
+    """The deep report split into its labelled sections, as the story page
+    lays them out: kind is lead, left, center, right, next or other, and
+    empty marks an L/C/R bucket that had no sources."""
+    return [{"label": s["label"], "kind": s["kind"], "paragraphs": s["paragraphs"], "empty": s["empty"]}
+            for s in parse_analysis(text)]
 
 
 def _dek(summary):
@@ -199,6 +208,7 @@ def story_detail(story, opinion_pieces):
         "created_at": iso(story.created_at),
         "summary": _paragraphs(story.summary),
         "deep_report": _paragraphs(story.deep_report),
+        "analysis_sections": analysis_sections(story.deep_report),
         "opinion_roundup": _paragraphs(story.opinion_roundup),
         "articles": by_leaning(articles, _article_side, article_card),
         "copies_hidden": sum(1 for a in articles if is_copy_in_story(a)),
