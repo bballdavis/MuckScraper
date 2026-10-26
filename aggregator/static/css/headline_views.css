@@ -22,12 +22,16 @@
 .view-rule { font-size: 12px; opacity: 0.85; }
 [data-theme="dark"] .view-seg.on { background: var(--accent-light); }
 
-/* Why a card is in the view: "+7 outlets in 6h", "Framing gap: high · 6 op-eds".
-   In the meta row, right of the article count (Philip, 2026-10-25). */
-.card-meta .why { margin: 0 10px; }
-.why {
-    display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 99px;
-    color: var(--accent-text); background: var(--summary-bg); border: 1px solid var(--input-border);
+/* Why a card is in the view: "High gap · 6 op-eds". One more item in the
+   meta row, right of the article count, with the view's icon and no pill
+   (Philip, 2026-10-26: mock B). */
+.why { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-weight: 600; color: var(--accent-text); }
+.why .icon { width: 14px; height: 14px; flex: none; }
+/* Phones: it doesn't fit beside the date and count, so it takes the line
+   under them, without a separator dot left hanging at the start. */
+@media (max-width: 600px) {
+    .card-meta .why { flex-basis: 100%; }
+    .card-meta .meta-item.why::before { content: none; margin: 0; }
 }
 .why-hot { color: #b45309; }
 [data-theme="dark"] .why-hot { color: #fb923c; }
