@@ -73,7 +73,7 @@ def headlines_feed():
     for story in stories:
         apply_aggregator_filter(story)
         story_bias_totals(story)
-        story.why_label = headline_views.why_label(view, story.rank_entry)
+        story.why_label = headline_views.short_why(view, story.rank_entry)
 
     groups = []
     if view == "latest":
