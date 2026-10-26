@@ -4,6 +4,17 @@ All notable changes to MuckScraper are documented here.
  
 ---
 
+## [Unreleased]
+
+### Changed
+- **Article summaries and analyses read up to 24,000 characters of the
+  article** (was the first 3,000 and 3,500). Long pieces are summarised from
+  the whole text instead of their opening, and the analysis no longer says a
+  piece lacks evidence that sits further down. Costs about two seconds per
+  long article. Needs a model context of at least ~8k tokens: raise
+  `OLLAMA_CONTEXT_LENGTH` on the Ollama server, or set
+  `ARTICLE_CONTENT_LIMIT=3000` in `.env` to keep the old length.
+
 ## [1.0.2] - 2026-10-26
 
 ### Added

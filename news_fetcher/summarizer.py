@@ -586,6 +586,16 @@ def generate_deep_report(story):
     return None
 
 
+# How much of an article the article summary and analysis read. 24,000
+# characters (~6-7k tokens) covers all but ~1 in 150 articles and fits the
+# 16k context. Was 3,000 / 3,500, which on 2026-10-26 A/B cut the later half
+# of long pieces: analyses said "no polling data" for an article that had it.
+# About +2 s per long article. ARTICLE_CONTENT_LIMIT in .env lowers it for a
+# model with a small context (Ollama's old 4k default needs ~3000).
+ARTICLE_SUMMARY_CONTENT_LIMIT = int(os.environ.get("ARTICLE_CONTENT_LIMIT") or 24000)
+ARTICLE_ANALYSIS_CONTENT_LIMIT = ARTICLE_SUMMARY_CONTENT_LIMIT
+
+
 @observe()
 def summarize_article(article):
     """
@@ -607,7 +617,7 @@ def summarize_article(article):
     analysis_type = detect_analysis_type(article)
     persona = get_persona(analysis_type)
 
-    clean_content = strip_html(article.content)[:3000].strip()
+    clean_content = strip_html(article.content)[:ARTICLE_SUMMARY_CONTENT_LIMIT].strip()
     if not clean_content:
         return None
 
@@ -649,7 +659,7 @@ def generate_article_deep_analysis(article):
         return None
 
     analysis_type = detect_analysis_type(article)
-    clean_content = strip_html(article.content)[:3500].strip()
+    clean_content = strip_html(article.content)[:ARTICLE_ANALYSIS_CONTENT_LIMIT].strip()
     if not clean_content:
         return None
 
