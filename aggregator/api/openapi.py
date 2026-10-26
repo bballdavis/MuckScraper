@@ -163,7 +163,11 @@ SCHEMAS["StoryDetail"] = {"allOf": [_ref("StorySummary"), _obj(
     ["title", "topics", "created_at", "summary", "deep_report", "opinion_roundup", "articles", "copies_hidden", "opinion"],
     title=_S, topics=_PARAS, created_at=_NDT, summary=_PARAS, deep_report=_PARAS, opinion_roundup=_PARAS,
     articles=_by_leaning(_ref("ArticleCard")), copies_hidden=_I, opinion=_by_leaning(_ref("OpinionPiece")),
-    is_skipped={"type": "boolean", "description": "Passed on in Swipe: scheduled runs won't summarize it"})]}
+    is_skipped={"type": "boolean", "description": "Passed on in Swipe: scheduled runs won't summarize it"},
+    analysis_sections={"type": "array", "description": "deep_report split into its labelled sections", "items": _obj(
+        ["label", "kind", "paragraphs", "empty"], label=_NS,
+        kind={"type": "string", "enum": ["lead", "left", "center", "right", "next", "other"]},
+        paragraphs=_PARAS, empty={"type": "boolean", "description": "An L/C/R bucket with no sources"})})]}
 SCHEMAS["ArticleDetail"] = {"allOf": [_ref("ArticleCard"), _obj(
     ["topics", "analysis", "content_html"], topics=_PARAS, analysis=_PARAS,
     content_html={"type": ["string", "null"], "description": "Sanitized scraped HTML; null unless the server allows full text."},

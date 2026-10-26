@@ -62,6 +62,22 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(story_analysis.layout("  \n ")["sections"], [])
 
 
+class ApiSectionsTests(unittest.TestCase):
+    """The mobile API sends the same sections, so the iOS app lays out
+    left / center / right without a parser of its own."""
+
+    def test_api_sections(self):
+        from aggregator.api.serializers import analysis_sections
+        sections = analysis_sections(POLITICS)
+        self.assertEqual([s["kind"] for s in sections],
+                         ["lead", "left", "center", "right", "other", "other", "next"])
+        self.assertEqual(sections[1], {"label": "How the left is covering it", "kind": "left",
+                                       "paragraphs": ["The Guardian leads with the bystander video."],
+                                       "empty": False})
+        self.assertTrue(sections[3]["empty"])
+        self.assertEqual(analysis_sections(None), [])
+
+
 class DeepReportTypeTests(unittest.TestCase):
     """Which prompt writes the analysis (news_fetcher.summarizer.deep_report_type):
     general stories with rated sources get the left/center/right breakdown
