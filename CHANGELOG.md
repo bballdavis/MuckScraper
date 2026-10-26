@@ -6,13 +6,6 @@ All notable changes to MuckScraper are documented here.
 
 ## [Unreleased]
 
-### Added
-- **Mobile API sends the analysis in sections.** `GET /api/v1/stories/{id}`
-  now includes `analysis_sections`: the multi-source analysis split into
-  its labelled parts, each with a `kind` (lead, left, center, right, next or
-  other), so the iOS app can lay out left / center / right like the story
-  page. `deep_report` is unchanged.
-
 ### Changed
 - **Multi-source analysis is Left / Center / Right for general stories too.**
   A general story (not science, sports or business) with at least one
@@ -39,6 +32,11 @@ All notable changes to MuckScraper are documented here.
   so it no longer sits empty for most of the night.
 
 ### Added
+- **Mobile API sends the analysis in sections.** `GET /api/v1/stories/{id}`
+  now includes `analysis_sections`: the multi-source analysis split into
+  its labelled parts, each with a `kind` (lead, left, center, right, next or
+  other), so the iOS app can lay out left / center / right like the story
+  page. `deep_report` is unchanged.
 - **Headlines views: Trending, Latest and Controversial.** Headlines now opens
   on a live view, picked with a chip as wide as the column under Breaking
   News (each segment with its count and a one-line rule) instead of the
