@@ -40,7 +40,7 @@
     <div class="panel-head">
         <div>
             <h2>Pair a device</h2>
-            <p>Creates a one-time code for a user. Scan the QR code in MuckScroller, or type the code. It works once and expires after {{ pairing_minutes }} minutes; no password crosses the internet.</p>
+            <p>Creates a one-time code for a user. Scan the QR code with the iPhone camera or in MuckScroller (Settings › Server), and the app fills in this server and the code; or type them. It works once and expires after {{ pairing_minutes }} minutes; no password crosses the internet.</p>
         </div>
     </div>
     {%- if pairing %}
@@ -51,7 +51,7 @@
             <span class="pair-code">{{ pairing.display }}</span>
             <span class="row-sub">Expires {{ pairing.expires_at | local_datetime }}. It is shown only now.</span>
             {%- if not pairing.server %}
-            <span class="field-warn">No public address is set below, so the QR code doesn't tell the app where your server is; enter it in the app.</span>
+            <span class="field-warn">No public address is set below, so the QR code doesn't tell the app where your API is; enter its address in the app.</span>
             {%- endif %}
         </div>
     </div>
