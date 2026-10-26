@@ -411,6 +411,9 @@
     .ft-left { flex: 1 1 0; min-width: 0; }
     .ft-right { flex: 0 0 auto; }
     .ft-search-toggle { display: inline-flex; }
+    /* 16px so iOS doesn't zoom in when the search takes focus (theme.css
+       does the same for every field on touch screens). */
+    .ft-search input[type="search"] { font-size: 16px; }
     .feed-topbar:not(.search-open) .ft-center { display: none; }
     .feed-topbar.search-open .ft-center { animation: ft-slide-down 0.18s ease-out; }
 }
