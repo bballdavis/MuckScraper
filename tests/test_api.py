@@ -372,6 +372,8 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertIsNone(rest["next_cursor"])
         multi = self._get("/api/v1/stories?single=false", token).get_json()["items"]
         self.assertEqual([s["id"] for s in multi], [self.ids["story"]])
+        # Trending's "N outlets in 6h" rides along, or null.
+        self.assertTrue(all("why" in s for s in multi))
         self.assertEqual(self._get("/api/v1/stories?topic=Nope", token).status_code, 404)
 
     def test_bad_parameters_are_rejected(self):

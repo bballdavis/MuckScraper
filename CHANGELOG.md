@@ -7,6 +7,10 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Changed
+- **Mobile API: section lists say what's trending.** `GET /api/v1/stories`
+  cards carry `why`, Trending's "4 outlets in 6h", or null when no outlet
+  reported the story in the last 6 hours, so the iOS app shows it on every
+  section list as it does on Headlines.
 - **Swipe deck: most sources first.** The app's Swipe deck
   (`GET /api/v1/me/deck`) now puts the stories covered by the most outlets
   first and works down, with better-graded outlets (reporting grade)

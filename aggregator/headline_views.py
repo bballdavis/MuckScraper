@@ -182,8 +182,8 @@ def short_why(view, entry):
     reporting in the last 6h", "Framing gap: high · 6 op-eds") gave way to
     these (Philip, 2026-10-26). Trending's count shows beside the Breaking
     chip, not in place of it."""
-    if view == "trending" and entry.signals.recent:
-        return f"{entry.signals.recent} outlet{'s' if entry.signals.recent != 1 else ''} in 6h"
+    if view == "trending":
+        return recent_why(entry.signals.recent)
     if view == "controversial":
         parts = []
         level = gap_level(entry.gap)
@@ -194,6 +194,21 @@ def short_why(view, entry):
             parts.append(f"{columns} op-ed{'s' if columns != 1 else ''}")
         return " · ".join(parts) or "Both sides"
     return None
+
+
+def recent_why(recent):
+    """Trending's "4 outlets in 6h"; None when no outlet reported it lately."""
+    if not recent:
+        return None
+    return f"{recent} outlet{'s' if recent != 1 else ''} in 6h"
+
+
+def recent_whys(story_ids, now=None):
+    """{story_id: "N outlets in 6h"} for the section lists, the count Trending
+    shows, for stories that have one."""
+    if not story_ids:
+        return {}
+    return {r.story_id: recent_why(r.recent) for r in _signal_rows(story_ids=story_ids, now=now) if r.recent}
 
 
 def hour_group(newest, now):

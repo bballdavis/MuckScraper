@@ -10,7 +10,7 @@ from flask import g, jsonify, request
 from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload, selectinload
 
-from aggregator import article_jobs, article_lean, db, feed_prefs, reads, skips
+from aggregator import article_jobs, article_lean, db, feed_prefs, headline_views, reads, skips
 from aggregator.models import Article, Edition, EditionStory, OpinionPiece, Story, Topic
 from aggregator.opinion import published_edition_opinion_cards
 from aggregator.search import SearchUnavailableError, search_article_ids, search_story_ids
@@ -227,7 +227,11 @@ def stories():
         query = query.filter(Story.topics.contains(topic))
     rows = (query.options(*_story_load()).order_by(func.max(Article.date).desc(), Story.id.desc())
             .offset(offset).limit(limit + 1).all())
-    return jsonify(_page(_annotate_read([ser.story_summary(s) for s in rows]), offset, limit))
+    cards = _annotate_read([ser.story_summary(s) for s in rows])
+    whys = headline_views.recent_whys([c["id"] for c in cards])
+    for card in cards:
+        card["why"] = whys.get(card["id"])
+    return jsonify(_page(cards, offset, limit))
 
 
 @api.route("/stories/<int:story_id>")
