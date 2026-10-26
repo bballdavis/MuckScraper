@@ -23,6 +23,7 @@ HEADERS_DEFAULT = {
 # with exactly the same rules at render time.
 from aggregator.html_safety import ALLOWED_ATTRIBUTES, ALLOWED_TAGS, sanitize_html  # noqa: E402,F401
 from news_fetcher import nyt_api  # noqa: E402
+from news_fetcher.bylines import author_from_html  # noqa: E402
 
 # No crawler user agent and no headless browser for paywalled sites (Regis,
 # 2026-10-21). Posing as Googlebot is how 12ft.io got past paywalls before
@@ -100,6 +101,9 @@ class ScrapeResult:
     # The page's share image (og:image and the like), read from the first
     # page fetched; ingestion and rescrapes use it when the feed gave none.
     image_url: str | None = None
+    # The byline the publisher's page declares (raw; clean with
+    # news_fetcher.bylines.clean_byline). Only set when the page was fetched.
+    author: str | None = None
 
     @property
     def succeeded(self):
@@ -913,7 +917,9 @@ def _scrape_publisher_pages(url, fallback_content, force, page_images):
                 page_images.append(extract_page_image(response.text, candidate_url))
                 if page_images[0] is None:
                     page_images.clear()
-            if candidate_url == url and headers == HEADERS_DEFAULT:
+            # try_bs4(url) passes headers=None, which _fetch_html turns into
+            # HEADERS_DEFAULT; comparing to HEADERS_DEFAULT alone never matched.
+            if candidate_url == url and headers in (None, HEADERS_DEFAULT):
                 initial_html = response.text
             content = extract_with_readability(response.text, candidate_url)
             if content:
@@ -935,33 +941,38 @@ def _scrape_publisher_pages(url, fallback_content, force, page_images):
             logger.info(f"  [Scraper] Error for {candidate_url[:60]}: {exc}")
         return None
 
+    def with_author(result):
+        if initial_html and result is not None:
+            result.author = author_from_html(initial_html)
+        return result
+
     result = try_bs4(url, method="bs4")
     if result and result.succeeded:
-        return result
+        return with_author(result)
 
     if should_try_variant_urls(url=url, http_status=http_status, failure_reason=last_failure):
         for variant_url in build_variant_urls(url, html=initial_html):
             logger.info(f"  [Scraper] Trying variant {variant_url[:80]}")
             variant_result = try_bs4(variant_url, method="variant_bs4")
             if variant_result and variant_result.succeeded:
-                return ScrapeResult(
+                return with_author(ScrapeResult(
                     content=variant_result.content,
                     status=SCRAPE_STATUS_FALLBACK,
                     method="variant_bs4",
                     http_status=variant_result.http_status,
-                )
+                ))
 
     if initial_html:
         attempted_methods.append("metadata")
         content = extract_structured_metadata(initial_html, url)
         if content:
-            return finalize_content(content, "metadata", SCRAPE_STATUS_FALLBACK)
+            return with_author(finalize_content(content, "metadata", SCRAPE_STATUS_FALLBACK))
 
     if fallback_content:
         logger.info(f"  [Scraper] Falling back to feed/API description for {url[:60]}")
         content = sanitize_html(f"<div><p>{bleach.clean(_clean_text(fallback_content), strip=True)}</p></div>")
         if len(_clean_text(fallback_content)) >= 80:
-            return finalize_content(content, "feed_description", SCRAPE_STATUS_FALLBACK)
+            return with_author(finalize_content(content, "feed_description", SCRAPE_STATUS_FALLBACK))
 
     result = ScrapeResult(
         content=None,
@@ -971,4 +982,4 @@ def _scrape_publisher_pages(url, fallback_content, force, page_images):
         http_status=http_status,
     )
     update_retry_cache(url, result)
-    return result
+    return with_author(result)
