@@ -168,6 +168,7 @@ class HeadlineViewTests(unittest.TestCase):
         meta = card[card.index('class="card-meta"'):card.index("bias-balance")]
         self.assertIn("5 articles", meta)
         self.assertNotIn("reporting in the last 6h", meta)
+        self.assertIn("outlets in 6h", meta)
         small = self._card(page, self.ids["small"])
         self.assertIn("The Big Picture", small)
         self.assertIn("Crews are evacuating three towns.", small)
