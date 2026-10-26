@@ -47,3 +47,38 @@ def test_navigation_does_not_cover_brand_and_restores_focus(width, height):
             assert not page.locator('#sidebar').evaluate('(el) => el.inert')
         assert not errors
         browser.close()
+
+
+@pytest.mark.parametrize("width,height", [(393, 852), (1440, 1000)])
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_menu_uses_header_foreground_on_real_headlines_page(width, height, theme):
+    playwright = pytest.importorskip("playwright.sync_api")
+    env = Environment(loader=FileSystemLoader(ROOT / "aggregator/templates"))
+    env.filters["get_big_picture"] = lambda value: value
+    env.globals.update(url_for=lambda endpoint, **kw: "/static/" + kw["filename"] if endpoint == "static" else "/" + endpoint,
+                       can=lambda role: False, current_user=SimpleNamespace(is_authenticated=False),
+                       request=SimpleNamespace(query_string="", path="/headlines"),
+                       config={"DISPLAY_TIMEZONE": "UTC"}, current_back=lambda: "/headlines")
+    html = env.get_template("headlines_feed.html").render(stories=[], page=1, total_pages=1,
+        edition=None, edition_label="Synthetic review edition", is_past_edition=False)
+    with playwright.sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page(viewport={"width": width, "height": height})
+        def route(request):
+            if request.request.url == "https://reader.example/":
+                request.fulfill(body=html, content_type="text/html")
+            elif "/static/css/" in request.request.url:
+                path = ROOT / "aggregator/static/css" / request.request.url.rsplit("/", 1)[-1]
+                request.fulfill(body=path.read_bytes(), content_type="text/css")
+            else:
+                request.abort()
+        page.route("**/*", route)
+        page.goto("https://reader.example/")
+        page.evaluate("theme => document.documentElement.dataset.theme = theme", theme)
+        button = page.locator("#sidebar-toggle")
+        assert button.evaluate("el => getComputedStyle(el).color") == page.locator(".topbar-title").evaluate("el => getComputedStyle(el).color")
+        box = button.bounding_box()
+        brand = page.locator(".topbar-title").bounding_box()
+        assert box["x"] + box["width"] <= brand["x"]
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        browser.close()
