@@ -10,6 +10,7 @@ from sqlalchemy import or_
 
 from aggregator import db, newsbox, skips
 from aggregator.models import Article, Edition, EditionStory, NewsBoxItem, Story
+from aggregator.outlet_reporting import HIGH, LEVELS, VERY_HIGH, reporting_for
 
 from . import api, serializers as ser
 from .auth import require_token
@@ -19,7 +20,7 @@ from .routes import DEFAULT_PAGE_SIZE, _annotate_read, _page, _published_edition
 
 # How far back the deck looks once the latest edition's headlines are done.
 DECK_WINDOW = timedelta(days=7)
-# The most stories the second tier considers.
+# The most stories the second tier considers, most articles first.
 DECK_MORE_LIMIT = 500
 
 
@@ -33,9 +34,25 @@ def _needs_work(stories):
     return [s for s in stories if not newsbox.has_parts(s, "summary_analysis")]
 
 
+def _outlets(story):
+    """The story's distinct outlet names: what its card counts as sources."""
+    return {a.outlet.name if a.outlet else a.source for a in story.site_articles}
+
+
+def _deck_order(story, tier):
+    """Sort key: most sources first (Philip, 2026-10-26), then the best
+    reporting grade among them (aggregator/outlet_reporting.py), then how
+    many outlets grade High or better, then the edition's headlines."""
+    grades = [reporting_for(name) for name in _outlets(story)]
+    best = min((LEVELS.index(g) for g in grades if g), default=len(LEVELS))
+    strong = sum(g in (VERY_HIGH, HIGH) for g in grades)
+    return (-len(grades), best, -strong, tier != "headlines")
+
+
 def _deck(user_id):
-    """[(story, tier)] in deck order: the latest edition's headlines by rank,
-    then other recent stories, newest first."""
+    """[(story, tier)] in deck order: stories with the most outlets first,
+    better-graded outlets breaking ties. Within a tie the latest edition's
+    headlines come first by rank, then other recent stories, newest first."""
     excluded = {sid for (sid,) in db.session.query(NewsBoxItem.story_id).filter_by(user_id=user_id)}
     excluded |= skips.skipped_ids(user_id)
     missing = or_(_blank(Story.summary), _blank(Story.deep_report))
@@ -51,15 +68,23 @@ def _deck(user_id):
                 out.append((story, "headlines"))
                 excluded.add(story.id)
 
+    # Most articles first, so a busy week can't push multi-source stories
+    # past the limit behind a pile of new one-article ones.
     newest = db.func.max(Article.date)
     rows = (Story.query.join(Article, Article.story_id == Story.id)
             .filter(missing).group_by(Story.id)
             .having(newest >= datetime.utcnow() - DECK_WINDOW)
-            .options(*_story_load()).order_by(newest.desc(), Story.id.desc()).limit(DECK_MORE_LIMIT).all())
+            .options(*_story_load())
+            .order_by(db.func.count(Article.id).desc(), newest.desc(), Story.id.desc())
+            .limit(DECK_MORE_LIMIT).all())
+    rows.sort(key=lambda s: (max((a.date for a in s.articles if a.date), default=datetime.min), s.id),
+              reverse=True)
     for story in _needs_work(rows):
         if story.id not in excluded:
             out.append((story, "more"))
             excluded.add(story.id)
+    # A stable sort keeps rank and recency order within each tie.
+    out.sort(key=lambda entry: _deck_order(*entry))
     return out
 
 
@@ -67,8 +92,9 @@ def _deck(user_id):
 @require_token()
 def get_deck():
     """The Swipe deck: stories without a summary or analysis that the user
-    hasn't queued or skipped. The latest edition's headlines come first
-    (tier "headlines"), then the past week's other stories (tier "more")."""
+    hasn't queued or skipped, from the latest edition's headlines (tier
+    "headlines") and the past week's other stories (tier "more"). Stories
+    with the most outlets come first, better-graded outlets breaking ties."""
     args = query_args(cursor=cursor, limit=integer(1, MAX_PAGE_SIZE))
     offset, limit = args["cursor"] or 0, args["limit"] or DEFAULT_PAGE_SIZE
     cards = []
