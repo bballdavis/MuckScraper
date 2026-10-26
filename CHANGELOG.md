@@ -7,6 +7,10 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Changed
+- **Mobile API: section lists say what's trending.** `GET /api/v1/stories`
+  cards carry `why`, Trending's "4 outlets in 6h", or null when no outlet
+  reported the story in the last 6 hours, so the iOS app shows it on every
+  section list as it does on Headlines.
 - **Multi-source analysis is Left / Center / Right for general stories too.**
   A general story (not science, sports or business) with at least one
   bias-rated source now gets the left / center / right breakdown instead

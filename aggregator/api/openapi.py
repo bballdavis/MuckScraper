@@ -84,6 +84,10 @@ SCHEMAS = {
         framing_gap={"type": ["string", "null"], "enum": ["high", "moderate", "low", None],
                      "description": "Controversial only: how differently left and right outlets write it up"},
         opeds={"type": "integer", "description": "Linked op-eds (Controversial only; 0 elsewhere)"})]},
+    "SectionCard": {"allOf": [_ref("StorySummary"), _obj(
+        ["why"],
+        why={"type": ["string", "null"], "description": "Trending's \"4 outlets in 6h\" for beside the "
+             "kicker line; null when no outlet reported it in the last 6 hours"})]},
     "ArticleCard": _obj(
         ["id", "story_id", "title", "outlet", "leaning", "url", "published_at", "image_url", "summary", "copy_of"],
         id=_I, story_id=_NI, title=_S, outlet=_ref("Outlet"), leaning=_LEANING, url=_URL,
@@ -250,7 +254,7 @@ PATHS = {
         "type": "array", "items": _obj(["story", "columns"], story=_ref("StorySummary"),
                                        columns=_by_leaning(_ref("OpinionPiece")))})),
         [_q("edition", _I)], _NOT_FOUND),
-    "/stories": _get("stories", _json(_page(_ref("StorySummary"))),
+    "/stories": _get("stories", _json(_page(_ref("SectionCard"))),
                      [_q("topic", _S), _RANGE, _q("single", _B, "Include single-article stories"), _CURSOR, _LIMIT],
                      _NOT_FOUND),
     "/headlines": _get("headlines", _json(_obj(
