@@ -177,10 +177,13 @@ def gap_level(gap):
 
 def short_why(view, entry):
     """Why a card is in the view, short enough to sit beside the L/C/R pill
-    on a phone row or in a web card's meta row: "High gap · 2 op-eds",
-    "Both sides". Trending's "N reporting in the last 6h" gave way to the
-    Breaking chip (Philip, 2026-10-25), and the web's longer "Framing gap:
-    high · 6 op-eds" pill to this (Philip, 2026-10-26)."""
+    on a phone row or in a web card's meta row: "4 outlets in 6h",
+    "High gap · 2 op-eds", "Both sides". The web's longer pills ("N
+    reporting in the last 6h", "Framing gap: high · 6 op-eds") gave way to
+    these (Philip, 2026-10-26). Trending's count shows beside the Breaking
+    chip, not in place of it."""
+    if view == "trending" and entry.signals.recent:
+        return f"{entry.signals.recent} outlet{'s' if entry.signals.recent != 1 else ''} in 6h"
     if view == "controversial":
         parts = []
         level = gap_level(entry.gap)
