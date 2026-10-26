@@ -118,6 +118,23 @@ class ParamTests(unittest.TestCase):
 
 
 @unittest.skipUnless(TEST_DB, "set API_TEST_DATABASE_URL to run the API end-to-end tests")
+class PairingLinkTests(unittest.TestCase):
+    def test_link_carries_code_and_both_addresses_encoded(self):
+        from urllib.parse import parse_qs, urlsplit
+        from aggregator.blueprints.admin.api_access import pairing_link
+        link = pairing_link("ABCDE23456", "https://api.example.com/x?a=1&b=2", "https://news.example.com")
+        parts = urlsplit(link)
+        self.assertEqual((parts.scheme, parts.netloc), ("muckscroller", "pair"))
+        self.assertEqual(parse_qs(parts.query), {
+            "code": ["ABCDE23456"], "server": ["https://api.example.com/x?a=1&b=2"],
+            "site": ["https://news.example.com"],
+        })
+
+    def test_empty_addresses_are_left_out(self):
+        from aggregator.blueprints.admin.api_access import pairing_link
+        self.assertEqual(pairing_link("ABCDE23456", "", ""), "muckscroller://pair?code=ABCDE23456")
+
+
 class ApiEndToEndTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

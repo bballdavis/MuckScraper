@@ -3,6 +3,7 @@
 one-time pairing codes with a QR code for the MuckScroller app. Lives in the
 web app, never in the API process."""
 from datetime import datetime, timedelta
+from urllib.parse import urlencode
 
 from flask import flash, make_response, redirect, render_template, request, session, url_for
 from flask_login import current_user
@@ -35,6 +36,26 @@ def _qr_svg(payload):
     return Markup(segno.make(payload, error="m").svg_inline(scale=5, dark="#111", light="#fff"))
 
 
+def pairing_link(code, server, site):
+    """What the pairing QR code holds: muckscroller://pair with the code, the
+    API's address (`server`, Settings › API's public address) and this site's
+    address (`site`, for the links the app shares). The app fills in all
+    three and pairs; empty addresses are left out."""
+    params = {"code": code}
+    if server:
+        params["server"] = server
+    if site:
+        params["site"] = site
+    return "muckscroller://pair?" + urlencode(params)
+
+
+def _site_url():
+    """This site's address as the browser sees it. The web app has no
+    ProxyFix, so a TLS proxy in front shows up only in X-Forwarded-Proto."""
+    proto = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip() or request.scheme
+    return f"{proto}://{request.host}"
+
+
 def _formatted_code(code):
     half = CODE_LENGTH // 2
     return f"{code[:half]}-{code[half:]}"
@@ -64,7 +85,7 @@ def _render(new_key=None):
     pairing = None
     if new_code:
         server = config["public_url"].rstrip("/")
-        payload = f"muckscroller://pair?code={new_code['code']}" + (f"&server={server}" if server else "")
+        payload = pairing_link(new_code["code"], server, _site_url())
         pairing = {**new_code, "display": _formatted_code(new_code["code"]), "qr": _qr_svg(payload), "server": server,
                    "expires_at": datetime.fromisoformat(new_code["expires_at"])}
     pending = ApiPairingCode.query.filter(ApiPairingCode.used_at.is_(None),
