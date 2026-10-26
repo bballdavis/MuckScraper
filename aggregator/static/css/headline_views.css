@@ -22,7 +22,7 @@
 .view-rule { font-size: 12px; opacity: 0.85; }
 [data-theme="dark"] .view-seg.on { background: var(--accent-light); }
 
-/* Why a card is in the view: "High gap · 6 op-eds". One more item in the
+/* Why a card is in the view: "4 outlets in 6h", "High gap · 6 op-eds". One more item in the
    meta row, right of the article count, with the view's icon and no pill
    (Philip, 2026-10-26: mock B). */
 .why { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-weight: 600; color: var(--accent-text); }
