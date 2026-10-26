@@ -169,21 +169,6 @@ def load_stories(entries):
     return out
 
 
-def why_label(view, entry):
-    """The short chip a card shows for why it is in the view, or None.
-    Trending's "N reporting in the last 6h" gave way to the Breaking chip
-    (Philip, 2026-10-25)."""
-    if view == "controversial":
-        parts = []
-        if entry.gap is not None:
-            parts.append("Framing gap: " + gap_level(entry.gap))
-        columns = entry.opeds[0] if entry.opeds else 0
-        if columns:
-            parts.append(f"{columns} op-ed{'s' if columns != 1 else ''}")
-        return " · ".join(parts) or "Covered by both sides"
-    return None
-
-
 def gap_level(gap):
     if gap is None:
         return None
@@ -191,8 +176,11 @@ def gap_level(gap):
 
 
 def short_why(view, entry):
-    """why_label cut down for a phone row, where it sits beside the L/C/R
-    pill: "High gap · 2 op-eds", "Both sides"."""
+    """Why a card is in the view, short enough to sit beside the L/C/R pill
+    on a phone row or in a web card's meta row: "High gap · 2 op-eds",
+    "Both sides". Trending's "N reporting in the last 6h" gave way to the
+    Breaking chip (Philip, 2026-10-25), and the web's longer "Framing gap:
+    high · 6 op-eds" pill to this (Philip, 2026-10-26)."""
     if view == "controversial":
         parts = []
         level = gap_level(entry.gap)

@@ -226,7 +226,7 @@
 {%- endif -%}
 {%- endmacro %}
 
-{% macro story_card(story, compact=false, why=none, why_hot=false) -%}
+{% macro story_card(story, compact=false, why=none, why_hot=false, why_icon=none) -%}
 {%- if compact %}
 {#- Compact (All / Grouped Stories): the image, the headline, one meta row
     (date, counts, flags), then the bottom row: the Left/Center/Right bar for
@@ -308,8 +308,10 @@
                 {% endif %}
                 <span class="meta-item">{{ article_count }} article{{ 's' if article_count != 1 else '' }}</span>
                 {#- Headlines: why the card is in the view, on the count's
-                    right rather than a row of its own (Philip, 2026-10-25). -#}
-                {% if why %}<span class="why{{ ' why-hot' if why_hot else '' }}">{{ why }}</span>{% endif %}
+                    right rather than a row of its own (Philip, 2026-10-25),
+                    as one more meta item with an icon, not a pill (Philip,
+                    2026-10-26: mock B). -#}
+                {% if why %}<span class="meta-item why{{ ' why-hot' if why_hot else '' }}">{% if why_icon %}{{ icon(why_icon) }}{% endif %}{{ why }}</span>{% endif %}
                 {% if story.edition_has_updates %}<span class="card-flag flag-new">New updates</span>{% endif %}
             </div>
 
