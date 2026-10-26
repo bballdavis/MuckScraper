@@ -146,7 +146,8 @@ class HeadlineViewTests(unittest.TestCase):
         self.assertIn("single source", latest)
         self.assertIn("Last hour", latest)
         controversial = client.get("/headlines?view=controversial").get_data(as_text=True)
-        self.assertIn("Framing gap: high · 1 op-ed", controversial)
+        self.assertIn("High gap · 1 op-ed", controversial)
+        self.assertNotIn("Framing gap", controversial)
 
     def test_an_edition_by_id_has_no_switcher(self):
         page = self._client().get(f"/headlines?edition={self.ids['edition']}").get_data(as_text=True)

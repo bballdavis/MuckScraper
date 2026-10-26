@@ -129,7 +129,7 @@
         {% set can_analyze = can('scraper') %}
         {% for story in stories %}
         {% if can_mark_read %}<div class="hl-item" data-story-id="{{ story.id }}">{% endif %}
-        {% call story_card(story, why=story.why_label, why_hot=(view == 'controversial')) %}
+        {% call story_card(story, why=story.why_label, why_hot=(view == 'controversial'), why_icon=view_icons[view]) %}
             {{ bias_balance(story) }}
 
             {#- No placeholder line while a story has no summary (Philip,
