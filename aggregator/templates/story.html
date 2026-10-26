@@ -391,7 +391,7 @@
 
     const aiTaskStartUrl = "{{ url_for('admin.start_ai_task') }}";
     const aiTaskStatusTemplate = "{{ url_for('admin.ai_task_status', task_type='TASK_TYPE', resource_id=999999) }}";
-    let activeAiTaskPoll = null;
+    const activeAiTaskPolls = new Map();
 
     function aiTaskStatusUrl(taskType, resourceId) {
         return aiTaskStatusTemplate
@@ -410,39 +410,41 @@
     }
 
     async function pollAiTask(taskType, resourceId, button) {
-        if (activeAiTaskPoll) {
-            clearInterval(activeAiTaskPoll);
-            activeAiTaskPoll = null;
-        }
+        const key = `${taskType}:${resourceId}`;
+        const previous = activeAiTaskPolls.get(key);
+        if (previous) previous.stop();
 
+        const poll = {
+            stop() {
+                clearInterval(poll.timer);
+                if (activeAiTaskPolls.get(key) === poll) activeAiTaskPolls.delete(key);
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = button.dataset.originalText;
+                }
+            },
+        };
+        activeAiTaskPolls.set(key, poll);
         const statusUrl = aiTaskStatusUrl(taskType, resourceId);
-        activeAiTaskPoll = setInterval(async () => {
+        poll.timer = setInterval(async () => {
+            if (activeAiTaskPolls.get(key) !== poll) return;
             try {
                 const response = await fetch(statusUrl);
                 if (!response.ok) throw new Error('Status unavailable');
                 const status = await response.json();
+                // A request already in flight may finish after its poll was replaced.
+                if (activeAiTaskPolls.get(key) !== poll) return;
                 renderAiTaskStatus(status, status.status === 'error');
-
                 if (status.status === 'success') {
-                    clearInterval(activeAiTaskPoll);
-                    activeAiTaskPoll = null;
+                    poll.stop();
                     window.location.reload();
-                    return;
-                }
-
-                if (status.status === 'error') {
-                    clearInterval(activeAiTaskPoll);
-                    activeAiTaskPoll = null;
-                    if (button) {
-                        button.disabled = false;
-                        button.textContent = button.dataset.originalText;
-                    }
+                } else if (status.status === 'error') {
+                    poll.stop();
                 }
             } catch (error) {
-                clearInterval(activeAiTaskPoll);
-                activeAiTaskPoll = null;
+                if (activeAiTaskPolls.get(key) !== poll) return;
+                poll.stop();
                 renderAiTaskStatus({message: 'Could not check progress. Reload this page to see whether the task completed.'}, true);
-                if (button) { button.disabled = false; button.textContent = button.dataset.originalText; }
             }
         }, 2000);
     }

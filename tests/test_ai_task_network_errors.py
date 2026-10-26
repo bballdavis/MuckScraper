@@ -54,3 +54,44 @@ def test_task_controls_recover(template, failure):
         if failure in {"poll_http", "poll_network"}:
             assert "Could not check progress" in result["message"]
         browser.close()
+
+
+@pytest.mark.parametrize("template", ["article", "story"])
+@pytest.mark.parametrize("same_task", [False, True])
+def test_late_poll_failure_cannot_cancel_another_poll(template, same_task):
+    playwright = pytest.importorskip("playwright.sync_api")
+    source = (ROOT / "aggregator/templates" / (template + ".html")).read_text()
+    source = source[source.index("    const aiTaskStartUrl"):].split("</script>", 1)[0]
+    source = re.sub(r"{{.*?}}", "/task", source)
+    with playwright.sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page()
+        page.set_content('<meta name="csrf-token" content="fixture"><div id="ai-task-status"></div><button id="a">A</button><button id="b">B</button>')
+        page.evaluate("""() => {
+            window.polls = []; window.cancelled = [];
+            window.setInterval = fn => { polls.push(fn); return polls.length; };
+            window.clearInterval = id => cancelled.push(id);
+        }""")
+        page.add_script_tag(content=source)
+        result = page.evaluate("""async sameTask => {
+            let rejectOld;
+            window.fetch = async (url, options) => options
+                ? {ok: true, status: 200, json: async () => ({status: {status: 'running'}})}
+                : new Promise((resolve, reject) => { rejectOld = reject; });
+            const a = document.querySelector('#a'), b = document.querySelector('#b');
+            await startAiTask('article_summary', 7, a);
+            const oldRequest = polls[0]();
+            await startAiTask('article_summary', sameTask ? 7 : 8, b);
+            rejectOld(Error('Late failure'));
+            await oldRequest;
+            const newerStillRunning = !cancelled.includes(2) && b.disabled;
+            window.fetch = async () => ({ok: true, json: async () => ({status: 'error', message: 'Finished newer task'})});
+            await polls[1]();
+            return {newerStillRunning, aDisabled: a.disabled, bDisabled: b.disabled,
+                    label: b.textContent, message: document.querySelector('#ai-task-status').textContent};
+        }""", same_task)
+        assert result["newerStillRunning"]
+        assert not result["aDisabled"] and not result["bDisabled"]
+        assert result["label"] == "B"
+        assert result["message"] == "Finished newer task"
+        browser.close()
