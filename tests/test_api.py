@@ -376,6 +376,33 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertTrue(all("why" in s for s in multi))
         self.assertEqual(self._get("/api/v1/stories?topic=Nope", token).status_code, 404)
 
+    def test_section_needs_a_third_of_the_articles(self):
+        """A big story that picked up Sports from one article out of four is
+        not a Sports story; one whose articles carry no topics keeps the
+        story's own (aggregator/sections.py)."""
+        from aggregator import db
+        from aggregator.models import Article, Story, Topic
+        from aggregator.sections import in_section
+        try:
+            sports, news = Topic(name="Sports"), Topic(name="US News")
+            big = Story(title="Big", topics=[sports, news])
+            game = Story(title="Game", topics=[sports, news])
+            untagged = Story(title="Old", topics=[sports])
+            db.session.add_all([sports, news, big, game, untagged])
+            db.session.flush()
+            for i in range(4):
+                db.session.add(Article(title=f"Big {i}", url=f"https://x.example/big{i}", story=big,
+                                       topics=[sports] if i == 0 else [news]))
+            db.session.add(Article(title="Game 1", url="https://x.example/g1", story=game, topics=[sports, news]))
+            db.session.add(Article(title="Game 2", url="https://x.example/g2", story=game, topics=[news]))
+            db.session.add(Article(title="Old 1", url="https://x.example/o1", story=untagged))
+            db.session.flush()
+            names = {s.title for s in Story.query.filter(in_section(sports))}
+            self.assertEqual(names, {"Game", "Old"})
+            self.assertEqual({s.title for s in Story.query.filter(in_section(news.id))}, {"Big", "Game"})
+        finally:
+            db.session.rollback()
+
     def test_bad_parameters_are_rejected(self):
         token = self._pair()
         for path in ("/api/v1/stories?limit=500", "/api/v1/stories?range=1y", "/api/v1/stories?sort=new",

@@ -20,6 +20,7 @@ from sqlalchemy import func
 
 from aggregator import jobs, skips
 from aggregator.models import (Article, Edition, EditionStory, NewsBoxItem, Story, SummarySchedule, Topic, db)
+from aggregator.sections import in_section
 
 logger = logging.getLogger(__name__)
 
@@ -428,7 +429,7 @@ def _candidates(rule, now):
     topic = Topic.query.filter(func.lower(Topic.name) == rule["section"].lower()).first()
     if topic is None:
         return [], 0
-    stories = (Story.query.join(Article).filter(Story.topics.contains(topic), Article.date >= now - SECTION_WINDOW)
+    stories = (Story.query.join(Article).filter(in_section(topic), Article.date >= now - SECTION_WINDOW)
                .group_by(Story.id).order_by(func.count(Article.id).desc(), func.max(Article.date).desc())
                .limit(max(rule["amount"] * 4, 40)).all())
     return stories, rule["amount"]
