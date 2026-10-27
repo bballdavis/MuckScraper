@@ -80,6 +80,8 @@ SCHEMAS = {
         source_count=_I, updated_at=_DT, is_summarized=_B, has_analysis=_B, has_ai_headline=_B, has_updates=_B,
         can_analyze={"type": "boolean", "description": "Two or more sources, so a multi-source analysis can be "
                      "written. When false, hide analysis buttons; depth analysis writes the summary instead."},
+        can_summarize={"type": "boolean", "description": "Some article has enough text to summarize. False = "
+                       "headline only: say so instead of offering Summarize"},
         breaking={"oneOf": [_ref("BreakingChip"), {"type": "null"}],
                   "description": "Set while the story is breaking: show the Breaking chip, with these details "
                   "in its tooltip"},
@@ -113,7 +115,9 @@ SCHEMAS = {
     "ArticleCard": _obj(
         ["id", "story_id", "title", "outlet", "leaning", "url", "published_at", "image_url", "summary", "copy_of"],
         id=_I, story_id=_NI, title=_S, outlet=_ref("Outlet"), leaning=_LEANING, url=_URL,
-        published_at=_NDT, image_url=_URL, image_focus=_FOCUS, summary=_NS, copy_of=_NS),
+        published_at=_NDT, image_url=_URL, image_focus=_FOCUS, summary=_NS, copy_of=_NS,
+        text={"type": "string", "enum": ["full", "excerpt", "none"],
+              "description": "How much of it was read: the page, only the feed's teaser, or none (headline only)"}),
     "OpinionPiece": _obj(
         ["id", "title", "outlet", "leaning", "url", "published_at", "stance", "story_id"],
         id=_I, title=_S, outlet=_ref("Outlet"), leaning=_LEANING, url=_URL, published_at=_NDT,
@@ -202,6 +206,8 @@ SCHEMAS["StoryDetail"] = {"allOf": [_ref("StorySummary"), _obj(
 SCHEMAS["ArticleDetail"] = {"allOf": [_ref("ArticleCard"), _obj(
     ["topics", "analysis", "content_html"], topics=_PARAS, analysis=_PARAS,
     content_html={"type": ["string", "null"], "description": "Sanitized scraped HTML; null unless the server allows full text."},
+    excerpt={"type": ["string", "null"], "description": "Plain-text teaser from the publisher's feed when text is "
+             "excerpt (sent even without full text); null otherwise"},
     is_read={"type": "boolean", "description": "Marked read by this user"},
     is_summarizing={"type": "boolean", "description": "Its summary is queued or being written"},
     is_rating_bias={"type": "boolean", "description": "Its lean rating is queued or running"},
