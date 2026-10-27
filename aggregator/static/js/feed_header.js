@@ -127,13 +127,26 @@
             });
             panel.append(group);
         }
-        if (!stories.length && !articles.length) {
-            panel.append(el('div', 'ft-empty', 'No stories or articles match “' + data.q + '”.'));
+        // Opinion & Editorials searches columns only (data-scope="oped").
+        const opeds = data.opeds || [];
+        if (opeds.length) {
+            panel.append(el('div', 'ft-group-label', 'Columns'));
+            const group = el('div', 'ft-hits');
+            opeds.forEach(function (o) {
+                group.append(hitRow(o, [el('span', null, o.outlet), el('span', 'ft-lean ' + o.lean_class, o.lean)]));
+            });
+            panel.append(group);
+        }
+        if (!stories.length && !articles.length && !opeds.length) {
+            panel.append(el('div', 'ft-empty', form.dataset.scope === 'oped'
+                ? 'No columns match “' + data.q + '”.'
+                : 'No stories or articles match “' + data.q + '”.'));
         }
         const foot = el('div', 'ft-suggest-foot');
         foot.append(el('span', null, '↑ ↓ to move · Enter to open · Esc to close'));
         if (data.all_url) {
-            const all = el('a', null, data.story_total > 1 ? 'See all ' + data.story_total + ' stories →' : 'Open full search →');
+            const all = el('a', null, data.oped_total > 1 ? 'See all ' + data.oped_total + ' columns →'
+                : data.story_total > 1 ? 'See all ' + data.story_total + ' stories →' : 'Open full search →');
             all.href = data.all_url;
             foot.append(all);
         }
@@ -159,6 +172,7 @@
         const seq = ++requestSeq;
         const params = new URLSearchParams({ q: q });
         if (form.dataset.range) params.set('range', form.dataset.range);
+        if (form.dataset.scope) params.set('scope', form.dataset.scope);
         fetch(form.dataset.suggestUrl + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (data) {

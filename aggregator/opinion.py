@@ -6,7 +6,7 @@ full runs; this module only reads them.
 """
 import re
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from aggregator.models import Edition, EditionStory, OpinionPiece, Story, db
 
@@ -111,12 +111,34 @@ def published_edition_opinion_cards(edition):
     return [(story, pieces) for story, pieces in cards if story.id in published]
 
 
-def stories_with_opinion(limit=30):
+def opinion_filters(q=None, since=None, side=None):
+    """SQL conditions on OpinionPiece for the Op/Ed page's search, time range
+    and outlet leaning ("left", "center", "right"), shared by its two views
+    and the top bar's live results. The search matches the title, the
+    outlet and the column's stance."""
+    conditions = []
+    if since is not None:
+        conditions.append(OpinionPiece.date >= since)
+    if side == "left":
+        conditions.append(OpinionPiece.bias_score <= LEFT_MAX)
+    elif side == "center":
+        conditions.extend([OpinionPiece.bias_score > LEFT_MAX, OpinionPiece.bias_score <= CENTER_MAX])
+    elif side == "right":
+        conditions.append(OpinionPiece.bias_score > CENTER_MAX)
+    if q:
+        like = f"%{q}%"
+        conditions.append(or_(OpinionPiece.title.ilike(like), OpinionPiece.source.ilike(like),
+                              OpinionPiece.stance.ilike(like)))
+    return conditions
+
+
+def stories_with_opinion(limit=30, filters=()):
     """[(Story, columns)] for the stories with the most linked columns,
-    newest column first among equals."""
+    newest column first among equals. `filters` (opinion_filters()) limits
+    which columns count and are shown."""
     rows = (
         db.session.query(OpinionPiece.story_id, func.count(OpinionPiece.id), func.max(OpinionPiece.date))
-        .filter(OpinionPiece.story_id.isnot(None))
+        .filter(OpinionPiece.story_id.isnot(None), *filters)
         .group_by(OpinionPiece.story_id)
         .order_by(func.count(OpinionPiece.id).desc(), func.max(OpinionPiece.date).desc().nullslast())
         .limit(limit)
@@ -127,7 +149,7 @@ def stories_with_opinion(limit=30):
         return []
     stories = {s.id: s for s in Story.query.filter(Story.id.in_(story_ids)).all()}
     pieces = {}
-    for piece in OpinionPiece.query.filter(OpinionPiece.story_id.in_(story_ids)).all():
+    for piece in OpinionPiece.query.filter(OpinionPiece.story_id.in_(story_ids), *filters).all():
         pieces.setdefault(piece.story_id, []).append(piece)
     return [(stories[sid], split_by_leaning(pieces[sid])) for sid in story_ids if sid in stories]
 

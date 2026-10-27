@@ -1,5 +1,5 @@
 {#- Signed-out visitors (PUBLIC_READ_ACCESS) get Headlines, the two story
-    lists, Op/Ed and the topic filters; Search needs an account and Fetch Articles
+    lists, Opinion & Editorials and the topic filters; Search needs an account and Fetch Articles
     the Scraper role.
     Three groups (Philip, 2026-10-22: headings and links were hard to tell
     apart): the story lists, Topics, and More. Headings are small muted
@@ -30,10 +30,11 @@
 
                 <div class="nav-group">
                     <h2 class="nav-heading">Topics</h2>
+                    {#- Topics show their full section names (constants.SECTION_NAMES); links keep the key. #}
                     {% for topic in topics|default([]) %}
                     {%- set is_active = active_label|default(none) == topic.name %}
                     <a class="nav-link nav-topic {% if is_active %}active{% endif %}" href="{{ url_for('admin.list_articles', topic=topic.name, scrape_status=nav_scrape, show_single=show_single|default(none)|string|lower if show_single is defined else none, q=active_search_query|default(none) or '', range=active_range|default(none)) }}"{% if is_active %} aria-current="page"{% endif %}>
-                        <span class="full-text">{{ topic.name }}</span>
+                        <span class="full-text">{{ topic.name|section_name }}</span>
                     </a>
                     {% endfor %}
                 </div>
@@ -43,7 +44,7 @@
                     <h2 class="nav-heading">More</h2>
                     <a class="nav-link {% if active_nav == 'oped' %}active{% endif %}" href="{{ url_for('admin.oped_list', range=active_range|default(none)) }}"{% if active_nav == 'oped' %} aria-current="page"{% endif %}>
                         {{ icon('message-square') }}
-                        <span class="full-text">Op/Ed</span>
+                        <span class="full-text">Opinion &amp; Editorials</span>
                     </a>
                     {%- if current_user.is_authenticated %}
                     <a class="nav-link {% if active_nav == 'read' %}active{% endif %}" href="{{ url_for('reading.recently_read') }}"{% if active_nav == 'read' %} aria-current="page"{% endif %}>

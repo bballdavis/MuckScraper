@@ -46,6 +46,10 @@ def register_filters(app):
     # Article summaries read as one paragraph, without section labels.
     app.add_template_filter(summary_paragraph, "summary_paragraph")
 
+    # A topic key as its full section name ("Sci/Tech" -> "Science & Technology").
+    from aggregator.constants import section_name
+    app.add_template_filter(section_name, "section_name")
+
     # A photo's focal point as CSS object-position (aggregator/story_image.py).
     from aggregator.story_image import object_position
     app.add_template_filter(object_position, "object_position")

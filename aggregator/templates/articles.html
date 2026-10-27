@@ -77,7 +77,7 @@
     </style>
 </head>
 <body>
-{%- set section_title = active_label or ('Grouped Stories' if is_multi_view else 'All Stories') -%}
+{%- set section_title = (active_label|section_name if active_label else none) or ('Grouped Stories' if is_multi_view else 'All Stories') -%}
 {#- Every filter link keeps the others; scrape_param (not active_scrape_status)
     so an explicit "All" survives a saved scrape default. -#}
 {%- set base = {'topic': active_label, 'scrape_status': scrape_param, 'show_single': show_single|string|lower, 'q': active_search_query, 'range': active_range} -%}
@@ -181,7 +181,7 @@
                 {%- set range_label = (time_ranges|selectattr(0, 'equalto', active_range)|map(attribute=1)|first) or '' %}
                 {% if active_label and not active_search_query %}
                 {#- A section with nothing of its own says so; it never stands in other stories (Philip, 2026-10-27). #}
-                <p>No {{ active_label }} stories {% if active_range != 'all' %}in the last {{ range_label }}{% else %}yet{% endif %}.</p>
+                <p>No {{ active_label|section_name }} stories {% if active_range != 'all' %}in the last {{ range_label }}{% else %}yet{% endif %}.</p>
                 {% if active_range != 'all' %}<p><a href="{{ url_for(list_endpoint, topic=active_label, scrape_status=scrape_param, show_single=show_single|string|lower, range='all') }}">Show all time</a></p>{% endif %}
                 {% else %}
                 <p>No articles found. Try fetching a new topic or check back later.</p>
