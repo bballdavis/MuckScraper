@@ -7,7 +7,7 @@ from collections import Counter
 from datetime import datetime
 from datetime import timedelta
 from aggregator.article_signals import bias_bucket_for_score
-from news_fetcher import google_news
+from news_fetcher import google_news, wire_carriers
 from news_fetcher.bylines import feed_entry_author
 from news_fetcher.fetch_and_store_articles import merge_count_maps, normalize_source_name
 from news_fetcher.story_grouper import normalize_title_tokens, titles_are_near_duplicates
@@ -154,6 +154,18 @@ def _title_already_stored(title, source_name, days=4):
     return False
 
 
+def _title_stored_with_text(title, source_name, days=4):
+    """_title_already_stored for a wire carrier's feed: a Reuters headline
+    stored without its text (reuters.com is headline-only) doesn't count,
+    so the carrier's copy can fill it in (news_fetcher/wire_carriers.py)."""
+    from aggregator.models import Article
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    for article in Article.query.filter(Article.title == title, Article.fetched_at >= cutoff):
+        if len(article.content or "") >= wire_carriers.MIN_TEXT_CHARS:
+            return True
+    return False
+
+
 def _entries_from_feed(feed, feed_url, max_entries):
     """(source_name, normalized article dicts) from a parsed feed. Google
     News links are left unresolved."""
@@ -223,8 +235,10 @@ def fetch_feed(feed_url, max_entries=30, fallback_url=None):
             return fetch_feed(fallback_url, max_entries=max_entries)
         source_name, articles = _entries_from_feed(feed, feed_url, max_entries)
 
+        carrier_feed = wire_carriers.is_carrier_feed(feed_url)
         if google_news.is_google_news_feed(feed_url):
-            articles, stats = google_news.resolve_entries(articles, already_stored=_title_already_stored)
+            already_stored = _title_stored_with_text if carrier_feed else _title_already_stored
+            articles, stats = google_news.resolve_entries(articles, already_stored=already_stored)
             source_name = articles[0]["source_name"] if articles else source_name
             logger.info(
                 f"  [RSS] Google News {feed_url[:80]}: {stats['entries']} entries, "
@@ -232,6 +246,9 @@ def fetch_feed(feed_url, max_entries=30, fallback_url=None):
                 f"{stats['already_stored']} already stored, {stats['resolved']} resolved, "
                 f"{stats['failed']} unresolved"
             )
+        if carrier_feed:
+            # Stored only as Reuters copy; ingestion drops the rest.
+            articles = [{**article, "wire_only": True} for article in articles]
         logger.info(f"  [RSS] Got {len(articles)} articles from {feed_url[:60]}")
         return source_name, articles
 

@@ -134,6 +134,8 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 
 Story cards (editions, `/stories`, `/headlines`, the deck, NewsBox, bookmarks) carry `image_url` and `image_focus` (`{x, y}` from 0 to 1, the photo's focal point to crop around, or null; article cards too), `logo_url` and `source_name` (the outlet a card names when it has no photo: under its logo, or alone as a masthead), `coverage`, `source_count` (distinct outlets), `is_summarized`, `has_analysis`, `can_analyze` (two or more outlets, so an analysis can be asked for), `has_ai_headline`, and `breaking` (the Breaking chip's details, or null). `section` is the topic most of the story's articles carry. Search hits carry `image_focus` and `source_name` too.
 
+Article cards carry `text_via` (`{name, url}`, or null): a Reuters story whose text was read from a site licensed to republish it, such as Yahoo Finance, since reuters.com itself can't be read. `url` is the article's own link (reuters.com when the Reuters headline was stored first, else the carrier's page).
+
 Outlets carry `country` (an ISO code, set only for outlets based outside the US) and `funding` (`public`, `state` or null). An outlet abroad takes its lean from AllSides, else from Media Bias/Fact Check or Ad Fontes Media where they rate it on the US scale; one none of them rates stays `unrated` and is never guessed. Story `coverage` counts those unrated articles as `international`, outside `left`/`center`/`right`.
 
 Outlets also carry `reporting`: a hand-kept grade of how reliable the outlet's reporting is, separate from its lean, one of `very_high`, `high`, `mostly_factual`, `mixed`, `low`, or null when not graded (`aggregator/outlet_reporting.py`).
