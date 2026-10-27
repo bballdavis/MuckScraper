@@ -113,14 +113,16 @@
             <tbody>
                 {% for topic in topics %}
                 <tr class="{{ 'inactive' if not topic.is_active else '' }}">
-                    <form method="POST" action="{{ url_for('admin.update_topic', topic_id=topic.id) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <td>{{ topic.name }}</td>
-                        <td><input type="text" class="icon-input" name="icon" maxlength="4" value="{{ topic.icon or '' }}"></td>
-                        <td><input type="number" class="sort-input" name="sort_order" value="{{ topic.sort_order if topic.sort_order is not none else '' }}"></td>
-                        <td><input type="checkbox" name="is_active" {{ 'checked' if topic.is_active else '' }}></td>
-                        <td><button type="submit" class="save-btn">Save</button></td>
-                    </form>
+                    <td>{{ topic.name }}</td>
+                    <td><input form="topic-{{ topic.id }}" type="text" class="icon-input" name="icon" maxlength="4" value="{{ topic.icon or '' }}"></td>
+                    <td><input form="topic-{{ topic.id }}" type="number" class="sort-input" name="sort_order" value="{{ topic.sort_order if topic.sort_order is not none else '' }}"></td>
+                    <td><input form="topic-{{ topic.id }}" type="checkbox" name="is_active" {{ 'checked' if topic.is_active else '' }}></td>
+                    <td>
+                        <form id="topic-{{ topic.id }}" method="POST" action="{{ url_for('admin.update_topic', topic_id=topic.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button form="topic-{{ topic.id }}" type="submit" class="save-btn">Save</button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

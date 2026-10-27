@@ -142,18 +142,21 @@
             <tbody>
                 {% for entry in entries %}
                 <tr class="{{ 'disabled' if not entry.is_active else '' }}">
-                    <form method="POST" action="{{ url_for('admin.update_pipeline_schedule', entry_id=entry.id) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <td><input type="number" class="hour-input" name="hour" min="0" max="23" value="{{ entry.hour }}"></td>
-                        <td>
+                    <td><input form="pipeline-{{ entry.id }}" type="number" class="hour-input" name="hour" min="0" max="23" value="{{ entry.hour }}"></td>
+                    <td>
                             <label class="check-label">
-                                <input type="checkbox" name="run_full_pipeline" {{ 'checked' if entry.run_full_pipeline else '' }}>
+                                <input form="pipeline-{{ entry.id }}" type="checkbox" name="run_full_pipeline" {{ 'checked' if entry.run_full_pipeline else '' }}>
                                 {% if entry.run_full_pipeline %}<span class="badge badge-full">Full Pipeline</span>{% else %}<span class="badge badge-fetch">Fetch Only</span>{% endif %}
                             </label>
-                        </td>
-                        <td><input type="checkbox" name="is_active" {{ 'checked' if entry.is_active else '' }}></td>
-                        <td><button type="submit" class="save-btn">Save</button></td>
-                    </form>
+                    </td>
+                    <td><input form="pipeline-{{ entry.id }}" type="checkbox" name="is_active" {{ 'checked' if entry.is_active else '' }}></td>
+                    <td>
+                        <form id="pipeline-{{ entry.id }}" method="POST" action="{{ url_for('admin.update_pipeline_schedule', entry_id=entry.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button form="pipeline-{{ entry.id }}" type="submit" class="save-btn">Save</button>
+                        </form>
+                    </td>
+
                     <td>
                         <form method="POST" action="{{ url_for('admin.delete_pipeline_schedule', entry_id=entry.id) }}" style="display:inline;" onsubmit="return confirm('Delete this scheduled run time?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
