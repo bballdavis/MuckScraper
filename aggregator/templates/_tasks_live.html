@@ -8,6 +8,14 @@
     <button type="submit" class="btn {{ cls }}"{% if disabled %} disabled{% endif %}{% if title %} title="{{ title }}"{% endif %}>{{ label }}</button>
 </form>
 {%- endmacro %}
+{#- An icon-only POST button: tip is its tooltip, and with what it acts on, its accessible name. -#}
+{%- macro icon_post(endpoint, name, tip, what, args={}, hidden={}, disabled=false, on=false) -%}
+<form method="POST" action="{{ url_for(endpoint, **args) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {%- for k, v in hidden.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <button type="submit" class="btn btn-quiet tasks-icon-btn{% if on %} is-on{% endif %}" aria-label="{{ tip }}: {{ what }}" data-tip="{{ tip }}"{% if disabled %} disabled{% endif %}>{{ icon(name) }}</button>
+</form>
+{%- endmacro %}
 {%- set status_chip = {'ok': 'chip-safe', 'run': 'chip-new', 'warn': 'chip-broad', 'bad': 'chip-danger', 'off': ''} %}
 
 {%- if not scheduler.alive %}
@@ -65,14 +73,24 @@
             <tr>
                 <td data-label="Task"><div class="cell"><div class="row-label">{{ t.name }}</div><span class="row-sub">{{ t.desc }}</span></div></td>
                 <td data-label="Schedule"><div class="cell">{{ t.every }}<span class="row-sub">Next: {{ t.next }}</span></div></td>
-                <td data-label="Last run"><div class="cell">{% if t.last %}{{ t.last }}{% if t.took or t.summary %}<span class="row-sub{% if t.state == 'bad' %} tasks-error{% endif %}">{{ t.took or '' }}{% if t.took and t.summary %} · {% endif %}{{ t.summary or '' }}</span>{% endif %}{% else %}<span class="tasks-muted">Not yet</span>{% endif %}</div></td>
+                <td data-label="Last run"><div class="cell">
+                    {%- if t.last %}{{ t.last }}
+                    {%- if t.error %}
+                    <button type="button" class="tasks-err" popovertarget="task-err-{{ t.id }}" aria-label="{{ t.error_short }}. Show the full error">{{ icon('circle-alert') }}<span>{{ t.error_short }}</span></button>
+                    <div id="task-err-{{ t.id }}" class="tasks-err-pop" popover>
+                        <div class="tasks-err-head"><strong>{{ t.name }} failed</strong><span class="tasks-muted">{{ t.last }}{% if t.took %} · {{ t.took }}{% endif %}</span></div>
+                        <pre>{{ t.error }}</pre>
+                    </div>
+                    {%- elif t.took or t.summary %}<span class="row-sub">{{ t.took or '' }}{% if t.took and t.summary %} · {% endif %}{{ t.summary or '' }}</span>{% endif %}
+                    {%- else %}<span class="tasks-muted">Not yet</span>{% endif %}
+                </div></td>
                 <td data-label="Status"><div class="cell"><span class="chip {{ status_chip[t.state] }}">{{ t.label }}</span></div></td>
                 <td class="tasks-actions">
-                    {{ post('admin.run_task_now', 'Starting…' if t.requested else 'Run now', args={'task_id': t.id}, disabled=t.requested or t.running or not scheduler.alive) }}
+                    {{ icon_post('admin.run_task_now', 'play', 'Starting…' if t.requested else ('Running' if t.running else 'Run now'), t.name, args={'task_id': t.id}, disabled=t.requested or t.running or not scheduler.alive) }}
                     {%- if t.paused %}
-                    {{ post('admin.pause_task', 'Resume', args={'task_id': t.id}, hidden={'paused': '0'}) }}
+                    {{ icon_post('admin.pause_task', 'pause', 'Resume', t.name, args={'task_id': t.id}, hidden={'paused': '0'}, on=true) }}
                     {%- else %}
-                    {{ post('admin.pause_task', 'Pause', args={'task_id': t.id}) }}
+                    {{ icon_post('admin.pause_task', 'pause', 'Pause', t.name, args={'task_id': t.id}) }}
                     {%- endif %}
                 </td>
             </tr>

@@ -6,6 +6,7 @@ The scheduler writes what it's doing to app_settings (aggregator/
 scheduler_tasks.py); this page reads that and writes Pause / Run now back,
 which the scheduler applies within CONTROL_SECONDS.
 """
+import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -113,6 +114,19 @@ def _summary_text(summary):
     return ", ".join(parts[:2]) or None
 
 
+def _short_error(error):
+    """An error's first line, without the driver's wrapper or the SQL, for the
+    Last run cell; the full text opens from it in a popover."""
+    if not error:
+        return None
+    text = error.split("[SQL:")[0].strip()
+    text = text.splitlines()[0] if text else error.strip().splitlines()[0]
+    text = re.sub(r"^\([\w.]+\)\s*", "", text).strip() or "Failed"
+    text = re.sub(r"^column (\S+) does not exist$", r"Missing column \1", text)
+    text = text[0].upper() + text[1:]
+    return text if len(text) <= 90 else text[:89].rstrip() + "…"
+
+
 def _hour_label(hour):
     return datetime(2000, 1, 1, hour).strftime("%-I %p")
 
@@ -191,7 +205,9 @@ def _row(task_id, every, next_at, runs, paused, requested, scheduled):
         "every": every,
         "last": _when(run.get("finished_at")),
         "took": _span(run.get("seconds")),
-        "summary": run.get("error") if run.get("status") == "error" else _summary_text(run.get("summary")),
+        "summary": None if run.get("status") == "error" else _summary_text(run.get("summary")),
+        "error": run.get("error") if run.get("status") == "error" else None,
+        "error_short": _short_error(run.get("error")) if run.get("status") == "error" else None,
         "next": "Paused" if task_id in paused else (_when(next_at) if next_at else ("—" if scheduled else "Not scheduled")),
         "state": state,
         "label": label,

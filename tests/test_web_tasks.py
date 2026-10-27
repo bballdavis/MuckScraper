@@ -92,6 +92,26 @@ class TasksPageTests(unittest.TestCase):
         self.assertNotIn("isn't running", partial)
         self.assertNotIn("One-off jobs", partial)
 
+    def test_failed_run_shows_a_short_error_with_the_full_text_in_a_popover(self):
+        from aggregator import scheduler_tasks
+        now = datetime.utcnow()
+        error = ("(psycopg2.errors.UndefinedColumn) column rss_feeds.last_read_at does not exist\n"
+                 "LINE 1: ...rss_feeds.fallback_url AS rss_feeds_fallback_url, rss_feeds.... "
+                 "[SQL: SELECT rss_feeds.id AS rss_feeds_id FROM rss_feeds]")
+        scheduler_tasks.record_run("breaking_feeds", now - timedelta(seconds=1), now, "error", error=error)
+        html = self.client().get("/admin/tasks?partial=1").get_data(as_text=True)
+        self.assertIn("<span>Missing column rss_feeds.last_read_at</span>", html)
+        self.assertIn('popover>', html)
+        self.assertIn("[SQL: SELECT rss_feeds.id", html)  # only inside the popover
+        self.assertIn('aria-label="Run now: Breaking News feeds"', html)
+        self.assertIn('aria-label="Pause: Breaking News feeds"', html)
+
+    def test_short_error(self):
+        from aggregator.blueprints.admin.tasks_page import _short_error
+        self.assertIsNone(_short_error(None))
+        self.assertEqual(_short_error("TimeoutError: read timed out"), "TimeoutError: read timed out")
+        self.assertTrue(_short_error("x" * 200).endswith("…"))
+
     def test_cancel_only_touches_queued_jobs(self):
         from aggregator import db, jobs
         from aggregator.models import Job
