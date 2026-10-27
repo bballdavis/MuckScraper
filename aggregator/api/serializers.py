@@ -208,6 +208,10 @@ def article_card(article):
         "image_focus": _article_focus(article),
         "summary": summary_paragraph(article.summary) or None,
         "copy_of": copy_label(article),
+        # A Reuters story read from a site licensed to republish it
+        # (news_fetcher/wire_carriers.py): {"name", "url"}, else null.
+        "text_via": ({"name": article.text_via, "url": _http_url(article.text_via_url)}
+                     if getattr(article, "text_via", None) else None),
     }
 
 

@@ -357,6 +357,16 @@
                        'skipped': ('pending', 'ban'), 'pending': ('pending', 'circle-alert')}[scrape_status] %}
         <div class="source-row">
             <a href="{{ article.url }}" target="_blank" rel="noopener" class="pill">{{ icon('link') }} Source</a>
+            {#- Reuters text read where Reuters licenses it to be republished
+                (news_fetcher/wire_carriers.py); reuters.com itself is
+                headline-only. -#}
+            {% if article.text_via %}
+                {% if article.text_via_url and article.text_via_url != article.url %}
+                    <a href="{{ article.text_via_url }}" target="_blank" rel="noopener" class="pill" title="Reuters doesn't allow its own pages to be read, so the text was read where it was republished.">{{ icon('link') }} Text via {{ article.text_via }}</a>
+                {% else %}
+                    <span class="pill" title="Reuters doesn't allow its own pages to be read, so the text was read where it was republished.">Via {{ article.text_via }}</span>
+                {% endif %}
+            {% endif %}
             <span class="read-chip read-{{ chip[0] }}" tabindex="0" aria-label="{{ read_status[0] }}: {{ read_status[1] }}">{{ icon(chip[1]) }}<span class="tip" role="tooltip"><strong>{{ read_status[0] }}</strong> {{ read_status[1] }}
                 {%- if current_user.is_authenticated %}<span class="tip-facts">Method: {{ article.scrape_method or 'n/a' }} · HTTP {{ article.scrape_http_status or 'n/a' }}{% if article.scrape_failure_reason %}<br>{{ article.scrape_failure_reason }}{% endif %}</span>{% endif %}</span></span>
         </div>

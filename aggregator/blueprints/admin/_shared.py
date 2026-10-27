@@ -28,6 +28,7 @@ def fetch_presets():
             "mode":           row.mode,
             "country":        row.newsapi_country or "",
             "category":       row.newsapi_category or "",
+            "sources":        row.newsapi_sources or "",
             "query":          row.newsapi_query or "",
             "gnews_query":    row.gnews_query or "",
             "gnews_category": row.gnews_category or "",

@@ -195,6 +195,7 @@ def fetch_articles():
     query = request.form.get("query", "").strip() or None
     country = request.form.get("country", "").strip() or None
     category = request.form.get("category", "").strip() or None
+    sources = request.form.get("sources", "").strip() or None
     label = request.form.get("label", "").strip() or None
     scrape_status = request.form.get("scrape_status", "").strip() or None
     gnews_query = request.form.get("gnews_query", "").strip() or None
@@ -214,6 +215,7 @@ def fetch_articles():
             query=query,
             country=country,
             category=category,
+            sources=sources,
             gnews_query=gnews_query,
             gnews_category=gnews_category,
         )

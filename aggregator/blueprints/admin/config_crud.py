@@ -170,6 +170,7 @@ def _scheduled_fetch_form_values(form):
         "gnews_category": field("gnews_category"),
         "newsapi_country":  field("newsapi_country") if mode == "top" else None,
         "newsapi_category": field("newsapi_category") if mode == "top" else None,
+        "newsapi_sources":  field("newsapi_sources") if mode == "top" else None,
         "newsapi_query":    field("newsapi_query") if mode == "query" else None,
         "known_outlets_only": form.get("known_outlets_only") == "on",
     }
