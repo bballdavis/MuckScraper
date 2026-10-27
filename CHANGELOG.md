@@ -19,6 +19,18 @@ All notable changes to MuckScraper are documented here.
 - **Run schedule edits apply without a restart.** The scheduler re-reads
   the schedule every 15 seconds, and restarts its job queue worker thread
   if it ever dies.
+- **NYT API budget and the Times Wire.** NYT requests are counted in a
+  `nyt_api_calls` ledger over the last 24 hours, shared by both containers
+  and kept across restarts, with `NYT_API_DAILY_LIMIT` (default 500, never
+  higher) as the cap. The scheduler polls the Times Wire, which lists
+  everything NYT publishes several hundred items a request, every 3 minutes
+  in the morning and evening peaks, 6 midday and 20 overnight (about 300
+  requests a day, slower past 75% of the limit). News-section items go to
+  the Breaking headlines at once and are ingested as articles each pipeline
+  run; Article Search adds their lead paragraphs ten per request. A NYT
+  article no longer costs a request of its own unless the wire never listed
+  it. Settings › Source API keys shows the last 24 hours' use. Migration
+  `c4e9a2f7d1b3` adds `nyt_api_calls` and `nyt_wire_items`.
 - **Optional OIDC sign-in, set in Settings › Sign-in.** From upstream
   grregis/MuckScraper#28 (rinseaid): "Sign in with …" through an OpenID
   Connect provider, with identities bound to accounts by issuer and subject

@@ -17,8 +17,10 @@ SOURCES = {
     "gnews": ("GNews", "Top headlines and keyword search for scheduled fetches.", "https://gnews.io/register"),
     "nyt": ("New York Times",
             "NYT articles are paywalled, so the scraper only gets their RSS description. With a free "
-            "Article Search API key, a NYT article gets its abstract and opening paragraph instead. "
-            "The key allows 500 requests a day; the limit keeps MuckScraper under that.",
+            "key (enable the Times Wire and Article Search APIs for it), MuckScraper reads everything "
+            "NYT publishes from the Times Wire through the day, several hundred items a request, and "
+            "ingests the news sections with their abstract and opening paragraph. The key allows 500 "
+            "requests a day; the limit counts the last 24 hours and can only go lower.",
             "https://developer.nytimes.com/get-started"),
 }
 
@@ -37,7 +39,18 @@ def source_keys_page():
             "key": key, "name": name, "about": about, "signup": signup, "fields": fields,
             "configured": any(f["kind"] == "secret" and f["source"] != "unset" for f in fields),
         })
-    return render_template("settings_source_keys.html", sources=sources, key_source=secret_box.key_source())
+    return render_template("settings_source_keys.html", sources=sources, key_source=secret_box.key_source(),
+                           nyt_usage=_nyt_usage())
+
+
+def _nyt_usage():
+    from news_fetcher import nyt_api
+    if not nyt_api.enabled():
+        return None
+    try:
+        return nyt_api.usage_summary()
+    except Exception:
+        return None
 
 
 @admin.route("/settings/source-keys/<key>", methods=["POST"])

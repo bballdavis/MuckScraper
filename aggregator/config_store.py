@@ -82,7 +82,7 @@ SOURCE_FIELDS = {
 
 # Defaults the code applies when neither a saved value nor the environment
 # sets one, shown as the field's placeholder.
-DEFAULTS = {"NYT_API_DAILY_LIMIT": "450", "LMSTUDIO_HOST": "http://localhost:1234/v1",
+DEFAULTS = {"NYT_API_DAILY_LIMIT": "500", "LMSTUDIO_HOST": "http://localhost:1234/v1",
             "EMBEDDING_MODEL": "nomic-embed-text"}
 
 _FIELD_GROUPS = list(PROVIDER_FIELDS.values()) + list(SOURCE_FIELDS.values())

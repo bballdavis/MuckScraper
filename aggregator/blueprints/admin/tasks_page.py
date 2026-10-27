@@ -27,7 +27,7 @@ HISTORY_ROWS = 10
 # The pipeline's steps (scheduler._mark_step labels) in four stages, for the
 # run history bars.
 STAGES = (
-    ("fetch", "Fetch", ("Fetching", "Filling missing card images")),
+    ("fetch", "Fetch", ("Fetching", "Ingesting NYT", "Filling missing card images")),
     ("enrich", "Enrich", ("Retrying unrated", "Syncing AllSides", "Running headline ranking", "Targeted RSS")),
     ("stories", "Stories", ("Marking copied", "Generating headlines")),
     ("publish", "Publish", ("Publishing", "Processing current edition", "Linking Op/Ed", "Daily horoscope", "Exporting")),
@@ -157,7 +157,7 @@ def _recurring(state, runs, paused, requested):
     from news_fetcher.breaking_feed import POLL_MINUTES
     from news_fetcher.image_focus import RUN_MINUTES
     for task_id, every in (("breaking_feeds", f"{POLL_MINUTES} min"), ("image_focus", f"{RUN_MINUTES} min"),
-                           ("newsbox_schedules", "1 min")):
+                           ("nyt_wire", "1 min"), ("newsbox_schedules", "1 min")):
         rows.append(_row(task_id, every, next_by_id.get(task_id), runs, paused, requested, scheduled=True))
     return rows
 

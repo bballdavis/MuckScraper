@@ -35,6 +35,7 @@ TASKS = {
     "pipeline_fetch": ("Fetch only", "Topic and RSS fetches, scrape, group, card images"),
     "breaking_feeds": ("Breaking News feeds", "Read the general feeds' headlines and flag breaking events"),
     "image_focus": ("Photo focal points", "Find where to crop new story photos"),
+    "nyt_wire": ("NYT Times Wire", "Poll the Times Wire on its own schedule, within the daily NYT budget"),
     "newsbox_schedules": ("NewsBox schedules", "Queue each reader's scheduled summaries when they're due"),
 }
 # Recurring tasks that can't be paused from the page (the page itself needs them).

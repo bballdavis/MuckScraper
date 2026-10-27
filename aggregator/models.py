@@ -930,3 +930,45 @@ class StorySkip(db.Model):
 
     story = db.relationship("Story")
     user = db.relationship("User", backref=db.backref("story_skips", lazy="dynamic", cascade="all, delete-orphan"))
+
+
+class NytApiCall(db.Model):
+    """One request to a New York Times API (news_fetcher/nyt_api.py). The key
+    allows 500 a day, so the budget counts these rows over the last 24 hours,
+    which stays under the limit however NYT counts its day and whichever
+    container (scheduler or web) made the call. `kind` is what the call was
+    for (wire / search / lookup), `items` how many articles it returned."""
+    __tablename__ = "nyt_api_calls"
+    __table_args__ = (db.Index("ix_nyt_api_calls_called_at", "called_at"),)
+
+    id          = db.Column(db.Integer, primary_key=True)
+    called_at   = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    kind        = db.Column(db.String(16), nullable=False)
+    http_status = db.Column(db.Integer, nullable=True)
+    items       = db.Column(db.Integer, nullable=True)
+
+
+class NytWireItem(db.Model):
+    """An item from NYT's Times Wire feed, which lists everything NYT
+    publishes, a few hundred items per request (news_fetcher/nyt_api.py).
+    Pipeline runs ingest the news sections' items as articles
+    (`ingested_at`); the abstract, and the lead paragraph that a batched
+    Article Search adds (`searched_at`), are their text, so a NYT article
+    costs no request of its own."""
+    __tablename__ = "nyt_wire_items"
+    __table_args__ = (db.Index("ix_nyt_wire_items_published_at", "published_at"),)
+
+    id             = db.Column(db.Integer, primary_key=True)
+    url            = db.Column(db.String(2000), nullable=False, unique=True)
+    title          = db.Column(db.String(500), nullable=False)
+    abstract       = db.Column(db.Text, nullable=True)
+    lead_paragraph = db.Column(db.Text, nullable=True)
+    section        = db.Column(db.String(100), nullable=True)
+    subsection     = db.Column(db.String(100), nullable=True)
+    byline         = db.Column(db.String(300), nullable=True)
+    item_type      = db.Column(db.String(50), nullable=True)
+    image_url      = db.Column(db.String(2000), nullable=True)
+    published_at   = db.Column(db.DateTime, nullable=False)
+    first_seen_at  = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    searched_at    = db.Column(db.DateTime, nullable=True)
+    ingested_at    = db.Column(db.DateTime, nullable=True)

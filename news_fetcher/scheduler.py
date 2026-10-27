@@ -19,7 +19,7 @@ from news_fetcher.rss_fetcher import (
     enrich_skewed_stories_with_left_feeds,
     get_skewed_story_ids_for_left_enrichment,
 )
-from news_fetcher import llm_client
+from news_fetcher import llm_client, nyt_api
 from datetime import datetime, timedelta, timezone
 import logging
 import sys
@@ -923,6 +923,16 @@ def run_all_fetches(run_full_pipeline=True):
                     "reason": str(e),
                 }
 
+        # NYT lead paragraphs first (ten articles a request), so the NYT
+        # Opinion and World feed articles below get them too
+        # (news_fetcher/nyt_api.py).
+        try:
+            run_metrics["steps"]["nyt_lead_paragraphs"] = {"searched": nyt_api.search_lead_paragraphs()}
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error searching NYT lead paragraphs: {e}")
+            run_metrics["steps"]["nyt_lead_paragraphs"] = {"status": "error", "reason": str(e)}
+
         # Run RSS fetch for major wire services and networks
         _mark_step(run_metrics, "Fetching RSS feeds")
         try:
@@ -944,6 +954,25 @@ def run_all_fetches(run_full_pipeline=True):
                 "status": "error",
                 "reason": str(e),
             }
+
+        # NYT articles from the Times Wire the poller job below stored.
+        _mark_step(run_metrics, "Ingesting NYT Times Wire items")
+        try:
+            nyt_metrics = nyt_api.ingest_wire_items()
+            run_metrics["nyt_wire"] = nyt_metrics
+            run_metrics["totals"]["input_articles"] += nyt_metrics.get("input_articles", 0)
+            run_metrics["totals"]["stored"] += nyt_metrics.get("stored", 0)
+            run_metrics["totals"]["new_outlets"] += nyt_metrics.get("new_outlets", 0)
+            run_metrics["totals"]["stories_touched"] += nyt_metrics.get("stories_touched", 0)
+            _merge_counts(run_metrics["totals"]["skipped"], nyt_metrics.get("skipped"))
+            _merge_counts(run_metrics["totals"]["scrape_statuses"], nyt_metrics.get("scrape_statuses"))
+            _merge_counts(run_metrics["totals"]["bias_buckets"], nyt_metrics.get("bias_buckets"))
+            _merge_counts(run_metrics["totals"]["bias_sources"], nyt_metrics.get("bias_sources"))
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error ingesting NYT Times Wire items: {e}")
+            run_metrics["status"] = "partial_error"
+            run_metrics["nyt_wire"] = {"status": "error", "reason": str(e)}
 
         # Op/Ed feeds go to their own table; their counts stay out of the news totals.
         _mark_step(run_metrics, "Fetching Op/Ed feeds")
@@ -1305,6 +1334,11 @@ if __name__ == "__main__":
         from news_fetcher.breaking_feed import poll_feeds
         return poll_feeds()
 
+    # NYT Times Wire (news_fetcher/nyt_api.py): checked every minute, polled
+    # on its own schedule so the day's 500 requests last the day.
+    def poll_nyt_wire():
+        return nyt_api.poll_wire_if_due()
+
     # Photo focal points (news_fetcher/image_focus.py): every few minutes, so
     # new articles' photos crop around their subject soon after they land.
     def find_image_focus():
@@ -1318,6 +1352,7 @@ if __name__ == "__main__":
         "breaking_feeds": (poll_breaking_feeds, BREAKING_POLL_MINUTES,
                            f"Breaking News feed check (every {BREAKING_POLL_MINUTES} min)"),
         "image_focus": (find_image_focus, FOCUS_RUN_MINUTES, f"Photo focal points (every {FOCUS_RUN_MINUTES} min)"),
+        "nyt_wire": (poll_nyt_wire, 1, "NYT Times Wire check (every minute, polls on its schedule)"),
     }
     for job_id, (func, minutes, name) in RECURRING.items():
         scheduler.add_job(
