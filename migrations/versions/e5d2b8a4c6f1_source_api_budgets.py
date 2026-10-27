@@ -16,14 +16,26 @@ depends_on = None
 
 
 def upgrade():
-    op.drop_index("ix_nyt_api_calls_called_at", table_name="nyt_api_calls")
-    op.rename_table("nyt_api_calls", "source_api_calls")
-    op.add_column("source_api_calls",
-                  sa.Column("provider", sa.String(16), nullable=False, server_default="nyt"))
-    op.create_index("ix_source_api_calls_provider_called_at", "source_api_calls", ["provider", "called_at"])
-    op.add_column("raw_article_payloads", sa.Column("ingested_at", sa.DateTime(), nullable=True))
+    # create_app() and the scheduler run db.create_all(), so a container on
+    # the new code can create an empty source_api_calls before this runs.
+    # Move the NYT rows into it then, rather than renaming over it.
+    bind = op.get_bind()
+    tables = set(sa.inspect(bind).get_table_names())
+    if "source_api_calls" not in tables:
+        op.drop_index("ix_nyt_api_calls_called_at", table_name="nyt_api_calls")
+        op.rename_table("nyt_api_calls", "source_api_calls")
+        op.add_column("source_api_calls",
+                      sa.Column("provider", sa.String(16), nullable=False, server_default="nyt"))
+        op.create_index("ix_source_api_calls_provider_called_at", "source_api_calls", ["provider", "called_at"])
+    elif "nyt_api_calls" in tables:
+        op.execute(
+            "INSERT INTO source_api_calls (provider, called_at, kind, http_status, items) "
+            "SELECT 'nyt', called_at, kind, http_status, items FROM nyt_api_calls"
+        )
+        op.drop_table("nyt_api_calls")
     # Payloads from before were ingested when they were fetched.
-    op.execute("UPDATE raw_article_payloads SET ingested_at = fetched_at")
+    op.execute("ALTER TABLE raw_article_payloads ADD COLUMN IF NOT EXISTS ingested_at TIMESTAMP WITHOUT TIME ZONE")
+    op.execute("UPDATE raw_article_payloads SET ingested_at = fetched_at WHERE ingested_at IS NULL")
 
 
 def downgrade():

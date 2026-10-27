@@ -14,6 +14,10 @@ depends_on = None
 
 
 def upgrade():
+    # create_app() and the scheduler run db.create_all(), so the table can
+    # already exist on a running install; create it only when it doesn't.
+    if "llm_usage" in sa.inspect(op.get_bind()).get_table_names():
+        return
     op.create_table(
         "llm_usage",
         sa.Column("id", sa.Integer(), primary_key=True),

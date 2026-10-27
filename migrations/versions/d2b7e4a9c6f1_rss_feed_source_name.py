@@ -11,7 +11,7 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column("rss_feeds", sa.Column("source_name", sa.String(), nullable=True))
+    op.execute("ALTER TABLE rss_feeds ADD COLUMN IF NOT EXISTS source_name VARCHAR")
 
 
 def downgrade():
