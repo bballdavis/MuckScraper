@@ -363,6 +363,9 @@
         </div>
         {% endif %}
 
+        {#- A one-source story has nothing to compare, so no analysis section
+            or button (Philip, 2026-10-27). -#}
+        {% if story.deep_report or story.articles|length >= 2 %}
         <div class="section-head">
             <h2 class="section-label">Multi-Source Analysis</h2>
             {{ story_analysis_action(story, can('scraper') and ollama_online, new_sources=analysis_new) }}
@@ -377,10 +380,11 @@
                 </div>
             {% else %}
                 <div class="status-msg" data-ai-status="story_deep_report">
-                    No multi-source analysis has been generated yet.{% if can('scraper') and story.articles|length >= 2 %} Generate it with the button beside the heading.{% endif %}
+                    No multi-source analysis has been generated yet.{% if can('scraper') %} Generate it with the button beside the heading.{% endif %}
                 </div>
             {% endif %}
         </div>
+        {% endif %}
         {% endif %}
 
         {% if opinion %}
