@@ -193,7 +193,11 @@ SCHEMAS["StoryDetail"] = {"allOf": [_ref("StorySummary"), _obj(
     analysis_sections={"type": "array", "description": "deep_report split into its labelled sections", "items": _obj(
         ["label", "kind", "paragraphs", "empty"], label=_NS,
         kind={"type": "string", "enum": ["lead", "left", "center", "right", "next", "other"]},
-        paragraphs=_PARAS, empty={"type": "boolean", "description": "An L/C/R bucket with no sources"})})]}
+        paragraphs=_PARAS, empty={"type": "boolean", "description": "An L/C/R bucket with no sources"})},
+    summary_generated_at=_NDT, analysis_generated_at=_NDT,
+    new_sources_for_summary={"type": "integer", "description": "Articles fetched since the summary was written; "
+                             "above 0, offer refresh (summarize with refresh true)"},
+    new_sources_for_analysis={"type": "integer", "description": "Articles fetched since the analysis was written"})]}
 SCHEMAS["ArticleDetail"] = {"allOf": [_ref("ArticleCard"), _obj(
     ["topics", "analysis", "content_html"], topics=_PARAS, analysis=_PARAS,
     content_html={"type": ["string", "null"], "description": "Sanitized scraped HTML; null unless the server allows full text."},
@@ -300,7 +304,9 @@ PATHS = {
             "type": "object", "additionalProperties": False, "properties": {
                 "depth": {"type": "string", "enum": ["summary", "analysis", "summary_analysis"]},
                 "origin": {"type": "string", "enum": ["requested", "saved"],
-                           "description": "Defaults to requested"}}}}}},
+                           "description": "Defaults to requested"},
+                "refresh": {"type": "boolean", "description": "Rewrite the parts depth asks for that sources have "
+                            "arrived since (new_sources_for_*); parts with none are kept"}}}}}},
         "responses": {"200": _json(_ref("NewsBoxItem"), "Already summarized: ready"),
                       "202": _json(_ref("NewsBoxItem"), "Summary queued: pending"),
                       **_ERRORS, **_NOT_FOUND}}},

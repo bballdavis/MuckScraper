@@ -585,6 +585,48 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertEqual((r.get_json()["state"], r.get_json()["step"]), ("pending", "summary"))
         self._clear_newsbox()
 
+    def test_refresh_rewrites_only_what_sources_arrived_since(self):
+        """The app's Refresh summary / Refresh analysis buttons: the detail
+        counts new sources since each was written, and summarize with
+        refresh writes the stale part again and leaves the other alone."""
+        from aggregator import db, jobs
+        from aggregator.models import Article, Story
+        self._clear_newsbox()
+        story = Story.query.get(self.ids["story"])
+        kept, now = story.summary, datetime.utcnow()
+        self.addCleanup(self._restore_summary, self.ids["story"], kept)
+        for article in story.articles:
+            article.fetched_at = now - timedelta(hours=3)
+        Article.query.get(self.ids["a1"]).fetched_at = now - timedelta(minutes=5)
+        story.summary_generated_at = now - timedelta(hours=1)
+        story.deep_report_generated_at = now
+        db.session.commit()
+        token = self._pair(scopes=("read", "summarize"))
+        detail = self._get(f"/api/v1/stories/{self.ids['story']}", token).get_json()
+        self.assertEqual((detail["new_sources_for_summary"], detail["new_sources_for_analysis"]), (1, 0))
+        self.assertIsNotNone(detail["summary_generated_at"])
+
+        path = f"/api/v1/stories/{self.ids['story']}/summarize"
+        # Nothing new since the analysis: a refresh of it is ready at once.
+        r = self._send("POST", path, token, json={"depth": "analysis", "refresh": True})
+        self.assertEqual((r.status_code, r.get_json()["state"]), (200, "ready"))
+        r = self._send("POST", path, token, json={"depth": "summary", "refresh": True})
+        self.assertEqual((r.status_code, r.get_json()["state"], r.get_json()["step"]), (202, "pending", "summary"))
+        with mock.patch("news_fetcher.summarizer.check_ollama_status", return_value=True), \
+                mock.patch("news_fetcher.summarizer.summarize_story", return_value="The big picture: Refreshed."), \
+                mock.patch("news_fetcher.summarizer.generate_deep_report") as deep:
+            self.assertTrue(jobs.run_next_job())
+        deep.assert_not_called()
+        db.session.expire_all()
+        story = Story.query.get(self.ids["story"])
+        self.assertEqual((story.summary, story.deep_report), ("The big picture: Refreshed.", "The story: long report."))
+        detail = self._get(f"/api/v1/stories/{self.ids['story']}", token).get_json()
+        self.assertEqual(detail["new_sources_for_summary"], 0)
+        r = self._send("POST", path, token, json={"depth": "summary", "refresh": True})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(self._send("POST", path, token, json={"refresh": "yes"}).status_code, 400)
+        self._clear_newsbox()
+
     def test_two_articles_from_one_outlet_are_one_source(self):
         from aggregator.models import Article, Story
         story = Story(title="Wire story")

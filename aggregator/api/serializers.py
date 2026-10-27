@@ -255,6 +255,14 @@ def story_detail(story, opinion_pieces):
         "opinion_roundup": _paragraphs(story.opinion_roundup),
         "articles": by_leaning(articles, _article_side, article_card),
         "copies_hidden": sum(1 for a in articles if is_copy_in_story(a)),
+        # Sources fetched since each was written: the app offers Refresh
+        # summary / Refresh analysis only when these are above zero, as the
+        # web story page does (Story.new_sources_for_*).
+        "summary_generated_at": iso(story.summary_generated_at),
+        "analysis_generated_at": iso(story.deep_report_generated_at),
+        "new_sources_for_summary": story.new_sources_for_summary if (story.summary or "").strip() else 0,
+        "new_sources_for_analysis": (story.new_sources_for_analysis
+                                     if (story.deep_report or "").strip() and story.can_analyze else 0),
         "opinion": by_leaning(
             sorted(opinion_pieces, key=lambda p: p.date or p.fetched_at or dt.min, reverse=True),
             lambda p: leaning(p.bias_score), opinion_piece),
