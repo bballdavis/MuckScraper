@@ -256,6 +256,11 @@ class Article(db.Model):
     scrape_method = db.Column(db.String(255), nullable=True)
     scrape_failure_reason = db.Column(db.String(1024), nullable=True)
     scrape_http_status = db.Column(db.Integer, nullable=True)
+    # A Reuters story whose text was read from a site licensed to republish
+    # it (news_fetcher/wire_carriers.py): the carrier's name ("Yahoo
+    # Finance") and the page the text came from. NULL for everything else.
+    text_via = db.Column(db.String(64), nullable=True)
+    text_via_url = db.Column(db.String, nullable=True)
     grouping_match_method = db.Column(db.String(32), nullable=True)
     grouping_confidence = db.Column(db.Float, nullable=True)
     grouping_candidate_story_ids = db.Column(db.Text, nullable=True)
