@@ -334,34 +334,37 @@
             <h2 class="section-label">Executive Summary</h2>
             {{ story_summary_action(story, can('scraper') and ollama_online, new_sources=summary_new) }}
         </div>
-        {% if story.summary and analysis_layout != 'sections' %}
-        {#- In the Cards layout the summary is plain paragraphs, flat like the
-            analysis below it (Philip, 2026-10-25). -#}
-        <div class="sa sa-cards sa-summary">
-            {% for line in story.summary.split('\n') if line.strip() %}<p>{{ line.strip() }}</p>{% endfor %}
-        </div>
-        {% else %}
-        <div class="analysis-box">
-            {% if story.summary %}
-                <div class="analysis-content">
-                    {% for line in story.summary.split('\n') %}
-                        {% set l = line.strip() %}
-                        {% if l %}
-                            <p>{{ l }}</p>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            {% elif not ollama_online %}
-                <div class="status-msg">
-                    Summary will be generated when Ollama is back online. This story has been queued for processing.
-                </div>
+        {#- Where the summary goes; ai_tasks.js shows a skeleton here while it is written. -#}
+        <div data-ai-slot="story_summary">
+            {% if story.summary and analysis_layout != 'sections' %}
+            {#- In the Cards layout the summary is plain paragraphs, flat like the
+                analysis below it (Philip, 2026-10-25). -#}
+            <div class="sa sa-cards sa-summary">
+                {% for line in story.summary.split('\n') if line.strip() %}<p>{{ line.strip() }}</p>{% endfor %}
+            </div>
             {% else %}
-                <div class="status-msg" data-ai-status="story_summary">
-                    No executive summary has been generated yet.{% if can('scraper') %} Generate it with the button beside the heading.{% endif %}
-                </div>
+            <div class="analysis-box">
+                {% if story.summary %}
+                    <div class="analysis-content">
+                        {% for line in story.summary.split('\n') %}
+                            {% set l = line.strip() %}
+                            {% if l %}
+                                <p>{{ l }}</p>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% elif not ollama_online %}
+                    <div class="status-msg">
+                        Summary will be generated when Ollama is back online. This story has been queued for processing.
+                    </div>
+                {% else %}
+                    <div class="status-msg">
+                        No executive summary has been generated yet.{% if can('scraper') %} Generate it with the button beside the heading.{% endif %}
+                    </div>
+                {% endif %}
+            </div>
             {% endif %}
         </div>
-        {% endif %}
 
         {#- A one-source story has nothing to compare, so no analysis section
             or button (Philip, 2026-10-27). -#}
@@ -370,21 +373,23 @@
             <h2 class="section-label">Multi-Source Analysis</h2>
             {{ story_analysis_action(story, can('scraper') and ollama_online, new_sources=analysis_new) }}
         </div>
-        {% if analysis.sections %}
-        {{ story_analysis(analysis, story, analysis_layout) }}
-        {% else %}
-        <div class="analysis-box">
-            {% if not ollama_online %}
-                <div class="status-msg">
-                    Analysis will be generated when Ollama is back online. This story has been queued for processing.
-                </div>
+        <div data-ai-slot="story_deep_report">
+            {% if analysis.sections %}
+            {{ story_analysis(analysis, story, analysis_layout) }}
             {% else %}
-                <div class="status-msg" data-ai-status="story_deep_report">
-                    No multi-source analysis has been generated yet.{% if can('scraper') %} Generate it with the button beside the heading.{% endif %}
-                </div>
+            <div class="analysis-box">
+                {% if not ollama_online %}
+                    <div class="status-msg">
+                        Analysis will be generated when Ollama is back online. This story has been queued for processing.
+                    </div>
+                {% else %}
+                    <div class="status-msg">
+                        No multi-source analysis has been generated yet.{% if can('scraper') %} Generate it with the button beside the heading.{% endif %}
+                    </div>
+                {% endif %}
+            </div>
             {% endif %}
         </div>
-        {% endif %}
         {% endif %}
 
         {% if opinion %}
@@ -465,107 +470,11 @@
 
     const savedTheme = localStorage.getItem('muckscraper-theme') || 'light';
     applyTheme(savedTheme);
-
-    const aiTaskStartUrl = "{{ url_for('admin.start_ai_task') }}";
-    const aiTaskStatusTemplate = "{{ url_for('admin.ai_task_status', task_type='TASK_TYPE', resource_id=999999) }}";
-    let activeAiTaskPoll = null;
-
-    function aiTaskStatusUrl(taskType, resourceId) {
-        return aiTaskStatusTemplate
-            .replace('TASK_TYPE', taskType)
-            .replace('999999', String(resourceId));
-    }
-
-
-    async function pollAiTask(taskType, resourceId, buttons) {
-        if (activeAiTaskPoll) {
-            clearInterval(activeAiTaskPoll);
-            activeAiTaskPoll = null;
-        }
-
-        const statusUrl = aiTaskStatusUrl(taskType, resourceId);
-        activeAiTaskPoll = setInterval(async () => {
-            const response = await fetch(statusUrl);
-            const status = await response.json();
-            aiTaskToast(taskType, status, status.status === 'error');
-
-            if (status.status === 'success') {
-                clearInterval(activeAiTaskPoll);
-                activeAiTaskPoll = null;
-                window.location.reload();
-                return;
-            }
-
-            if (status.status === 'error') {
-                clearInterval(activeAiTaskPoll);
-                activeAiTaskPoll = null;
-                setAiTaskBusy(buttons, false);
-                showAiTaskInSection(taskType, status.message || 'It did not finish.');
-            }
-        }, 2000);
-    }
-
-    // Every control that starts this task: the round rail button and the
-    // one beside the section heading run the same task, so they go busy and
-    // come back together (Philip, 2026-10-25: one consistent behaviour).
-    function aiTaskButtons(taskType, resourceId, button) {
-        const call = "startAiTask('" + taskType + "', " + resourceId + ",";
-        const found = [...document.querySelectorAll('button[onclick]')]
-            .filter(b => b.getAttribute('onclick').startsWith(call));
-        if (button && !found.includes(button)) found.push(button);
-        return found;
-    }
-
-    function setAiTaskBusy(buttons, busy) {
-        buttons.forEach(b => {
-            b.disabled = busy;
-            // Icon buttons (ai_actions.html) pulse; text buttons say so.
-            if (b.classList.contains('act')) b.classList.toggle('busy', busy);
-            else if (busy) { b.dataset.originalText = b.textContent; b.textContent = 'Working...'; }
-            else if (b.dataset.originalText) b.textContent = b.dataset.originalText;
-        });
-    }
-
-    // The section's own "not generated yet" line says it is running too, so
-    // the feedback sits where the result will appear.
-    function showAiTaskInSection(taskType, message) {
-        const line = document.querySelector('[data-ai-status="' + taskType + '"]');
-        if (line) line.textContent = message;
-    }
-
-    async function startAiTask(taskType, resourceId, button) {
-        const buttons = aiTaskButtons(taskType, resourceId, button);
-        setAiTaskBusy(buttons, true);
-        showAiTaskInSection(taskType, 'Generating… the page reloads when it is done.');
-
-        const response = await fetch(aiTaskStartUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content,
-            },
-            body: JSON.stringify({
-                task_type: taskType,
-                resource_id: resourceId,
-            }),
-        });
-
-        const payload = await response.json();
-        aiTaskToast(taskType, payload.status || payload, response.status >= 400);
-
-        if (!response.ok && response.status !== 409) {
-            setAiTaskBusy(buttons, false);
-            showAiTaskInSection(taskType, (payload.status || payload).message || 'Could not start it.');
-            return;
-        }
-
-        await pollAiTask(taskType, resourceId, buttons);
-    }
-
 </script>
 
 <script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
 {% if current_user.is_authenticated %}<script src="{{ url_for('static', filename='js/reads.js') }}" data-read-url="{{ url_for('reading.toggle_read', kind='KIND', item_id=0) }}" data-auto-read="{{ auto_read_seconds }}"></script>{% endif %}
 <script src="{{ url_for('static', filename='js/ai_toast.js') }}"></script>
+{% if can('scraper') %}<script src="{{ url_for('static', filename='js/ai_tasks.js') }}" data-start-url="{{ url_for('admin.start_ai_task') }}" data-status-url="{{ url_for('admin.ai_task_status', task_type='TASK_TYPE', resource_id=999999) }}"></script>{% endif %}
 </body>
 </html>

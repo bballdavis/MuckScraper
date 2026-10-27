@@ -366,6 +366,35 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
 .ai-toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; transition-delay: 0s; }
 .ai-toast.is-error { background: #f5a524; color: #1f1400; }
 
+/* Where a summary or analysis will appear while it is written (ai_tasks.js
+   on the story and article pages): the Headlines card skeleton's look
+   (headline_views.css .hl-skeleton), grey bars shimmering. If the task
+   fails, .ai-slot-error says so with a Retry button in its place. */
+.ai-skeleton {
+    display: flex; flex-direction: column; gap: 18px; padding: 16px 18px; margin-bottom: 16px;
+    background: var(--summary-bg); border: 1px solid var(--border); border-radius: 14px;
+}
+.analysis-box > .ai-skeleton { padding: 2px 0; margin: 0; background: none; border: 0; }
+.ai-skel-block { display: flex; flex-direction: column; gap: 8px; }
+.ai-skel-line {
+    display: block; height: 12px; width: 100%; border-radius: 4px;
+    background: linear-gradient(90deg, var(--border) 25%, var(--btn-muted-bg) 50%, var(--border) 75%);
+    background-size: 200% 100%; animation: ai-shimmer 1.4s linear infinite;
+}
+.ai-skel-line.w30 { width: 30%; height: 10px; margin-bottom: 2px; }
+.ai-skel-line.w60 { width: 60%; }
+@keyframes ai-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .ai-skel-line { animation: none; } }
+[data-ai-hidden] { display: none !important; }
+.ai-slot-error {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 14px; margin-bottom: 12px; border-radius: 10px;
+    border: 1px solid rgba(245, 165, 36, 0.6); background: rgba(245, 165, 36, 0.12);
+    color: var(--text); font-size: 14px;
+}
+.ai-slot-error span { flex: 1 1 220px; }
+.ai-slot-error .pill { flex: 0 0 auto; min-width: 0; }
+
 /* Round buttons under the back button (float_back's `below`): the read
    toggle, and on the article page the summary and lean buttons. Same shape
    and size as the back button; tooltips open to the right. On narrow
