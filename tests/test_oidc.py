@@ -729,3 +729,38 @@ def test_settings_page_is_admin_only(app, flow):
     client, start, finish = flow
     finish(start())
     assert client.get("/admin/settings/sign-in", base_url="https://reader.example").status_code == 403
+
+
+def test_default_role_sets_new_accounts_and_unmapped_groups(app, flow):
+    _, start, finish = flow
+    configure(app, default_role="scraper")
+    assert finish(start())[0].status_code == 302
+    with app.app_context():
+        user = User.query.one()
+        assert user.role == "scraper" and not user.is_admin
+    # With groups mapped, anyone outside them gets the default role too.
+    configure(app, default_role="reader", role_mapping={"admins": "admin"})
+    finish(start(), groups=["readers"])
+    with app.app_context():
+        assert User.query.one().role == "reader"
+
+
+def test_default_role_is_never_admin():
+    assert oidc_settings.clean({"default_role": "admin"})["default_role"] == "reader"
+    assert oidc_settings.clean({"default_role": "scraper"})["default_role"] == "scraper"
+    values = {**oidc_settings.DEFAULTS, "default_role": "admin"}
+    assert oidc_settings.errors(values, False)
+
+
+def test_settings_page_saves_default_role_and_users_page_preselects_it(app):
+    browser = _admin_browser(app)
+    browser.post("/admin/settings/sign-in", data=_form(default_role="admin"), base_url="https://reader.example")
+    with app.app_context():
+        assert oidc_settings.load()["default_role"] == "reader"
+    browser.post("/admin/settings/sign-in", data=_form(default_role="scraper"), base_url="https://reader.example")
+    with app.app_context():
+        assert oidc_settings.load()["default_role"] == "scraper"
+    page = browser.get("/admin/settings/sign-in", base_url="https://reader.example").get_data(as_text=True)
+    assert '<option value="scraper" selected>' in page and '<option value="admin"' not in page
+    users = browser.get("/admin/users", base_url="https://reader.example").get_data(as_text=True)
+    assert '<option value="scraper" selected>Scraper' in users

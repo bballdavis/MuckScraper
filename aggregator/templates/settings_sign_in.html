@@ -35,8 +35,9 @@
     </div>
 </div>
 
-<form class="panel config-field-form" method="POST" action="{{ url_for('admin.save_sign_in') }}" autocomplete="off">
+<form class="config-field-form sign-in-form" method="POST" action="{{ url_for('admin.save_sign_in') }}" autocomplete="off">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<section class="panel">
     <div class="panel-head">
         <div>
             <h2>Provider</h2>
@@ -72,7 +73,15 @@
         <input type="text" id="scopes" name="scopes" value="{{ values.scopes }}" class="wide-input" spellcheck="false">
     </div>
 
-    <div class="panel-head panel-sub"><div><h2>Access and roles</h2><p>Groups come from a string array claim in the signed ID token. The provider must also send a verified email.</p></div></div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Access and roles</h2>
+            <p>Groups come from a string array claim in the signed ID token. The provider must also send a verified email.</p>
+        </div>
+    </div>
     <div class="row">
         <span><label class="row-label" for="groups_claim">Groups claim</label></span>
         <input type="text" id="groups_claim" name="groups_claim" value="{{ values.groups_claim }}" class="wide-input" spellcheck="false">
@@ -82,7 +91,7 @@
         <input type="text" id="allowed_groups" name="allowed_groups" value="{{ values.allowed_groups | join(', ') }}" class="wide-input" spellcheck="false">
     </div>
     <div class="row">
-        <span><label class="row-label" for="admin_groups">Admin groups</label><span class="row-sub">With admin or scraper groups set, roles follow the provider at every sign-in (highest wins, anyone else is a Reader). Both blank: roles stay as set in Users.</span></span>
+        <span><label class="row-label" for="admin_groups">Admin groups</label><span class="row-sub">With admin or scraper groups set, roles follow the provider at every sign-in (highest wins, anyone else gets the default role below). Both blank: roles stay as set in Users.</span></span>
         <input type="text" id="admin_groups" name="admin_groups" value="{{ admin_groups | join(', ') }}" class="wide-input" spellcheck="false">
     </div>
     <div class="row">
@@ -90,11 +99,24 @@
         <input type="text" id="scraper_groups" name="scraper_groups" value="{{ scraper_groups | join(', ') }}" class="wide-input" spellcheck="false">
     </div>
     <label class="row">
-        <span><span class="row-label">Create accounts on first sign-in</span><span class="row-sub">Off: only accounts linked below can sign in with the provider. On: a new identity gets a Reader account (or its mapped role) with no password. Matching emails never link accounts.</span></span>
+        <span><span class="row-label">Create accounts on first sign-in</span><span class="row-sub">Off: only accounts linked below can sign in with the provider. On: a new identity gets an account with the default role (or its mapped role) and no password. Matching emails never link accounts.</span></span>
         <span class="switch"><input type="checkbox" name="create_users"{% if values.create_users %} checked{% endif %}><span aria-hidden="true"></span></span>
     </label>
+    <div class="row">
+        <span><label class="row-label" for="default_role">Default role for new accounts</label><span class="row-sub">Readers can read everything; Scrapers can also fetch articles and run summaries and analysis. Applies to accounts made on first sign-in and to anyone outside the admin and scraper groups, and is preselected in Users › Add a user. Admin is never a default.</span></span>
+        <select id="default_role" name="default_role" class="role-select">
+            {%- for role, label in default_roles %}<option value="{{ role }}"{% if values.default_role == role %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+    </div>
+</section>
 
-    <div class="panel-head panel-sub"><div><h2>Sign-in page and sessions</h2></div></div>
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Sign-in page and sessions</h2>
+            <p>How the sign-in page behaves and how long a provider sign-in lasts.</p>
+        </div>
+    </div>
     <label class="row">
         <span><span class="row-label">Provider only</span><span class="row-sub">Hides the password form and refuses password sign-in. {% if not oidc_session %}Sign in with the provider as an admin first, so you can't lock yourself out.{% else %}If the provider breaks, <code>flask --app aggregator.app disable-oidc</code> on the server turns passwords back on.{% endif %}</span></span>
         <span class="switch"><input type="checkbox" name="oidc_only"{% if not values.allow_password_login %} checked{% endif %}><span aria-hidden="true"></span></span>
@@ -107,7 +129,8 @@
         <span><label class="row-label" for="session_minutes">Session length (minutes)</label><span class="row-sub">A provider sign-in ends after this, however active. 1 to 1440.</span></span>
         <input type="number" id="session_minutes" name="session_minutes" value="{{ lifetime_minutes }}" min="1" max="1440" required class="num-input">
     </div>
-    <div class="panel-foot">
+</section>
+    <div class="form-actions">
         <button type="submit" class="btn">Save sign-in settings</button>
     </div>
 </form>
@@ -164,7 +187,14 @@
     .settings-content .row > span:first-child { flex: 1 1 280px; min-width: 0; }
     .wide-input { width: 360px; max-width: 100%; }
     .num-input { width: 110px; }
-    .panel-sub { border-top: 1px solid var(--border); }
+    /* Each group is its own card with a heading band, so a heading never
+       reads as one more field. */
+    .stat-grid + .sign-in-form, .sign-in-form .panel + .panel, .sign-in-form + .panel { margin-top: 24px; }
+    .settings-content .panel-head { padding: 14px 16px; background: var(--btn-muted-bg); }
+    .settings-content .panel-head h2 { font-size: 17px; font-weight: 800; letter-spacing: -0.2px; }
+    .settings-content .panel-head p { margin-top: 4px; font-size: 13px; line-height: 1.45; }
+    .form-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+    .role-select { width: 160px; }
     .secret-row { display: block; }
     .secret-row > .row-sub { margin-top: 6px; }
     .config-field-form .secret-row .field { grid-template-columns: minmax(0, 1fr) 360px; }

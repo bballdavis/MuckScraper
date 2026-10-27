@@ -89,6 +89,8 @@ def resolve_user(claims, config):
         raise OIDCRefused()
     if config["ALLOWED_GROUPS"] and not set(groups).intersection(config["ALLOWED_GROUPS"]):
         raise OIDCRefused()
+    # Reader for a config dict built without the setting.
+    default = config.get("DEFAULT_ROLE", ROLE_READER)
     binding = OIDCIdentity.query.filter_by(identity_key=key).first()
     if binding:
         if (binding.issuer != config["ISSUER_URL"] or binding.subject != claims["sub"]
@@ -101,13 +103,13 @@ def resolve_user(claims, config):
         username = "oidc_" + key[:59]
         if User.query.filter_by(username=username).first():
             raise OIDCRefused()
-        user = User(username=username, role=ROLE_READER, is_admin=False, is_active=True)
+        user = User(username=username, role=default, is_admin=False, is_active=True)
     email = claims.get("email")
     if not isinstance(email, str) or email_error(email, exclude_id=user.id):
         raise OIDCRefused()
     if config["ROLE_MAPPING"]:
-        role = max((config["ROLE_MAPPING"].get(g, ROLE_READER) for g in groups),
-                   key=ROLES.index, default=ROLE_READER)
+        role = max((config["ROLE_MAPPING"].get(g, default) for g in groups),
+                   key=ROLES.index, default=default)
         if user.role == ROLE_ADMIN and role != ROLE_ADMIN:
             # Serialize simultaneous OIDC demotions on databases supporting row
             # locks; do not let two administrators each count the other first.

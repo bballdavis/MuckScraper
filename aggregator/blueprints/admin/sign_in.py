@@ -9,7 +9,7 @@ from flask_login import current_user
 from sqlalchemy import func
 
 from aggregator import db, oidc, oidc_settings, secret_box
-from aggregator.models import OIDCIdentity, ROLE_ADMIN, ROLE_SCRAPER, User
+from aggregator.models import OIDCIdentity, ROLE_ADMIN, ROLE_LABELS, ROLE_SCRAPER, User
 from aggregator.permissions import role_required
 
 from . import admin
@@ -36,6 +36,7 @@ def sign_in_page():
         callback_url=_site_url() + url_for("auth.oidc_callback"),
         admin_groups=oidc_settings.role_groups(values["role_mapping"], ROLE_ADMIN),
         scraper_groups=oidc_settings.role_groups(values["role_mapping"], ROLE_SCRAPER),
+        default_roles=[(r, ROLE_LABELS[r]) for r in oidc_settings.DEFAULT_ROLES],
         lifetime_minutes=values["session_lifetime_seconds"] // 60,
         oidc_session=session.get("auth_method") == "oidc",
         https=_https_request(),
@@ -63,6 +64,7 @@ def save_sign_in():
         "allowed_groups": oidc_settings.parse_groups(form.get("allowed_groups")),
         "role_mapping": oidc_settings.mapping_from(oidc_settings.parse_groups(form.get("admin_groups")),
                                                    oidc_settings.parse_groups(form.get("scraper_groups"))),
+        "default_role": form.get("default_role") or oidc_settings.DEFAULTS["default_role"],
         "create_users": form.get("create_users") == "on",
         # The form asks the opposite question ("OIDC only"), so it is off by default.
         "allow_password_login": form.get("oidc_only") != "on",

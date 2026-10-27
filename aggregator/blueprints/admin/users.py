@@ -8,7 +8,7 @@ an action that would leave no active admin is refused.
 from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
-from aggregator import appearance_prefs, db, feed_prefs, reading_prefs
+from aggregator import appearance_prefs, db, feed_prefs, oidc_settings, reading_prefs
 from aggregator.accounts import email_error, other_active_admins, password_error, username_error
 from aggregator.models import ROLE_ADMIN, ROLES, User
 from aggregator.permissions import role_required
@@ -24,7 +24,7 @@ def _back():
 @role_required(ROLE_ADMIN)
 def users_page():
     users = User.query.order_by(User.username).all()
-    return render_template("users.html", users=users, roles=ROLES)
+    return render_template("users.html", users=users, roles=ROLES, default_role=oidc_settings.default_role())
 
 
 @admin.route("/users/add", methods=["POST"])
