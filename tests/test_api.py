@@ -691,6 +691,27 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertEqual(item["state"], "failed")
         self.assertIn("offline", item["error"])
 
+    def test_story_with_no_text_fails_with_a_reason_and_scheduled_runs_skip_it(self):
+        from aggregator import jobs, newsbox
+        from aggregator.models import Story
+        self._clear_newsbox()
+        token = self._pair(scopes=("read", "summarize"))
+        # The lone story's one article has no text, as a paywalled source's.
+        self._send("POST", f"/api/v1/stories/{self.ids['lone']}/summarize", token, json={})
+        with mock.patch("news_fetcher.summarizer.check_ollama_status", return_value=True), \
+                mock.patch("news_fetcher.summarizer.summarize_story", return_value=None):
+            jobs.run_next_job()
+        item = self._get("/api/v1/me/newsbox", token).get_json()["items"][0]
+        self.assertEqual(item["state"], "failed")
+        self.assertEqual(item["error"], newsbox.NO_TEXT_MESSAGE)
+        self._clear_newsbox()
+        settings, _ = newsbox.load_schedule(self.ids["reader"])
+        settings = {**settings, "skip_already_summarized": False,
+                    "sections": [{"section": "Headlines", "is_enabled": True, "amount": 5}]}
+        lone, story = Story.query.get(self.ids["lone"]), Story.query.get(self.ids["story"])
+        with mock.patch.object(newsbox, "_candidates", return_value=([lone, story], 5)):
+            self.assertEqual([s.id for s in newsbox.pick_stories(self.ids["reader"], settings)], [story.id])
+
     def test_summaries_per_day_are_limited(self):
         from aggregator import db
         from aggregator.api import settings
