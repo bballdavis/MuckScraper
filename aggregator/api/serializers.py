@@ -8,6 +8,7 @@ Swift's .iso8601 decoder reads.
 from datetime import datetime as dt
 from urllib.parse import urlparse
 
+from aggregator import newsbox
 from aggregator.article_copies import copy_label, is_copy_in_story
 from aggregator.filters import summary_paragraph
 from aggregator.html_safety import sanitize_html
@@ -132,6 +133,7 @@ def story_summary(story, edition_story=None):
         "updated_at": iso(story.last_updated),
         "is_summarized": bool((story.summary or "").strip()),
         "has_analysis": bool((story.deep_report or "").strip()),
+        "can_analyze": newsbox.can_analyze(story),
         "has_ai_headline": bool(story.has_ai_headline),
         "has_updates": bool(getattr(edition_story, "has_updates", False)),
         "breaking": breaking_chip(story),
