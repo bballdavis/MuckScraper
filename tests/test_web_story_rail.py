@@ -94,6 +94,28 @@ class StoryRailTests(unittest.TestCase):
         self.assertNotIn("executive summary", rail)
         self.assertIn("read-toggle", rail)
 
+    # While a summary or analysis is written, ai_tasks.js puts a skeleton in
+    # that section's [data-ai-slot] (Philip, 2026-10-27). Editors get the
+    # script and a slot per section; readers can't generate, so no script.
+    def _page(self, path, user="editor"):
+        client = self.web.test_client()
+        with client.session_transaction() as session:
+            session["_user_id"] = str(self.ids[user])
+            session["_fresh"] = True
+        with mock.patch("aggregator.blueprints.public.check_ollama_status", return_value=True):
+            return client.get(path).get_data(as_text=True)
+
+    def test_story_has_a_slot_per_section(self):
+        page = self._page(f"/story/{self.ids['bare']}")
+        self.assertIn('data-ai-slot="story_summary"', page)
+        self.assertIn('data-ai-slot="story_deep_report"', page)
+        self.assertIn("js/ai_tasks.js", page)
+        self.assertNotIn("let activeAiTaskPoll", page)
+
+    def test_readers_get_no_task_script(self):
+        page = self._page(f"/story/{self.ids['bare']}", user="reader")
+        self.assertNotIn("js/ai_tasks.js", page)
+
 
 if __name__ == "__main__":
     unittest.main()
