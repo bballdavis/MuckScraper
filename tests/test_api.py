@@ -348,6 +348,15 @@ class ApiEndToEndTests(unittest.TestCase):
             self.client.delete(f"/api/v1/me/read/stories/{self.ids['story']}", headers=headers)
         self.assertEqual(self._get("/api/v1/headlines?view=hot", token).status_code, 400)
 
+    def test_headline_views_by_section(self):
+        token = self._pair()
+        section = self._get("/api/v1/headlines?view=latest&topic=US%20Politics", token).get_json()
+        self.assertEqual(section["topic"], "US Politics")
+        # The lone story has no topic, so only the politics story is listed.
+        self.assertEqual([c["id"] for c in section["items"]], [self.ids["story"]])
+        self.assertEqual(section["views"][1]["count"], 1)
+        self.assertEqual(self._get("/api/v1/headlines?topic=Nope", token).status_code, 404)
+
     def test_full_text_only_when_allowed(self):
         from aggregator import db
         from aggregator.api import settings

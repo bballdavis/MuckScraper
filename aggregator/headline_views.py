@@ -14,6 +14,9 @@ edition, which still drives automatic summaries and stays under Past editions.
 
 Outlets are counted without copies (aggregator/article_copies.py), and lean
 is the article's score, else its outlet's, like story_rank.
+
+Each section (topic) has the same three views of its own stories (Philip,
+2026-10-27): build(topic_id=) keeps the stories tagged with that topic.
 """
 from collections import namedtuple
 from datetime import datetime, timedelta
@@ -25,6 +28,7 @@ from aggregator import db
 from aggregator.article_copies import original_articles
 from aggregator.article_signals import bias_bucket_for_score
 from aggregator.models import Article, OpinionPiece, Story
+from aggregator.sections import in_section
 from aggregator.story_rank import _signal_rows, score_signals
 
 VIEWS = ("trending", "latest", "controversial")
@@ -125,12 +129,16 @@ def controversy_score(row, gap, opeds, now):
     return base * 0.5 ** (age_hours / CONTROVERSY_HALF_LIFE_HOURS)
 
 
-def build(now=None, hidden_ids=frozenset()):
+def build(now=None, hidden_ids=frozenset(), topic_id=None):
     """{view: [Entry]} for all three views, in display order, leaving out
-    `hidden_ids` (stories the reader marked read)."""
+    `hidden_ids` (stories the reader marked read). With topic_id, only that
+    section's stories."""
     now = now or datetime.utcnow()
     rows = [r for r in _signal_rows(active_since=now - timedelta(hours=CONTROVERSIAL_WINDOW_HOURS), now=now)
             if r.story_id not in hidden_ids]
+    if topic_id is not None:
+        in_topic = _topic_story_ids(topic_id, [r.story_id for r in rows])
+        rows = [r for r in rows if r.story_id in in_topic]
     day = now - timedelta(hours=WINDOW_HOURS)
     recent = [r for r in rows if r.newest and r.newest >= day]
 
@@ -151,6 +159,16 @@ def build(now=None, hidden_ids=frozenset()):
     controversial.sort(key=lambda e: e.score, reverse=True)
 
     return {"trending": trending, "latest": latest[:LATEST_LIMIT], "controversial": controversial}
+
+
+def _topic_story_ids(topic_id, story_ids):
+    """The ones of `story_ids` in the topic's section (aggregator/sections.py):
+    every big story carries nearly every topic, so filtering on its topics
+    alone made each section's Trending the same as Headlines'."""
+    if not story_ids:
+        return set()
+    return {sid for (sid,) in db.session.query(Story.id)
+            .filter(Story.id.in_(story_ids), in_section(topic_id))}
 
 
 def load_stories(entries):

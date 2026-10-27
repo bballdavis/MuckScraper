@@ -18,6 +18,10 @@ All notable changes to MuckScraper are documented here.
   inserts feeds that are missing.
 
 ### Changed
+- **Mobile API: Trending, Latest and Controversial for each section.**
+  `GET /api/v1/headlines` takes `topic=`, giving that section's own stories
+  in the three views, with counts and `hidden_read` for the section (the
+  same one-third rule as the section pages). An unknown topic is a 404. Without `topic` it is Headlines as before.
 - **Story photos crop around their subject.** Each recent article photo gets
   a focal point (where a face or the most eye-catching part is), found every
   10 minutes from a 96px copy of the photo: spectral-residual saliency plus a
