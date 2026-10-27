@@ -122,6 +122,22 @@ class SerializerTests(unittest.TestCase):
         self.assertEqual(ser._story_logo(story), "https://new.com/i.png")
         self.assertIsNone(ser._story_logo(SimpleNamespace(site_articles=[_article(_outlet("x"))])))
 
+    def test_source_name_goes_with_the_logo(self):
+        # The app names this outlet on a photo's fallback tile (2026-10-27).
+        from aggregator.api import serializers as ser
+        story = SimpleNamespace(site_articles=[
+            _article(_outlet("No logo"), date=datetime(2026, 10, 22)),
+            _article(_outlet("CBS News", "https://cbsnews.com/i.png"), date=datetime(2026, 10, 20)),
+        ])
+        self.assertEqual(ser._story_source_name(story), "CBS News")
+        # No logo anywhere: the newest outlet, drawn as a masthead.
+        story = SimpleNamespace(site_articles=[
+            _article(_outlet("The Hill"), date=datetime(2026, 10, 1)),
+            _article(_outlet("Washington Post"), date=datetime(2026, 10, 22)),
+        ])
+        self.assertEqual(ser._story_source_name(story), "Washington Post")
+        self.assertIsNone(ser._story_source_name(SimpleNamespace(site_articles=[_article(None)])))
+
 
 class CardImageTemplateTests(unittest.TestCase):
     def render(self, articles):

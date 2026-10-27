@@ -60,6 +60,8 @@ SCHEMAS = {
         ["id", "section", "headline", "dek", "image_url", "logo_url", "coverage", "source_count", "updated_at",
          "is_summarized", "has_analysis", "has_ai_headline", "has_updates", "breaking"],
         id=_I, section=_S, headline=_S, dek=_NS, image_url=_URL, logo_url=_LOGO, coverage=_ref("Coverage"),
+        source_name={"type": ["string", "null"], "description": "Outlet named on the image fallback: the one "
+                     "whose logo_url it is, else the newest. With no logo, draw the name alone as a masthead"},
         source_count=_I, updated_at=_DT, is_summarized=_B, has_analysis=_B, has_ai_headline=_B, has_updates=_B,
         can_analyze={"type": "boolean", "description": "Two or more articles, so a multi-source analysis can be "
                      "written. When false, hide analysis buttons; depth analysis writes the summary instead."},
@@ -112,7 +114,7 @@ SCHEMAS = {
                         hide_single=_B),
     "SearchHit": {"type": "object", "required": ["kind", "id", "title"], "properties": {
         "kind": {"type": "string", "enum": ["story", "article"]}, "id": _I, "story_id": _NI, "title": _S,
-        "image_url": _URL, "logo_url": _LOGO, "source_count": _I, "updated_at": _NDT, "outlet": _ref("Outlet"),
+        "image_url": _URL, "logo_url": _LOGO, "source_name": _NS, "source_count": _I, "updated_at": _NDT, "outlet": _ref("Outlet"),
         "leaning": _LEANING, "published_at": _NDT}},
     "FeedHeadline": _obj(["title", "outlet", "url", "published_at"], title=_S, outlet=_S, url=_URL, published_at=_DT),
     "BreakingItem": _obj(

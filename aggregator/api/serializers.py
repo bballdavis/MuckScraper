@@ -112,10 +112,22 @@ def _story_logo(story):
     """The newest outlet logo among the story's articles: what a card shows
     when `image_url` is null. Clients draw it fitted on a plain tile, not
     cropped like a photo (news_fetcher/outlet_logos.py)."""
-    for article in sorted(story.site_articles, key=lambda a: a.date or dt.min, reverse=True):
-        if article.outlet is not None and _http_url(article.outlet.logo_url):
-            return article.outlet.logo_url
-    return None
+    source = _story_source(story)
+    return source.logo_url if source is not None and _http_url(source.logo_url) else None
+
+
+def _story_source(story):
+    """The outlet a card's fallback names: the one whose logo it shows, else
+    the newest outlet. Clients set its name under the logo, or alone as a
+    masthead when there's no logo (the web's card_image chain)."""
+    outlets = [a.outlet for a in sorted(story.site_articles, key=lambda a: a.date or dt.min, reverse=True)
+               if a.outlet is not None]
+    return next((o for o in outlets if _http_url(o.logo_url)), outlets[0] if outlets else None)
+
+
+def _story_source_name(story):
+    source = _story_source(story)
+    return source.name if source is not None else None
 
 
 def story_summary(story, edition_story=None):
@@ -128,6 +140,7 @@ def story_summary(story, edition_story=None):
         "dek": _dek(story.summary),
         "image_url": _story_image(story, edition_story),
         "logo_url": _story_logo(story),
+        "source_name": _story_source_name(story),
         "coverage": coverage(story),
         "source_count": len({a.outlet.name if a.outlet else a.source for a in articles}),
         "updated_at": iso(story.last_updated),
@@ -262,6 +275,7 @@ def search_story_hit(story):
         "title": story.display_headline,
         "image_url": _story_image(story),
         "logo_url": _story_logo(story),
+        "source_name": _story_source_name(story),
         "source_count": len({a.outlet.name if a.outlet else a.source for a in story.site_articles}),
         "updated_at": iso(story.last_updated),
     }
