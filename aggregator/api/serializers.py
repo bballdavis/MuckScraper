@@ -174,6 +174,13 @@ def breaking_chip(story):
     return {**details, "first_at": iso(details["first_at"])}
 
 
+def arrivals(story, now=None):
+    """Trending's 12-hour chart data (headline_views.arrivals): who reported
+    the story when, and which article brought each outlet in."""
+    from aggregator import headline_views
+    return [{**a, "at": iso(a["at"])} for a in headline_views.arrivals(story, now)]
+
+
 def outlet(o, fallback_name=None):
     if o is None:
         return {"id": None, "name": fallback_name or "Unknown", "leaning": "unrated", "logo_url": None,

@@ -28,6 +28,7 @@ from aggregator import db
 from aggregator.article_copies import original_articles
 from aggregator.article_signals import bias_bucket_for_score
 from aggregator.models import Article, OpinionPiece, Story
+from aggregator.opinion import leaning
 from aggregator.sections import in_section
 from aggregator.story_rank import _signal_rows, score_signals
 
@@ -219,6 +220,40 @@ def recent_why(recent):
     if not recent:
         return None
     return f"{recent} outlet{'s' if recent != 1 else ''} in 6h"
+
+
+ARRIVALS_HOURS = 12
+
+
+def arrivals(story, now=None):
+    """Trending's tap-for-detail chart on the phone: one entry per article the
+    story picked up in the last ARRIVALS_HOURS, oldest first, by when we
+    fetched it, with `first` set on the article that brought its outlet into
+    the story (Philip, 2026-10-27). Copies of another article in the story
+    are left out, as in the outlet counts."""
+    now = now or datetime.utcnow()
+    since = now - timedelta(hours=ARRIVALS_HOURS)
+    articles = sorted((a for a in original_articles(story.articles) if a.fetched_at),
+                      key=lambda a: (a.fetched_at, a.id or 0))
+    seen, out = set(), []
+    for article in articles:
+        name = (article.outlet.name if article.outlet else None) or (article.source or "").strip()
+        if not name:
+            continue
+        key = name.lower()
+        first = key not in seen
+        seen.add(key)
+        if since <= article.fetched_at <= now:
+            out.append({"name": name, "leaning": _arrival_leaning(article), "at": article.fetched_at,
+                        "first": first})
+    return out
+
+
+def _arrival_leaning(article):
+    score = article.bias_score
+    if score is None and article.outlet:
+        score = article.outlet.bias_score
+    return leaning(score)
 
 
 def recent_whys(story_ids, now=None):

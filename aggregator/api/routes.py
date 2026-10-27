@@ -231,8 +231,10 @@ def stories():
             .offset(offset).limit(limit + 1).all())
     cards = _annotate_read([ser.story_summary(s) for s in rows])
     whys = headline_views.recent_whys([c["id"] for c in cards])
-    for card in cards:
+    now = datetime.utcnow()
+    for story, card in zip(rows, cards):
         card["why"] = whys.get(card["id"])
+        card["arrivals"] = ser.arrivals(story, now) if card["why"] else None
     return jsonify(_page(cards, offset, limit))
 
 

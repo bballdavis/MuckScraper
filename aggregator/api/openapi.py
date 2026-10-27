@@ -43,6 +43,15 @@ def _by_leaning(item):
     return _obj(list(sides), **{side: {"type": "array", "items": item} for side in sides})
 
 
+# Trending's tap-for-detail chart (headline_views.arrivals): the articles the
+# story picked up in the last 12 hours, oldest first.
+_ARRIVALS = {"oneOf": [{"type": "array", "items": _obj(
+    ["name", "leaning", "at", "first"], name=_S, leaning=_LEANING,
+    at={**_DT, "description": "When we picked the article up"},
+    first={**_B, "description": "This article brought its outlet into the story"})}, {"type": "null"}],
+    "description": "Trending only: articles added in the last 12 hours, oldest first; null elsewhere"}
+
+
 def _page(item):
     return _obj(["items", "next_cursor"], items={"type": "array", "items": item}, next_cursor=_NS)
 
@@ -87,18 +96,20 @@ SCHEMAS = {
     "HeadlineCard": {"allOf": [_ref("StorySummary"), _obj(
         ["why", "newest_at", "group", "framing_gap", "opeds"],
         why={"type": ["string", "null"], "description": "Short reason the story is in the view, for beside the "
-             "L/C/R pill: \"High gap · 2 op-eds\" (Controversial); null on Trending and Latest, where the "
-             "Breaking chip says what's new"},
+             "L/C/R pill: \"4 outlets in 6h\" (Trending), \"High gap · 2 op-eds\" (Controversial); null on "
+             "Latest"},
         newest_at=_NDT,
         group={"type": ["string", "null"], "enum": ["Last hour", "Last 6 hours", "Earlier", None],
                "description": "Latest only: the section header the story falls under"},
         framing_gap={"type": ["string", "null"], "enum": ["high", "moderate", "low", None],
                      "description": "Controversial only: how differently left and right outlets write it up"},
-        opeds={"type": "integer", "description": "Linked op-eds (Controversial only; 0 elsewhere)"})]},
+        opeds={"type": "integer", "description": "Linked op-eds (Controversial only; 0 elsewhere)"},
+        arrivals=_ARRIVALS)]},
     "SectionCard": {"allOf": [_ref("StorySummary"), _obj(
         ["why"],
         why={"type": ["string", "null"], "description": "Trending's \"4 outlets in 6h\" for beside the "
-             "kicker line; null when no outlet reported it in the last 6 hours"})]},
+             "kicker line; null when no outlet reported it in the last 6 hours"},
+        arrivals=_ARRIVALS)]},
     "ArticleCard": _obj(
         ["id", "story_id", "title", "outlet", "leaning", "url", "published_at", "image_url", "summary", "copy_of"],
         id=_I, story_id=_NI, title=_S, outlet=_ref("Outlet"), leaning=_LEANING, url=_URL,
