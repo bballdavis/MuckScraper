@@ -28,6 +28,7 @@ def _card(story, view, now):
         "group": headline_views.hour_group(newest, now) if view == "latest" and newest else None,
         "framing_gap": headline_views.gap_level(entry.gap),
         "opeds": entry.opeds[0] if entry.opeds else 0,
+        "arrivals": ser.arrivals(story, now) if view == "trending" else None,
     })
     return card
 

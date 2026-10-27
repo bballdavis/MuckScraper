@@ -58,6 +58,35 @@ class HeadlineWhyTests(unittest.TestCase):
         self.assertEqual(short_why("controversial", self._entry(opeds=(0, False))), "Both sides")
 
 
+class ArrivalsTests(unittest.TestCase):
+    """Trending's 12-hour chart on the phone (headline_views.arrivals)."""
+
+    def test_arrivals_mark_each_outlets_first_article(self):
+        from types import SimpleNamespace as NS
+        from aggregator.headline_views import arrivals
+        now = datetime(2026, 10, 27, 12, 0)
+        fox, cnn = NS(name="Fox News", bias_score=4.5), NS(name="CNN", bias_score=1.8)
+
+        def article(id, hours_ago, outlet=None, source=None, copy_of=None):
+            return NS(id=id, story_id=1, outlet=outlet, source=source, bias_score=None,
+                      fetched_at=now - timedelta(hours=hours_ago),
+                      copy_of_id=copy_of.id if copy_of else None, copy_of=copy_of)
+
+        old_fox = article(1, 20, fox)
+        new_cnn = article(2, 5, cnn)
+        story = NS(articles=[article(3, 1, fox), new_cnn, old_fox, article(4, 2, source=" Wire "),
+                             article(5, 3, NS(name="Post", bias_score=4.0), copy_of=new_cnn),
+                             article(6, -1, cnn)])
+        got = [(a["name"], a["leaning"], a["first"], a["at"]) for a in arrivals(story, now)]
+        # Fox joined 20h ago, so its new article isn't its first; the copy
+        # and the future-dated article are left out.
+        self.assertEqual(got, [
+            ("CNN", "left", True, now - timedelta(hours=5)),
+            ("Wire", "unrated", True, now - timedelta(hours=2)),
+            ("Fox News", "right", False, now - timedelta(hours=1)),
+        ])
+
+
 class ScheduleTests(unittest.TestCase):
     def test_next_run_follows_days_and_time_zone(self):
         from aggregator.newsbox import clean_schedule, next_run
