@@ -15,5 +15,5 @@
 {%- endmacro -%}
 
 {%- macro meta_item(label, text=none, when=none) -%}
-<span class="tm-item"><span class="tm-label">{{ label }}:</span> {% if when %}<span class="local-date" data-utc="{{ when.isoformat() }}Z">{{ when|short_datetime }}</span>{% else %}{{ text }}{% endif %}</span>
+<span class="tm-item"><span class="tm-label">{{ label }}:</span> {% if when %}<span class="local-date" data-utc="{{ when.isoformat() }}Z">{{ when|relative_time }}</span>{% else %}{{ text }}{% endif %}</span>
 {%- endmacro -%}

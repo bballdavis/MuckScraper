@@ -57,6 +57,29 @@ def short_datetime(value: datetime | None) -> str:
     return local_datetime(value, SHORT_DATETIME_FORMAT)
 
 
+def relative_time(value: datetime | None, now: datetime | None = None) -> str:
+    """Template filter: "3 hours ago", the text static/js/local_time.js puts in
+    a .local-date span. Rendered on the server too, so the line already reads
+    the same at first paint instead of swapping from a timestamp once the
+    script runs (Philip, 2026-10-27). Older than a week: "Oct 19, 2026"."""
+    if value is None:
+        return ""
+    ago = (now or datetime.utcnow()) - value
+    if ago < timedelta(minutes=1):
+        return "Just now"
+    if ago < timedelta(hours=1):
+        minutes = int(ago.total_seconds() // 60)
+        return f"{minutes} minute{'' if minutes == 1 else 's'} ago"
+    if ago < timedelta(days=1):
+        hours = int(ago.total_seconds() // 3600)
+        return f"{hours} hour{'' if hours == 1 else 's'} ago"
+    if ago < timedelta(days=2):
+        return "Yesterday"
+    if ago < timedelta(days=7):
+        return f"{ago.days} days ago"
+    return to_display(value).strftime("%b %-d, %Y")
+
+
 def local_day_start_utc(day: date) -> datetime:
     """Midnight at the start of `day` in the display zone, as naive UTC, for
     comparing against stored timestamps."""

@@ -197,7 +197,7 @@
 {%- set source = logo_outlet or lead|first %}
 <div class="story-image{{ '' if photo else ' is-fallback' }}" aria-hidden="true">
     {%- if photo %}
-    <img class="story-photo" src="{{ photo }}" alt="" loading="lazy" style="object-position: {{ story.lead_image_focus|object_position }}" onerror="this.parentNode.classList.add('photo-failed')">
+    <img class="story-photo" src="{{ photo }}" alt="" loading="lazy" style="object-position: {{ story.lead_image_focus|object_position }}" onload="this.parentNode.classList.add('photo-loaded')" onerror="this.parentNode.classList.add('photo-failed')">
     {%- endif %}
     {%- if source %}
     <span class="story-image-source{{ '' if logo_outlet else ' no-logo' }}">
@@ -332,7 +332,7 @@
             {% set article_count = story.articles|length %}
             <div class="card-meta">
                 {% if story.last_updated %}
-                    <span class="meta-item">Updated <span class="local-date" data-utc="{{ story.last_updated.isoformat() }}Z">{{ story.last_updated.strftime('%Y-%m-%d %H:%M') }} UTC</span></span>
+                    <span class="meta-item">Updated <span class="local-date" data-utc="{{ story.last_updated.isoformat() }}Z">{{ story.last_updated|relative_time }}</span></span>
                 {% endif %}
                 <span class="meta-item">{{ article_count }} article{{ 's' if article_count != 1 else '' }}</span>
                 {#- Headlines: why the card is in the view, on the count's

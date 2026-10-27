@@ -58,8 +58,11 @@
 .ft-left { gap: 10px; }
 .ft-right { justify-content: flex-end; gap: 10px; }
 @media (min-width: 901px) {
-    :root:has(.feed-layout .sidebar) { --ft-offset: calc(240px + 10px); }
-    :root:has(.feed-layout .sidebar.collapsed) { --ft-offset: 10px; }
+    :root:has(.feed-layout .sidebar), :root[data-sidebar="expanded"] { --ft-offset: calc(240px + 10px); }
+    /* data-sidebar: the saved state, set in <head> (theme_toggle.js) until
+       sidebar_script.html gives the menu its .collapsed class. */
+    :root:has(.feed-layout .sidebar.collapsed), :root[data-sidebar="collapsed"],
+    :root[data-sidebar="collapsed"]:has(.feed-layout .sidebar) { --ft-offset: 10px; }
     /* One row; when space runs short only the search narrows, so the two
        sides keep their difference and the search stays centred. */
     .feed-topbar { flex-wrap: nowrap; }
