@@ -82,12 +82,13 @@ class OpedPageTests(unittest.TestCase):
         self.assertIn('<span class="ft-section">Opinion &amp; Editorials</span>', page)
         self.assertIn('data-scope="oped"', page)
         self.assertIn('id="feed-filters"', page)
-        self.assertIn('class="view-switch two"', page)
-        self.assertIn('class="story compact oped-card"', page)
+        # The same compact card as a one-article story on All Stories.
+        self.assertIn('<div class="story compact" id="oped-', page)
         self.assertIn("Tariffs will hurt families", page)
-        self.assertIn("On: <b>Senate passes the tariff bill</b>", page)
-        self.assertIn("Against the tariff bill", page)
-        self.assertIn("Prices go up.", page)
+        self.assertIn("/admin/oped/", page)
+        self.assertIn("Open on the publisher", page)
+        self.assertIn("Open the news story", page)
+        self.assertNotIn("breaking-chip", page)
         self.assertNotIn("Old column on zoning", page)
         self.assertIn("2 columns", page)
 
@@ -101,13 +102,13 @@ class OpedPageTests(unittest.TestCase):
         self.assertNotIn("A win for workers", page)
         self.assertIn("Left outlets", page)
 
-    def test_by_story_uses_headlines_card(self):
+    def test_by_story_uses_section_story_cards(self):
         page = self._get("/admin/oped?view=story&range=7d")
-        self.assertIn('id="story-', page)
-        self.assertIn('class="bias-balance"', page)
+        self.assertIn('<div class="story compact" id="story-', page)
+        self.assertIn('class="card-bias"', page)
+        self.assertIn("Senate passes the tariff", page)
         self.assertIn("2 columns", page)
-        self.assertIn('class="oped-columns"', page)
-        self.assertIn("A win for workers", page)
+        self.assertIn("1 story with columns", page)
 
     def test_live_results_are_columns(self):
         data = self._client().get("/admin/search/suggest?q=tariff&scope=oped&range=7d").get_json()

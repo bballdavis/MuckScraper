@@ -331,6 +331,8 @@
     .story-content { padding: 16px 14px; }
     .story.compact .story-content { padding: 10px 10px 10px 12px; }
     .story.compact .card-meta .meta-date { flex-basis: 100%; }
+    /* A single-article card leads with the outlet; the date below it gets no dot. */
+    .story.compact .card-meta .meta-item.meta-date::before { content: none; margin: 0; }
     .story.compact .card-meta .meta-date + .meta-item::before { content: none; margin: 0; }
     .story.compact .card-meta .meta-item { white-space: nowrap; }
     .story.compact .card-meta .meta-item + .meta-item::before { margin: 0 5px; }

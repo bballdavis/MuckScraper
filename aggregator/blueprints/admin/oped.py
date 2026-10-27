@@ -19,33 +19,29 @@ from sqlalchemy.orm import joinedload
 from aggregator.constants import OPED_SECTION_NAME
 from aggregator.models import OpinionPiece, Story, Topic, db
 from aggregator.navigation import incoming_back
-from aggregator.opinion import leaning, opinion_filters, reading_paragraphs, stories_with_opinion
+from aggregator.opinion import OpinionCard, leaning, opinion_filters, reading_paragraphs, stories_with_opinion
 from aggregator.permissions import public_or_login
+from aggregator.story_view import apply_aggregator_filter
 
 from . import admin
+from ._shared import story_bias_totals
 from .articles import DEFAULT_TIME_RANGE, TIME_RANGES
 
 PER_PAGE = 25
-EXCERPT_CHARS = 280
 
 LEANINGS = [("left", "Left"), ("center", "Center"), ("right", "Right")]
 TIME_RANGE_LABELS = [("24h", "24 hours"), ("7d", "7 days"), ("30d", "30 days"), ("all", "All time")]
 
 
-def _excerpt(content):
-    text = " ".join(Markup(content or "").striptags().split())
-    if len(text) <= EXCERPT_CHARS:
-        return text
-    return text[:EXCERPT_CHARS].rsplit(" ", 1)[0] + "…"
-
-
 @admin.route("/oped")
 @public_or_login
 def oped_list():
-    """Laid out like the section pages (articles.html, Philip 2026-10-27):
-    the top bar's search and Filters, compact cards, and Latest / By story
-    as the Headlines view switch. Search, time range and leaning apply to
-    both views."""
+    """Built like the section pages (articles.html, Philip 2026-10-27): the
+    top bar's search and Filters, the filter chips, and the same compact
+    story_card. Latest draws each column as a one-article story
+    (OpinionCard); By story lists the stories the columns are about, as a
+    section does. The view is a Filters option like All Stories' single-
+    article switch. Search, time range and leaning apply to both."""
     page = max(1, request.args.get("page", 1, type=int) or 1)
     active_range = request.args.get("range", DEFAULT_TIME_RANGE)
     if active_range not in TIME_RANGES:
@@ -68,6 +64,9 @@ def oped_list():
     pieces, by_story, total_pages = [], [], 1
     if active_view == "story":
         by_story = stories_with_opinion(filters=filters)
+        for story, _columns in by_story:
+            apply_aggregator_filter(story)
+            story_bias_totals(story)
     else:
         total_pages = max(1, -(-total // PER_PAGE))
         page = min(page, total_pages)
@@ -78,15 +77,12 @@ def oped_list():
             .limit(PER_PAGE)
             .all()
         )
-    excerpts = {p.id: _excerpt(p.content) for p in pieces} if current_user.is_authenticated else {}
-
     return render_template(
         "oped.html",
         section_title=OPED_SECTION_NAME,
-        pieces=pieces,
+        cards=[OpinionCard(piece) for piece in pieces],
         active_view=active_view,
         by_story=by_story,
-        excerpts=excerpts,
         total=total,
         story_total=story_total,
         topics=Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all(),

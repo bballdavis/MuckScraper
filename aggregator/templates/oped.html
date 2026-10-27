@@ -1,20 +1,17 @@
 {% extends '_app_page.html' %}
-{% from 'story_card_macros.html' import story_card, bias_balance, bias_tag, outlet_bias_tag, outlet_flag, grade_pill with context %}
+{% from 'story_card_macros.html' import story_card with context %}
 {% from 'pagination.html' import pager %}
 {% from 'icons.html' import icon %}
-{% from 'oped_columns.html' import oped_columns, oped_roundup with context %}
-{#- Opinion & Editorials (admin.oped_list, blueprints/admin/oped.py), laid
-    out like the section pages (Philip, 2026-10-27): the top bar's search
-    with live op-ed results and a Filters popover (time range, outlet
-    leaning), the filter chips under it, then Latest / By story as the
-    Headlines view switch. Latest lists compact cards like All Stories;
-    By story uses the Headlines card with the story's L/C/R bar. -#}
+{#- Opinion & Editorials (admin.oped_list, blueprints/admin/oped.py), built
+    like the section pages in articles.html (Philip, 2026-10-27): the top
+    bar's search (live results are columns) and Filters popover, the filter
+    chips, then compact story cards. Latest draws each column as a
+    one-article story (opinion.OpinionCard), By story the stories the
+    columns are about, as a section lists them. -#}
 {% block title %}{{ section_title }}{% endblock %}
 {% block section %}{{ section_title }}{% endblock %}
 {% block head %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/story_card.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/headline_views.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/oped_columns.css') }}">
 {% endblock %}
 {% block styles %}
     <style>
@@ -26,92 +23,28 @@
             margin: 0 auto;
             position: relative;
         }
-        .view-switch.two { grid-template-columns: repeat(2, 1fr); }
-
-        /* A column's card: All Stories' compact card, with the excerpt
-           under the meta row and the outlet's grade and lean at the bottom. */
-        .oped-card .oped-excerpt {
-            font-size: var(--fs-meta); color: var(--text-muted); line-height: 1.45;
-            overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-        }
-        .oped-card .oped-on { position: relative; z-index: 2; color: var(--text-muted); text-decoration: none; }
-        .oped-card .oped-on:hover { color: var(--accent-text); text-decoration: underline; }
-        .oped-card .oped-on b { font-weight: 600; }
-        .oped-card .meta-on { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-        .oped-card .card-bottom .oped-stance {
-            min-width: 0; font-size: var(--fs-label); font-style: italic; color: var(--text-muted);
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        }
-        .oped-card .card-rail a.act { text-decoration: none; }
-
         .bias-none { background-color: #ddd; color: #666; }
         .empty { text-align: center; padding: 80px 0; color: var(--text-faint); font-style: italic; }
-
         @media (max-width: 900px) {
             .main { padding: 16px 16px 0; }
-        }
-        /* Phones: the date, the outlet, then "On: …" on its own line. */
-        @media (max-width: 600px) {
-            .oped-card .card-meta .meta-on { flex-basis: 100%; }
-            .story.compact.oped-card .card-meta .meta-item.meta-on::before { content: none; margin: 0; }
         }
     </style>
 {% endblock %}
 
-{%- macro oped_card(piece, excerpt) -%}
-{%- set outlet = piece.outlet %}
-{%- set name = outlet.name if outlet else piece.source %}
-<div class="story compact oped-card" id="oped-{{ piece.id }}">
-    <div class="story-layout">
-        {#- The column's image, else its outlet's logo tile, else the outlet's
-            name, like card_image() on the story cards. -#}
-        <div class="story-image{{ '' if piece.image_url else ' is-fallback' }}" aria-hidden="true">
-            {%- if piece.image_url %}
-            <img class="story-photo" src="{{ piece.image_url }}" alt="" loading="lazy" onerror="this.parentNode.classList.add('photo-failed')">
-            {%- endif %}
-            {%- if name %}
-            <span class="story-image-source{{ '' if outlet and outlet.logo_url else ' no-logo' }}">
-                {%- if outlet and outlet.logo_url %}<img class="story-logo" src="{{ outlet.logo_url }}" alt="" loading="lazy" onerror="this.parentNode.classList.add('no-logo')">{% endif -%}
-                <span class="story-source-name">{{ name }}</span>
-            </span>
-            {%- else %}
-            <span class="story-image-placeholder">{{ icon('message-square') }}</span>
-            {%- endif %}
-        </div>
-        <div class="story-content">
-            <h2><a class="story-link" href="{{ url_for('admin.oped_piece', piece_id=piece.id, back=current_back()) }}">{{ piece.title }}</a></h2>
-            <div class="card-meta">
-                {% if piece.date %}<span class="meta-item meta-date">{{ piece.date|short_datetime }}</span>{% endif %}
-                {% if name %}<span class="meta-item">{{ name }}{{ outlet_flag(outlet) }}</span>{% endif %}
-                {% if piece.story %}<span class="meta-item meta-on"><a class="oped-on" href="{{ url_for('public.view_story', story_id=piece.story.id, back=current_back()) }}">On: <b>{{ piece.story.display_headline }}</b></a></span>{% endif %}
-            </div>
-            {% if excerpt %}<p class="oped-excerpt">{{ excerpt }}</p>{% endif %}
-            <div class="card-bottom">
-                {% if outlet %}
-                    {% call grade_pill(outlet) %}{{ outlet_bias_tag(outlet) }}{% endcall %}
-                {% else %}
-                    {{ bias_tag(piece.bias_score) }}
-                {% endif %}
-                {% if piece.stance %}<span class="oped-stance">{{ piece.stance }}</span>{% endif %}
-            </div>
-        </div>
-        {#- The rail: the publisher's page, then the news story it's about. -#}
-        <div class="card-rail">
-            <a class="act act-ready" href="{{ piece.url }}" target="_blank" rel="noopener noreferrer" aria-label="Open on the publisher's site">{{ icon('external-link') }}<span class="tip" role="tooltip"><strong>Open on the publisher's site</strong> {{ name }}</span></a>
-            {% if piece.story %}
-            <a class="act act-ready" href="{{ url_for('public.view_story', story_id=piece.story.id, back=current_back()) }}" aria-label="Open the news story">{{ icon('layers') }}<span class="tip" role="tooltip"><strong>Open the news story</strong> Every outlet's coverage, with the other columns about it.</span></a>
-            {% endif %}
-        </div>
-    </div>
-</div>
-{%- endmacro -%}
+{%- set base = {'view': 'story' if active_view == 'story' else none, 'range': active_range, 'leaning': active_leaning, 'q': active_search_query} -%}
+{%- set range_short = {'24h': '24h', '7d': '7 days', '30d': '30 days', 'all': 'All'} -%}
 
 {% block topbar %}
-{%- set base = {'view': active_view if active_view == 'story' else none, 'range': active_range, 'leaning': active_leaning, 'q': active_search_query} -%}
-{%- set range_short = {'24h': '24h', '7d': '7 days', '30d': '30 days', 'all': 'All'} -%}
 {% call feed_topbar(section_title, url_for('admin.oped_list'), active_search_query,
                     {'view': base.view, 'range': active_range, 'leaning': active_leaning},
                     suggest_scope='oped', placeholder='Search columns and outlets') %}
+    <div>
+        <span class="fp-label">Show</span>
+        <div class="fp-segment">
+            <a href="{{ url_for('admin.oped_list', **dict(base, view=none)) }}" class="{{ 'active' if active_view != 'story' }}"{% if active_view != 'story' %} aria-current="true"{% endif %}>Columns</a>
+            <a href="{{ url_for('admin.oped_list', **dict(base, view='story')) }}" class="{{ 'active' if active_view == 'story' }}"{% if active_view == 'story' %} aria-current="true"{% endif %}>By story</a>
+        </div>
+    </div>
     <div>
         <span class="fp-label">Time range</span>
         <div class="fp-segment">
@@ -128,35 +61,25 @@
             <a href="{{ url_for('admin.oped_list', **dict(base, leaning=value)) }}" class="{{ 'active' if active_leaning == value }}">{{ label }}</a>
             {%- endfor %}
         </div>
-        <p class="fp-note" style="margin-top: 8px">A column is filed under its outlet's leaning; its stance says what it argues.</p>
     </div>
     <div class="fp-foot">
-        <a href="{{ url_for('admin.oped_list', view=base.view, q=active_search_query) }}">Reset filters</a>
+        <a href="{{ url_for('admin.oped_list', q=active_search_query) }}">Reset filters</a>
     </div>
 {% endcall %}
 {% endblock %}
 
 {% block body %}
-{%- set base = {'view': active_view if active_view == 'story' else none, 'range': active_range, 'leaning': active_leaning, 'q': active_search_query} -%}
 <div class="main">
     {% include '_flashes.html' %}
-    <nav class="view-switch two" aria-label="{{ section_title }} views">
-        {%- for key, label, view_icon, rule, count in [
-            ('latest', 'Latest', 'clock', 'Newest columns first', total),
-            ('story', 'By story', 'layers', 'Columns on each news story, Left to Right', story_total)] %}
-        <a class="view-seg{{ ' on' if key == active_view else '' }}" href="{{ url_for('admin.oped_list', **dict(base, view=key if key == 'story' else none, page=none)) }}"{% if key == active_view %} aria-current="page"{% endif %}>
-            <span class="view-name">{{ icon(view_icon) }}{{ label }}<span class="view-count">{{ count }}</span></span>
-            <span class="view-rule">{{ rule }}</span>
-        </a>
-        {%- endfor %}
-    </nav>
-
     <div class="active-filters">
         {%- set n = story_total if active_view == 'story' else total %}
-        <p>{{ '{:,}'.format(n) }} {% if active_view == 'story' %}stor{{ 'y' if n == 1 else 'ies' }}{% else %}column{{ '' if n == 1 else 's' }}{% endif %}{% if active_search_query %} matching “{{ active_search_query }}”{% endif %}</p>
+        <p>{{ '{:,}'.format(n) }} {% if active_view == 'story' %}stor{{ 'y' if n == 1 else 'ies' }} with columns{% else %}column{{ '' if n == 1 else 's' }}{% endif %}{% if active_search_query %} matching “{{ active_search_query }}”{% endif %}</p>
         <div class="filter-chips">
             {% if active_search_query %}
             <a class="filter-chip" href="{{ url_for('admin.oped_list', **dict(base, q=none)) }}" aria-label="Clear search {{ active_search_query }}">“{{ active_search_query }}” {{ icon('x') }}</a>
+            {% endif %}
+            {% if active_view == 'story' %}
+            <a class="filter-chip" href="{{ url_for('admin.oped_list', **dict(base, view=none)) }}" aria-label="Show latest columns instead">By story {{ icon('x') }}</a>
             {% endif %}
             {% if active_range != 'all' %}
             <a class="filter-chip" href="{{ url_for('admin.oped_list', **dict(base, range='all')) }}" aria-label="Remove filter: last {{ dict(time_ranges)[active_range]|lower }}">Last {{ dict(time_ranges)[active_range]|lower }} {{ icon('x') }}</a>
@@ -170,18 +93,22 @@
     {% if active_view == 'story' %}
         {% for story, columns in by_story %}
         {%- set n = columns.values()|map('length')|sum %}
-        {% call story_card(story, why=n ~ ' column' ~ ('' if n == 1 else 's'), why_icon='message-square') %}
-            {{ bias_balance(story) }}
-            {{ oped_roundup(story) }}
-            {{ oped_columns(columns) }}
+        {% call story_card(story, compact=true, why=n ~ ' column' ~ ('' if n == 1 else 's')) %}
+            <a class="card-menu-item" role="menuitem" href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">Open full coverage and columns</a>
         {% endcall %}
         {% else %}
         <div class="empty"><p>No columns about a news story {% if active_range != 'all' %}in the last {{ dict(time_ranges)[active_range]|lower }}{% else %}yet{% endif %}.</p>
             {% if active_range != 'all' %}<p><a href="{{ url_for('admin.oped_list', **dict(base, range='all')) }}">Show all time</a></p>{% endif %}</div>
         {% endfor %}
     {% else %}
-        {% for piece in pieces %}
-            {{ oped_card(piece, excerpts.get(piece.id)) }}
+        {% for card in cards %}
+        {% call story_card(card, compact=true, href=url_for('admin.oped_piece', piece_id=card.id, back=current_back())) %}
+            <a class="card-menu-item" role="menuitem" href="{{ url_for('admin.oped_piece', piece_id=card.id, back=current_back()) }}">{{ 'Read what it argues and its text' if current_user.is_authenticated else 'Read what it argues' }}</a>
+            <a class="card-menu-item" role="menuitem" href="{{ card.piece.url }}" target="_blank" rel="noopener noreferrer">Open on the publisher's site</a>
+            {% if card.story %}
+            <a class="card-menu-item" role="menuitem" href="{{ url_for('public.view_story', story_id=card.story.id, back=current_back()) }}">Open the news story</a>
+            {% endif %}
+        {% endcall %}
         {% else %}
         <div class="empty"><p>No columns {% if active_search_query %}match “{{ active_search_query }}”{% elif active_range != 'all' %}in the last {{ dict(time_ranges)[active_range]|lower }}{% else %}yet{% endif %}.</p>
             {% if active_range != 'all' %}<p><a href="{{ url_for('admin.oped_list', **dict(base, range='all')) }}">Show all time</a></p>{% endif %}</div>
@@ -191,5 +118,9 @@
 </div>
 {% endblock %}
 {% block scripts %}
+<script>
+    {% include '_ai_task_script.html' %}
+</script>
 <script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
+<script src="{{ url_for('static', filename='js/ai_toast.js') }}"></script>
 {% endblock %}

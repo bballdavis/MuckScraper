@@ -111,6 +111,31 @@ def published_edition_opinion_cards(edition):
     return [(story, pieces) for story, pieces in cards if story.id in published]
 
 
+class OpinionCard:
+    """An OpinionPiece shaped like a one-article Story, so the Op/Ed page's
+    Latest list draws it with the same compact story_card as a single-article
+    story on All Stories (Philip, 2026-10-27: "structurally we don't want to
+    be doing that much different here"). The card leaves out the Breaking
+    tag and the AI actions for it (`is_opinion`)."""
+
+    is_opinion = True
+    has_ai_headline = False
+    edition_has_updates = False
+    lead_image_focus = None
+
+    def __init__(self, piece):
+        self.piece = piece
+        self.id = piece.id
+        self.card_id = f"oped-{piece.id}"
+        self.display_headline = piece.title
+        self.last_updated = piece.date
+        self.lead_image_url = piece.image_url
+        self.story = piece.story
+        # The one "article": the column itself, with the fields the card's
+        # meta row, lean chip and ⋯ menu read.
+        self.articles = self.display_articles = [piece]
+
+
 def opinion_filters(q=None, since=None, side=None):
     """SQL conditions on OpinionPiece for the Op/Ed page's search, time range
     and outlet leaning ("left", "center", "right"), shared by its two views
