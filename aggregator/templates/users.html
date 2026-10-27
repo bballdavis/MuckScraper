@@ -75,7 +75,7 @@
             <div class="field"><label for="new-username">Username</label><input type="text" id="new-username" name="username" required autocomplete="off"></div>
             <div class="field"><label for="new-email">Email</label><input type="email" id="new-email" name="email" required autocomplete="off"></div>
             <div class="field"><label for="new-role">Role</label>
-                <select id="new-role" name="role">{% for role in roles %}<option value="{{ role }}">{{ role_labels[role] }}</option>{% endfor %}</select>
+                <select id="new-role" name="role">{% for role in roles %}<option value="{{ role }}"{{ ' selected' if role == default_role }}>{{ role_labels[role] }}</option>{% endfor %}</select>
             </div>
             <div class="field"><label for="new-password">Password</label><input type="password" id="new-password" name="password" minlength="8" required autocomplete="new-password"></div>
             <div><button type="submit" class="btn btn-primary">Add user</button></div>

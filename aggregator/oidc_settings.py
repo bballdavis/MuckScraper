@@ -19,7 +19,7 @@ from datetime import datetime
 from urllib.parse import urlsplit
 
 from aggregator import db, secret_box
-from aggregator.models import ROLES, AppSetting, ConfigSetting
+from aggregator.models import ROLE_READER, ROLE_SCRAPER, ROLES, AppSetting, ConfigSetting
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +39,25 @@ DEFAULTS = {
     # Empty accepts any verified identity from the issuer.
     "allowed_groups": [],
     # group -> role. Empty leaves roles to Settings › Users; non-empty is
-    # applied at every OIDC sign-in, highest role wins, unmapped is Reader.
+    # applied at every OIDC sign-in, highest role wins, unmapped gets
+    # default_role.
     "role_mapping": {},
+    # What a new account starts as (and an unmapped identity gets when groups
+    # are mapped). Never Admin: admins come from Admin groups or Users.
+    "default_role": ROLE_READER,
     "create_users": False,
+    # A claim whose value links a new identity to the one existing account
+    # with that email or username, on its first sign-in. Empty: an identity
+    # only reaches an account an admin linked (or one it creates).
+    "match_claim": "",
     "allow_password_login": True,
     "auto_login": False,
     "session_lifetime_seconds": 3600,
 }
 MIN_LIFETIME, MAX_LIFETIME = 60, 86400
+DEFAULT_ROLES = (ROLE_READER, ROLE_SCRAPER)
+# The page's shortcuts for match_claim; anything else is a custom claim.
+COMMON_MATCH_CLAIMS = ("email", "preferred_username")
 
 _GROUP_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,200}$")
 _CLAIM_RE = re.compile(r"^[A-Za-z0-9_.:/-]{1,100}$")
@@ -74,6 +85,8 @@ def clean(raw):
     for name in ("enabled", "create_users", "allow_password_login", "auto_login"):
         if isinstance(raw.get(name), bool):
             out[name] = raw[name]
+    if isinstance(raw.get("match_claim"), str) and _CLAIM_RE.match(raw["match_claim"].strip()):
+        out["match_claim"] = raw["match_claim"].strip()
     for name in ("issuer_url", "client_id", "redirect_uri", "provider_name", "scopes", "groups_claim"):
         if isinstance(raw.get(name), str) and raw[name].strip():
             out[name] = raw[name].strip()[:500]
@@ -82,6 +95,8 @@ def clean(raw):
     if isinstance(mapping, dict):
         out["role_mapping"] = {g: r for g, r in mapping.items()
                                if isinstance(g, str) and _GROUP_RE.match(g) and r in ROLES}
+    if raw.get("default_role") in DEFAULT_ROLES:
+        out["default_role"] = raw["default_role"]
     lifetime = raw.get("session_lifetime_seconds")
     if isinstance(lifetime, int) and not isinstance(lifetime, bool) and MIN_LIFETIME <= lifetime <= MAX_LIFETIME:
         out["session_lifetime_seconds"] = lifetime
@@ -97,6 +112,16 @@ def load():
         return clean({})
 
 
+def default_role():
+    """The role new non-admin accounts start with: Reader or Scraper. Read on
+    every call, so Settings › Users always preselects the saved choice."""
+    try:
+        return load()["default_role"]
+    except Exception:
+        db.session.rollback()
+        return ROLE_READER
+
+
 def errors(values, has_secret):
     """What stops `values` from being saved, as messages. Turned off, only
     malformed values count; turned on, everything sign-in needs is required."""
@@ -110,6 +135,10 @@ def errors(values, has_secret):
         problems.append("Scopes must include openid.")
     if not _CLAIM_RE.match(values.get("groups_claim", "")):
         problems.append("The groups claim is a claim name: letters, digits and . _ : / - only.")
+    if values.get("match_claim") and not _CLAIM_RE.match(values["match_claim"]):
+        problems.append("The account matching claim is a claim name: letters, digits and . _ : / - only.")
+    if values.get("default_role", ROLE_READER) not in DEFAULT_ROLES:
+        problems.append("New accounts start as a Reader or a Scraper.")
     if not 1 <= len(values.get("provider_name", "")) <= 100:
         problems.append("The button label needs 1 to 100 characters.")
     lifetime = values.get("session_lifetime_seconds")
@@ -197,7 +226,9 @@ def _build():
         "GROUPS_CLAIM": values["groups_claim"],
         "ALLOWED_GROUPS": list(values["allowed_groups"]),
         "ROLE_MAPPING": dict(values["role_mapping"]),
+        "DEFAULT_ROLE": values["default_role"],
         "CREATE_USERS": values["create_users"],
+        "MATCH_CLAIM": values["match_claim"],
         "ALLOW_PASSWORD_LOGIN": values["allow_password_login"],
         "AUTO_LOGIN": values["auto_login"],
         "SESSION_LIFETIME_SECONDS": values["session_lifetime_seconds"],
