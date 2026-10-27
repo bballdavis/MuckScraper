@@ -24,6 +24,7 @@ HEADERS_DEFAULT = {
 from aggregator.html_safety import ALLOWED_ATTRIBUTES, ALLOWED_TAGS, sanitize_html  # noqa: E402,F401
 from news_fetcher import nyt_api  # noqa: E402
 from news_fetcher.bylines import author_from_html  # noqa: E402
+from news_fetcher import wire_carriers  # noqa: E402
 
 # No crawler user agent and no headless browser for paywalled sites (Regis,
 # 2026-10-21). Posing as Googlebot is how 12ft.io got past paywalls before
@@ -104,6 +105,9 @@ class ScrapeResult:
     # The byline the publisher's page declares (raw; clean with
     # news_fetcher.bylines.clean_byline). Only set when the page was fetched.
     author: str | None = None
+    # On a wire carrier's page (news_fetcher/wire_carriers.py): whether the
+    # page credits Reuters. None for every other site.
+    credits_wire: bool | None = None
 
     @property
     def succeeded(self):
@@ -921,6 +925,10 @@ def _scrape_publisher_pages(url, fallback_content, force, page_images):
             # HEADERS_DEFAULT; comparing to HEADERS_DEFAULT alone never matched.
             if candidate_url == url and headers in (None, HEADERS_DEFAULT):
                 initial_html = response.text
+            content = wire_carriers.extract_body(response.text, candidate_url)
+            if content:
+                return finalize_content(sanitize_html(content), f"{method}_carrier")
+
             content = extract_with_readability(response.text, candidate_url)
             if content:
                 return finalize_content(content, method)
@@ -944,6 +952,8 @@ def _scrape_publisher_pages(url, fallback_content, force, page_images):
     def with_author(result):
         if initial_html and result is not None:
             result.author = author_from_html(initial_html)
+        if result is not None and wire_carriers.carrier_name(url):
+            result.credits_wire = wire_carriers.credits_wire(initial_html, result.content)
         return result
 
     result = try_bs4(url, method="bs4")

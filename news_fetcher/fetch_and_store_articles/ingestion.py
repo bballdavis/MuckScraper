@@ -22,6 +22,7 @@ from aggregator.outlet_origins import is_international, lean_abroad_for, origin_
 from news_fetcher.allsides_lookup import get_allsides_score
 from news_fetcher.bylines import clean_byline
 from news_fetcher.outlet_bias_llm import get_outlet_bias_from_llm
+from news_fetcher import wire_carriers
 from news_fetcher.scraper import scrape_article
 from news_fetcher.story_grouper import find_or_create_story, get_embedding
 from news_fetcher.topic_classifier import classify_article
@@ -84,6 +85,12 @@ def empty_store_metrics(topic_name, provider=None, input_articles=0):
             "promotional": 0,
             "duplicate_url": 0,
             "duplicate_title_outlet": 0,
+            # A wire carrier's page that doesn't credit Reuters, from a
+            # carrier feed (news_fetcher/wire_carriers.py).
+            "not_wire_copy": 0,
+            # A carrier's Reuters copy that filled the stored Reuters
+            # headline instead of becoming an article of its own.
+            "wire_text_filled": 0,
         },
         "scrape_statuses": {},
         "bias_buckets": {bucket: 0 for bucket in BIAS_BUCKETS},
@@ -307,6 +314,50 @@ def store_opinion_feed(articles_data):
     return metrics
 
 
+def fill_wire_headline(title, scrape_result, carrier, carrier_url, days=4):
+    """Give a stored Reuters headline the text a wire carrier republished.
+
+    reuters.com is headline-only, so the Reuters article the site:reuters.com
+    feed stored has no text. When it is there (same title, last few days,
+    under MIN_TEXT_CHARS), it takes the carrier's text and keeps its own
+    reuters.com link. Returns True when an article was filled.
+    """
+    if not scrape_result.content:
+        return False
+    outlet = Outlet.query.filter_by(name=wire_carriers.WIRE_OUTLET).first()
+    if outlet is None:
+        return False
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    headline = (
+        Article.query
+        .filter(Article.outlet_id == outlet.id, Article.title == title, Article.fetched_at >= cutoff)
+        .first()
+    )
+    if headline is None or len(headline.content or "") >= wire_carriers.MIN_TEXT_CHARS:
+        return False
+    headline.content = scrape_result.content
+    headline.scrape_status = scrape_result.status
+    headline.scrape_method = truncate_db_string(scrape_result.method, 255)
+    headline.scrape_failure_reason = truncate_db_string(scrape_result.failure_reason, 1024)
+    headline.scrape_http_status = scrape_result.http_status
+    headline.text_via = carrier
+    headline.text_via_url = carrier_url
+    if not headline.image_url and scrape_result.image_url:
+        headline.image_url = scrape_result.image_url
+    # Embedded from the title alone when it was stored; now with its text,
+    # as every other article is.
+    from news_fetcher.story_grouper import strip_video_prefix
+    from news_fetcher.summarizer import strip_html
+    snippet = strip_html(scrape_result.content)[:200].strip()
+    embedding = get_embedding(f"{strip_video_prefix(title)}. {snippet}")
+    if isinstance(embedding, str):
+        embedding = json.loads(embedding)
+    if embedding is not None:
+        headline.embedding = embedding
+    logger.info(f"  [Wire] Filled Reuters headline {headline.id} with text via {carrier}")
+    return True
+
+
 def store_articles(articles_data, topic_name, provider=None):
     """
     Store a list of normalized article dicts into the database,
@@ -398,6 +449,25 @@ def store_articles(articles_data, topic_name, provider=None):
             metrics["skipped"]["duplicate_url"] += 1
             continue
 
+        # A wire carrier's page is read before anything else: whether it
+        # credits Reuters decides the outlet (news_fetcher/wire_carriers.py).
+        scrape_result = None
+        text_via = None
+        carrier = wire_carriers.carrier_name(url)
+        if carrier:
+            scrape_result = scrape_article(url, fallback_content=content)
+            if scrape_result.credits_wire:
+                text_via = carrier
+                source_name = wire_carriers.WIRE_OUTLET
+                author = clean_byline(article.get("author"), source_name, outlet_names)
+                if fill_wire_headline(title, scrape_result, carrier, url):
+                    metrics["skipped"]["wire_text_filled"] += 1
+                    continue
+            elif article.get("wire_only"):
+                logger.debug(f"Skipping carrier page that isn't Reuters copy: {title} [{url}]")
+                metrics["skipped"]["not_wire_copy"] += 1
+                continue
+
         # Check for Title + Source duplicate (catch same article, different URL)
         # First get/create outlet to have the ID
         outlet = Outlet.query.filter_by(name=source_name).first()
@@ -483,7 +553,8 @@ def store_articles(articles_data, topic_name, provider=None):
             if classified_topic not in story.topics:
                 story.topics.append(classified_topic)
 
-        scrape_result = scrape_article(url, fallback_content=content)
+        if scrape_result is None:
+            scrape_result = scrape_article(url, fallback_content=content)
         scraped_content = scrape_result.content
         if scraped_content:
             # Check if this looks like a duplicate login/error page across the outlet
@@ -532,6 +603,8 @@ def store_articles(articles_data, topic_name, provider=None):
             scrape_method=truncate_db_string(scrape_result.method, 255),
             scrape_failure_reason=truncate_db_string(scrape_result.failure_reason, 1024),
             scrape_http_status=scrape_result.http_status,
+            text_via=text_via,
+            text_via_url=url if text_via else None,
             grouping_match_method=truncate_db_string(getattr(match, "method", None), 32),
             grouping_confidence=getattr(match, "confidence", None),
             grouping_candidate_story_ids=serialize_grouping_candidate_ids(

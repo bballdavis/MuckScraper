@@ -202,7 +202,11 @@ SEED_RSS_GENERAL = ['https://feeds.bbci.co.uk/news/rss.xml',
  'https://feeds.npr.org/1008/rss.xml',
  'https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml',
  'https://www.theguardian.com/culture/rss',
- 'https://variety.com/feed/']
+ 'https://variety.com/feed/',
+ # b6d2e8f4a1c7: Reuters stories from sites licensed to republish them.
+ 'https://news.google.com/rss/search?q=Reuters+site:finance.yahoo.com+when:1d&hl=en-US&gl=US&ceid=US:en',
+ 'https://news.google.com/rss/search?q=site:kfgo.com+when:1d&hl=en-US&gl=US&ceid=US:en',
+ 'https://news.google.com/rss/search?q=Reuters+site:theglobeandmail.com+when:1d&hl=en-US&gl=US&ceid=US:en']
 
 SEED_RSS_RIGHT_ENRICHMENT = ['https://moxie.foxnews.com/google-publisher/latest.xml',
  'https://nypost.com/feed/',
@@ -315,7 +319,10 @@ SEED_RSS_LABELS = {('https://www.semafor.com/rss.xml', 'general'): 'Semafor',
  ('https://www.washingtonexaminer.com/section/opinion/feed/', 'op_ed'): 'Washington Examiner '
                                                                         'Opinion (Op/Ed)',
  ('https://www.washingtontimes.com/rss/headlines/opinion/', 'op_ed'): 'Washington Times Opinion '
-                                                                      '(Op/Ed)'}
+                                                                      '(Op/Ed)',
+ ('https://news.google.com/rss/search?q=Reuters+site:finance.yahoo.com+when:1d&hl=en-US&gl=US&ceid=US:en', 'general'): 'Reuters via Yahoo Finance',
+ ('https://news.google.com/rss/search?q=site:kfgo.com+when:1d&hl=en-US&gl=US&ceid=US:en', 'general'): 'Reuters via KFGO',
+ ('https://news.google.com/rss/search?q=Reuters+site:theglobeandmail.com+when:1d&hl=en-US&gl=US&ceid=US:en', 'general'): 'Reuters via The Globe and Mail'}
 
 SEED_RSS_FALLBACKS = {'https://www.semafor.com/rss.xml': 'https://news.google.com/rss/search?q=site:semafor.com+when:1d&hl=en-US&gl=US&ceid=US:en',
  'https://feeds.texastribune.org/feeds/main/': 'https://news.google.com/rss/search?q=site:texastribune.org+when:1d&hl=en-US&gl=US&ceid=US:en',
@@ -422,7 +429,8 @@ SEED_SCRAPE_BLOCKLIST = [('nytimes.com', 'Hard paywall — scraping permanently 
  ('foreignpolicy.com', 'Hard paywall — scraping permanently blocked'),
  ('hbr.org', 'Hard paywall — scraping permanently blocked'),
  ('seekingalpha.com', 'Hard paywall — scraping permanently blocked'),
- ('barrons.com', 'Hard paywall — scraping permanently blocked')]
+ ('barrons.com', 'Hard paywall — scraping permanently blocked'),
+ ('reuters.com', 'Blocks automated access (401) — headline only; text read from licensed carriers')]
 
 PROMPT_STORY_SUMMARY = """You are a {persona} writing an executive summary for a news briefing.
 
