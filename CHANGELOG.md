@@ -334,6 +334,24 @@ All notable changes to MuckScraper are documented here.
   `.env.sample` but never reached the app or scheduler, so setting them in
   `.env` had no effect.
 
+## [1.0.2] - 2026-10-26
+
+### Added
+- **Article bylines** (`articles.author`). Taken from the feed or NewsAPI
+  entry, or from the publisher's page when the scraper reads it, and cleaned
+  ("By Jane Doe, CNN" becomes "Jane Doe"; "Staff" and outlet names are left
+  blank). Not shown on pages yet. Upgrading adds one empty column
+  (`./install.sh` applies the migration); articles stored before it have no
+  byline.
+
+### Fixed
+- **The scraper's page-reading fallbacks run again.** Since 0.5 the first
+  page it downloaded was thrown away, so three fallbacks never ran: finding
+  the AMP version of a page from its link, reading the article from the
+  page's structured metadata, and (new here) the byline from the page.
+  Sites without a usable feed author or a clean readable page get more of
+  each now.
+
 ## [1.0.1] - 2026-10-22
 
 ### Added
