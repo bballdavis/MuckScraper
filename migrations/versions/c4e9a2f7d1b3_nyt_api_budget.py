@@ -14,6 +14,16 @@ depends_on = None
 
 
 def upgrade():
+    # create_app() and the scheduler run db.create_all(), so on a running
+    # install either table can already exist; create only what is missing.
+    existing = set(sa.inspect(op.get_bind()).get_table_names())
+    if "nyt_api_calls" not in existing:
+        _create_api_calls()
+    if "nyt_wire_items" not in existing:
+        _create_wire_items()
+
+
+def _create_api_calls():
     op.create_table(
         "nyt_api_calls",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -23,6 +33,9 @@ def upgrade():
         sa.Column("items", sa.Integer(), nullable=True),
     )
     op.create_index("ix_nyt_api_calls_called_at", "nyt_api_calls", ["called_at"])
+
+
+def _create_wire_items():
     op.create_table(
         "nyt_wire_items",
         sa.Column("id", sa.Integer(), primary_key=True),

@@ -1,6 +1,7 @@
 {#- Settings › Source API keys (admin.source_keys_page,
-    blueprints/admin/source_keys.py): keys for the news APIs ingestion can
-    use, saved encrypted like the LLM provider keys. -#}
+    blueprints/admin/source_keys.py): each news API's key, daily request
+    budget and poll schedule (news_fetcher/api_budget.py). Keys are saved
+    encrypted like the LLM provider keys. -#}
 {% extends 'settings_base.html' %}
 {% from '_config_fields.html' import config_field, config_field_styles %}
 {% from 'icons.html' import icon %}
@@ -9,57 +10,351 @@
 {% block settings_body %}
 <div class="page-head">
     <h1>Source API keys</h1>
-    <p>Optional keys for news APIs. The default RSS feeds work without any of them. Keys are encrypted with a key from {{ 'CONFIG_ENCRYPTION_KEY' if key_source == 'CONFIG_ENCRYPTION_KEY' else 'SECRET_KEY (set CONFIG_ENCRYPTION_KEY to use a separate one)' }} and never shown again after saving.</p>
+    <p>Optional news APIs, each with its own daily request budget and poll schedule. The default RSS feeds work without any of them. Keys are encrypted with a key from {{ 'CONFIG_ENCRYPTION_KEY' if key_source == 'CONFIG_ENCRYPTION_KEY' else 'SECRET_KEY (set CONFIG_ENCRYPTION_KEY to use a separate one)' }} and never shown again after saving.</p>
 </div>
 
 {% include '_flashes.html' %}
 
-<section class="panel">
+<nav class="src-jump" aria-label="Sources">
     {%- for s in sources %}
-    <form class="source config-field-form" id="source-{{ s.key }}" method="POST" action="{{ url_for('admin.save_source_keys', key=s.key) }}" autocomplete="off">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="source-info">
-            <div class="source-head">
-                <span class="row-label">{{ s.name }}</span>
-                {%- if s.configured %}
-                <span class="chip chip-safe">Key set</span>
-                {%- else %}
-                <span class="chip">No key</span>
+    <a href="#source-{{ s.key }}" class="src-jump-item">
+        <span class="src-dot{% if s.status_chip == 'chip-safe' %} is-on{% elif s.status_chip %} is-warn{% endif %}"></span>
+        <span class="src-jump-name">{{ s.name }}</span>
+        <span class="src-jump-meta">{% if s.usage %}{{ s.usage.used }} / {{ s.usage.limit }}{% else %}{{ s.status }}{% endif %}</span>
+    </a>
+    {%- endfor %}
+</nav>
+
+{%- for s in sources %}
+{%- set u = s.usage %}
+<form class="panel src config-field-form" id="source-{{ s.key }}" method="POST" action="{{ url_for('admin.save_source_keys', key=s.key) }}" autocomplete="off"
+      data-limit="{{ s.limit }}" data-max-limit="{{ s.max_limit }}" data-poll-share="{{ s.poll_share }}" data-per-poll="{{ s.requests_per_poll }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="panel-head src-head">
+        <div class="src-title">
+            <h2>{{ s.name }}</h2>
+            <span class="chip {{ s.status_chip }}">{{ s.status }}</span>
+        </div>
+        <a class="src-signup" href="{{ s.signup }}" target="_blank" rel="noopener noreferrer">Get a key {{ icon('external-link') }}</a>
+        <p class="src-about">{{ s.about }}</p>
+    </div>
+
+    <div class="src-body">
+        {#- Usage: the last 24 hours against the limit. #}
+        <section class="src-usage" aria-label="{{ s.name }} usage">
+            <h3 class="src-label">Last 24 hours</h3>
+            {%- if u %}
+            <div class="src-count">
+                <span class="src-used">{{ u.used }}</span>
+                <span class="src-of">of {{ u.limit }} requests</span>
+                <span class="src-left">{{ u.left }} left</span>
+            </div>
+            <div class="src-meter" role="img" aria-label="{{ u.used }} of {{ u.limit }} requests used">
+                {%- set colors = ['k1', 'k2', 'k3'] %}
+                {%- for kind, label in s.kind_labels.items() %}
+                {%- set n = (u.kinds.get(kind) or {}).get('requests', 0) %}
+                {%- if n %}<i class="{{ colors[loop.index0] }}" style="width: {{ [100, 100 * n / (u.limit or 1)]|min }}%"></i>{% endif %}
+                {%- endfor %}
+                <b class="src-mark" style="left: {{ s.slowdown }}%" title="Polls slow down past {{ s.slowdown }}%"></b>
+            </div>
+            <ul class="src-legend">
+                {%- for kind, label in s.kind_labels.items() %}
+                <li><b class="{{ colors[loop.index0] }}"></b>{{ label }} <strong>{{ (u.kinds.get(kind) or {}).get('requests', 0) }}</strong></li>
+                {%- endfor %}
+                {%- if u.errors %}<li class="src-err">{{ u.errors }} failed</li>{% endif %}
+            </ul>
+            <div class="src-hours" role="img" aria-label="Requests per hour over the last 24 hours">
+                {%- for n in u.hours %}<i style="height: {{ (4 + 96 * n / u.hour_max)|round(1) if n else 0 }}%" title="{{ n }} request{{ '' if n == 1 else 's' }}, {{ 24 - loop.index0 }}h ago"></i>{% endfor %}
+            </div>
+            <div class="src-hours-axis"><span>24h ago</span><span>12h</span><span>now</span></div>
+            <dl class="src-facts">
+                <div><dt>Polling</dt><dd>{% if u.interval %}every {% if u.interval >= 120 %}{{ '%g'|format((u.interval / 60)|round(1)) }} hours{% else %}{{ u.interval|round|int }} min{% endif %}{% if u.stretch and u.stretch > 1.01 %} <span class="src-note">({{ '%.1f'|format(u.stretch) }}× the schedule, to fit)</span>{% endif %}{% if u.slowed %} <span class="src-note">(halved past {{ s.slowdown }}%)</span>{% endif %}{% else %}off{% endif %}</dd></div>
+                <div><dt>Last poll</dt><dd>{{ u.last_poll_clock or 'not yet' }}{% if u.next_poll_clock %} · next about {{ u.next_poll_clock }}{% endif %}</dd></div>
+                {%- if u.items_per_poll_request %}<div><dt>Per request</dt><dd>about {{ u.items_per_poll_request }} articles</dd></div>{% endif %}
+                {%- if s.key == 'nyt' %}<div><dt>Wire</dt><dd>{{ u.wire_items }} new items, {{ u.ingested }} ingested</dd></div>{% endif %}
+            </dl>
+            {%- else %}
+            <div class="src-empty">
+                {{ icon('gauge') }}
+                <p>{% if s.configured %}Usage can't be read right now.{% else %}Add a key below to start. Nothing is requested without one.{% endif %}</p>
+            </div>
+            {%- endif %}
+        </section>
+
+        {#- Schedule: bands of (from hour, minutes between polls), Eastern time. #}
+        <section class="src-schedule" aria-label="{{ s.name }} poll schedule">
+            <h3 class="src-label">Poll schedule <span class="src-tz">Eastern time</span></h3>
+            <div class="src-day" aria-hidden="true">
+                <div class="src-strip"></div>
+                <div class="src-strip-axis"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
+            </div>
+            <div class="src-bands">
+                {%- for start, minutes in s.schedule %}
+                <div class="src-band">
+                    <label><span>From</span>
+                        <select name="band_hour" aria-label="Band start hour">
+                            {%- for h in range(24) %}<option value="{{ h }}"{% if h == start %} selected{% endif %}>{{ hour_labels[h] }}</option>{% endfor %}
+                        </select>
+                    </label>
+                    <label><span>every</span>
+                        <input type="number" name="band_minutes" value="{{ minutes }}" min="1" max="1440" inputmode="numeric" aria-label="Minutes between polls">
+                        <span>min</span>
+                    </label>
+                    <span class="src-band-cost"></span>
+                    <button type="button" class="btn btn-quiet btn-square src-band-remove" aria-label="Remove band" title="Remove band">{{ icon('x') }}</button>
+                </div>
+                {%- endfor %}
+            </div>
+            <div class="src-bands-actions">
+                <button type="button" class="btn btn-quiet src-band-add">{{ icon('plus') }} Add band</button>
+                {%- if s.fields.schedule.source == 'saved' %}
+                <button type="submit" name="reset_schedule" value="1" class="btn btn-quiet">{{ icon('undo') }} Default</button>
                 {%- endif %}
             </div>
-            <p class="source-about">{{ s.about }} <a href="{{ s.signup }}" target="_blank" rel="noopener noreferrer">Get a key</a></p>
-            {%- if s.key == 'nyt' and nyt_usage %}
-            {%- set k = nyt_usage.kinds %}
-            <p class="source-usage">Last 24 hours: {{ nyt_usage.used }} of {{ nyt_usage.limit }} requests
-                ({{ (k.wire or {}).requests or 0 }} wire, {{ (k.search or {}).requests or 0 }} lead paragraph, {{ (k.lookup or {}).requests or 0 }} single article).
-                {{ nyt_usage.wire_items }} new wire items{% if nyt_usage.items_per_wire_request %}, about {{ nyt_usage.items_per_wire_request }} per request{% endif %}; {{ nyt_usage.ingested }} ingested.
-                Polling every {{ nyt_usage.interval }} min now{% if nyt_usage.last_wire_poll %}, last at {{ nyt_usage.last_wire_poll.strftime('%H:%M') }} UTC{% endif %}.</p>
-            {%- endif %}
-        </div>
-        <div class="source-fields">
-            {%- for f in s.fields %}{{ config_field(f) }}{% endfor %}
-        </div>
-        <button type="submit" class="btn btn-square" aria-label="Save {{ s.name }}" title="Save {{ s.name }}">{{ icon('save') }}</button>
-    </form>
-    {%- endfor %}
-</section>
+            <p class="src-plan" aria-live="polite"></p>
+        </section>
+    </div>
+
+    <div class="src-fields">
+        {{ config_field(s.fields.secret) }}
+        {{ config_field(s.fields.int) }}
+        {{ config_field(s.fields.percent) }}
+    </div>
+
+    <div class="panel-foot src-foot">
+        <details class="src-how">
+            <summary>How the budget works</summary>
+            <p>{{ s.poll_about }} Every request counts against the last 24 hours, in the scheduler and the web app alike. When the schedule would use more than {{ (s.poll_share * 100)|round|int }}% of the limit, polls stretch to fit; past the slow-down percent they come half as often, and a 429 pauses {{ s.name }} for 15 minutes.{% if s.max_limit < 100000 %} The limit can't go above {{ s.max_limit }}.{% endif %}</p>
+        </details>
+        <button type="submit" class="btn">{{ icon('save') }} Save {{ s.name }}</button>
+    </div>
+</form>
+{%- endfor %}
+
+<template id="src-band-template">
+    <div class="src-band">
+        <label><span>From</span>
+            <select name="band_hour" aria-label="Band start hour">
+                {%- for h in range(24) %}<option value="{{ h }}">{{ hour_labels[h] }}</option>{% endfor %}
+            </select>
+        </label>
+        <label><span>every</span>
+            <input type="number" name="band_minutes" value="60" min="1" max="1440" inputmode="numeric" aria-label="Minutes between polls">
+            <span>min</span>
+        </label>
+        <span class="src-band-cost"></span>
+        <button type="button" class="btn btn-quiet btn-square src-band-remove" aria-label="Remove band" title="Remove band">{{ icon('x') }}</button>
+    </div>
+</template>
 {% endblock %}
 
 {% block styles %}
 <style>
-    .source { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr) auto; align-items: start; gap: 8px 18px; padding: 12px 16px; }
-    .source + .source { border-top: 1px solid var(--border); }
-    .source-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-    .source-about { margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--text-muted); }
-    .source-usage { margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-    .source-fields { display: flex; flex-direction: column; gap: 8px; }
-    .config-field-form.source .field { grid-template-columns: 120px minmax(0, 1fr); gap: 2px 12px; }
-    .app-page .page-body .source .field input { height: 30px; }
-    @media (max-width: 760px) {
-        .source { grid-template-columns: minmax(0, 1fr) auto; }
-        .source-fields { grid-column: 1 / -1; grid-row: 2; }
+    .src-jump { display: grid; grid-template-columns: repeat({{ sources|length }}, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .src-jump-item { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px 8px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-frame); color: var(--text); text-decoration: none; }
+    .src-jump-item:hover { border-color: var(--accent-light); }
+    .src-jump-name { font-weight: 700; font-size: 14px; }
+    .src-jump-meta { grid-column: 2; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .src-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--input-border); }
+    .src-dot.is-on { background: #2f9e5b; }
+    .src-dot.is-warn { background: #d29a1e; }
+
+    .src + .src { margin-top: 18px; }
+    .src { scroll-margin-top: 16px; }
+    .src-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 14px 18px; }
+    .src-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .src-title h2 { font-size: 17px; }
+    .src-signup { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .src-signup svg { width: 13px; height: 13px; }
+    .src-about { grid-column: 1 / -1; margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-muted); max-width: 78ch; }
+
+    .src-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .src-body > section { padding: 16px 18px; min-width: 0; }
+    .src-body > section + section { border-left: 1px solid var(--border); }
+    .src-label { margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-muted); }
+    .src-tz { margin-left: 6px; font-weight: 600; letter-spacing: 0; text-transform: none; opacity: 0.8; }
+
+    .src-count { display: flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums; }
+    .src-used { font-size: 30px; font-weight: 800; line-height: 1; letter-spacing: -0.5px; }
+    .src-of { font-size: 13px; color: var(--text-muted); }
+    .src-left { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--text-muted); }
+    .src-meter { position: relative; display: flex; height: 10px; margin: 10px 0 8px; border-radius: 5px; background: var(--border); overflow: visible; }
+    .src-meter i { display: block; height: 100%; }
+    .src-meter i:first-child { border-radius: 5px 0 0 5px; }
+    .src-mark { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--text-muted); opacity: 0.55; border-radius: 1px; }
+    .k1 { background: #5b6ad0; }
+    .k2 { background: #3f9cc0; }
+    .k3 { background: #4fa872; }
+    .src-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 14px; padding: 0; list-style: none; font-size: 12px; color: var(--text-muted); }
+    .src-legend b { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 2px; vertical-align: -1px; }
+    .src-legend strong { color: var(--text); font-variant-numeric: tabular-nums; }
+    .src-err { color: var(--risk-danger-text); font-weight: 600; }
+    .src-hours { display: flex; align-items: flex-end; gap: 2px; height: 44px; padding-bottom: 1px; border-bottom: 1px solid var(--border); }
+    .src-hours i { flex: 1; min-height: 0; background: var(--accent-light); border-radius: 2px 2px 0 0; opacity: 0.85; }
+    .src-hours i:last-child { background: var(--accent); opacity: 1; }
+    .src-hours-axis, .src-strip-axis { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--text-muted); }
+    .src-facts { display: grid; gap: 4px; margin: 12px 0 0; font-size: 13px; }
+    .src-facts > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; }
+    .src-facts dt { color: var(--text-muted); }
+    .src-facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+    .src-note { color: var(--risk-broad-text); }
+    .src-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 18px 0; color: var(--text-muted); font-size: 13px; }
+    .src-empty svg { width: 22px; height: 22px; opacity: 0.6; }
+    .src-empty p { margin: 0; }
+
+    .src-strip { display: flex; height: 26px; border-radius: 4px; overflow: hidden; background: var(--border); }
+    .src-strip i { display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; font-size: 11px; font-style: normal; font-weight: 700; white-space: nowrap; color: #fff; border-right: 1px solid var(--surface); }
+    .src-strip i:last-child { border-right: 0; }
+    .src-bands { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+    .src-band { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+    .src-band label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
+    .app-page .page-body .src-band select { width: 76px; height: 30px; }
+    .app-page .page-body .src-band input { width: 72px; height: 30px; }
+    .src-band-cost { justify-self: end; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .app-page .src-band .btn-square { height: 30px; }
+    .src-band .btn-square svg { width: 14px; height: 14px; }
+    .src-bands-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .app-page .src-bands-actions .btn { height: 30px; padding: 0 10px; font-size: 13px; }
+    .src-bands-actions svg { width: 14px; height: 14px; }
+    .src-plan { margin: 12px 0 0; padding: 8px 10px; border-radius: 4px; font-size: 13px; line-height: 1.45; background: var(--btn-muted-bg); }
+    .src-plan.is-over { background: var(--risk-broad-bg); color: var(--risk-broad-text); }
+    .src-plan.is-bad { background: var(--risk-danger-bg); color: var(--risk-danger-text); }
+
+    .src-fields { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px 18px; padding: 14px 18px; border-top: 1px solid var(--border); }
+    .config-field-form.src .field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .config-field-form.src .field-meta { grid-column: 1; }
+    .app-page .page-body .src .field input { height: 32px; }
+    .src-foot { justify-content: space-between; align-items: flex-start; }
+    .src-how { flex: 1 1 320px; font-size: 13px; color: var(--text-muted); }
+    .src-how summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+    .src-how p { margin: 4px 0 0; line-height: 1.5; max-width: 80ch; }
+    .src-foot .btn svg { width: 15px; height: 15px; }
+
+    @media (max-width: 980px) {
+        .src-body { grid-template-columns: minmax(0, 1fr); }
+        .src-body > section + section { border-left: 0; border-top: 1px solid var(--border); }
+        .src-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+        .src-fields .field:first-child { grid-column: 1 / -1; }
     }
-    @media (max-width: 600px) { .config-field-form.source .field { grid-template-columns: minmax(0, 1fr); } }
+    @media (max-width: 600px) {
+        .src-jump { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+        .src-jump-item { grid-template-columns: auto minmax(0, 1fr) auto; }
+        .src-jump-meta { grid-column: 3; }
+        .src-head { grid-template-columns: minmax(0, 1fr); padding: 12px 14px; }
+        .src-body > section, .src-fields { padding-left: 14px; padding-right: 14px; }
+        .src-band { grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 6px; }
+        .src-band label > span:first-child { display: none; }
+        .src-fields { grid-template-columns: minmax(0, 1fr); }
+        .src-foot { flex-direction: column-reverse; align-items: stretch; }
+        .src-how { flex: none; }
+        .src-foot .btn { justify-content: center; }
+    }
     {{ config_field_styles() }}
 </style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    // Live preview of each schedule: the day strip, each band's requests a
+    // day, and whether the whole fits the provider's poll budget (as
+    // news_fetcher/api_budget.py planned_per_day and stretch work it out).
+    var HOURS = ['12a','1a','2a','3a','4a','5a','6a','7a','8a','9a','10a','11a','12p','1p','2p','3p','4p','5p','6p','7p','8p','9p','10p','11p'];
+
+    function shade(minutes) {
+        // Darker for more frequent polls: 1 min is the darkest, 4 h and more the lightest.
+        var t = Math.max(0, Math.min(1, Math.log(minutes) / Math.log(240)));
+        var light = 34 + t * 40;
+        return 'hsl(240, 30%, ' + light + '%)';
+    }
+
+    function fmt(n) { return Math.round(n).toLocaleString(); }
+
+    function update(form) {
+        var perPoll = Number(form.dataset.perPoll) || 0;
+        var limitInput = form.querySelector('input[name$="_API_DAILY_LIMIT"]');
+        var maxLimit = Number(form.dataset.maxLimit);
+        var limit = Math.min(Number(limitInput && limitInput.value) || Number(form.dataset.limit), maxLimit);
+        var pollBudget = limit * Number(form.dataset.pollShare);
+        var rows = Array.prototype.slice.call(form.querySelectorAll('.src-band'));
+        var bands = {};
+        var bad = false;
+        rows.forEach(function (row) {
+            var hour = Number(row.querySelector('select').value);
+            var minutes = Number(row.querySelector('input').value);
+            if (!(minutes >= 1 && minutes <= 1440)) { bad = true; return; }
+            bands[hour] = minutes;
+        });
+        var starts = Object.keys(bands).map(Number).sort(function (a, b) { return a - b; });
+        var plan = form.querySelector('.src-plan');
+        var strip = form.querySelector('.src-strip');
+        strip.innerHTML = '';
+        if (!starts.length || bad) {
+            plan.className = 'src-plan is-bad';
+            plan.textContent = 'Each band needs minutes between polls from 1 to 1440.';
+            return;
+        }
+        var ordered = starts.map(function (h, i) { return [i === 0 ? 0 : h, bands[h]]; });
+        var total = 0;
+        var perBand = {};
+        ordered.forEach(function (band, i) {
+            var end = i + 1 < ordered.length ? ordered[i + 1][0] : 24;
+            var hours = end - band[0];
+            var polls = hours * 60 / band[1];
+            total += polls;
+            perBand[starts[i]] = polls * perPoll;
+            var seg = document.createElement('i');
+            seg.style.flex = String(hours);
+            seg.style.background = shade(band[1]);
+            seg.title = HOURS[band[0]] + '–' + HOURS[end % 24] + ': every ' + band[1] + ' min';
+            seg.textContent = hours >= 3 ? band[1] + 'm' : '';
+            strip.appendChild(seg);
+        });
+        rows.forEach(function (row) {
+            var hour = Number(row.querySelector('select').value);
+            var cost = row.querySelector('.src-band-cost');
+            var n = perBand[hour];
+            cost.textContent = n === undefined ? 'duplicate hour' : '≈ ' + fmt(n) + ' req';
+        });
+        var planned = total * perPoll;
+        if (!perPoll) {
+            plan.className = 'src-plan';
+            plan.textContent = 'No active scheduled fetches, so polls make no requests. Add them under Scheduled fetches.';
+        } else if (planned > pollBudget) {
+            plan.className = 'src-plan is-over';
+            plan.textContent = 'As set, about ' + fmt(planned) + ' requests a day, more than the ' + fmt(pollBudget) +
+                ' the polls may use. Polls will run ' + (planned / pollBudget).toFixed(1) + '× slower than this to fit.';
+        } else {
+            plan.className = 'src-plan';
+            plan.textContent = 'About ' + fmt(planned) + ' requests a day' + (perPoll > 1 ? ' (' + perPoll + ' per poll)' : '') +
+                ', within the ' + fmt(pollBudget) + ' the polls may use of ' + fmt(limit) + '.';
+        }
+    }
+
+    var template = document.getElementById('src-band-template');
+    document.querySelectorAll('form.src').forEach(function (form) {
+        var list = form.querySelector('.src-bands');
+        form.addEventListener('input', function () { update(form); });
+        form.addEventListener('change', function () { update(form); });
+        form.addEventListener('click', function (e) {
+            var remove = e.target.closest('.src-band-remove');
+            if (remove) {
+                if (list.children.length > 1) remove.closest('.src-band').remove();
+                update(form);
+            }
+            if (e.target.closest('.src-band-add') && list.children.length < 8) {
+                var row = template.content.firstElementChild.cloneNode(true);
+                var used = Array.prototype.map.call(list.querySelectorAll('select'), function (s) { return Number(s.value); });
+                var free = 0;
+                while (used.indexOf(free) !== -1 && free < 23) free++;
+                row.querySelector('select').value = String(free);
+                list.appendChild(row);
+                update(form);
+                row.querySelector('select').focus();
+            }
+        });
+        update(form);
+    });
+})();
+</script>
 {% endblock %}

@@ -1,7 +1,7 @@
 """Reuters headline-only, with its text read from licensed carriers.
 
 Revision ID: b6d2e8f4a1c7
-Revises: c4e9a2f7d1b3
+Revises: f3c8a1d6e2b9
 Create Date: 2026-10-27
 
 reuters.com answered 401 to 144 article fetches in 48 hours, its robots.txt
@@ -24,7 +24,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = 'b6d2e8f4a1c7'
-down_revision = 'c4e9a2f7d1b3'
+down_revision = 'f3c8a1d6e2b9'
 branch_labels = None
 depends_on = None
 

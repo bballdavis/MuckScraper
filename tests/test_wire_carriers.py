@@ -202,7 +202,8 @@ class IngestionTests(unittest.TestCase):
             db.session.execute(db.text(f"DELETE FROM {table}"))
         db.session.commit()
         self._patchers = [
-            mock.patch.object(self.ingestion, "get_embedding", return_value=[0.1] * 768),
+            mock.patch.object(self.ingestion.llm_client, "get_embeddings",
+                              side_effect=lambda texts: [[0.1] * 768 for _ in texts]),
             mock.patch.object(self.ingestion, "classify_article", return_value=[]),
             mock.patch.object(self.ingestion, "get_allsides_score", return_value=3),
         ]

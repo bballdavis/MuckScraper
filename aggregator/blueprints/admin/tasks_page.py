@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 from flask import render_template, request, redirect, url_for
 from flask_login import current_user
 
-from aggregator import jobs, scheduler_tasks
+from aggregator import db, jobs, scheduler_tasks
 from aggregator.models import Job, PipelineSchedule
 from aggregator.permissions import ROLE_ADMIN, role_required
 
@@ -43,7 +43,13 @@ JOB_LABELS = {
     "bookmark_capture": "Saved story capture",
     "bookmark_delete": "Saved story delete",
     "scrape_feed_entry": "Breaking News scrape",
+    "pipeline_stage": "Pipeline stage",
+    "pipeline_feed": "Pipeline feed",
+    "pipeline_story": "Pipeline story summary",
 }
+# A run queues one of these per feed and per story; the queue shows the
+# running ones and counts the waiting ones.
+BATCH_KINDS = ("pipeline_feed", "pipeline_story")
 
 
 def _stage_of(step):
@@ -224,6 +230,7 @@ def _history():
 def _queue():
     now = datetime.utcnow()
     live = (Job.query.filter(Job.status.in_(("running", "queued")))
+            .filter(db.or_(Job.status == "running", Job.kind.notin_(BATCH_KINDS)))
             .order_by(Job.status.desc(), Job.priority.desc(), Job.id).limit(25).all())
     failed = (Job.query.filter(Job.status == "error", Job.finished_at >= now - timedelta(days=1))
               .order_by(Job.finished_at.desc()).limit(10).all())
@@ -244,6 +251,7 @@ def _queue():
             "error": (job.error or "")[:200] or None,
         })
     counts = jobs.queue_counts()
+    counts["batched"] = Job.query.filter(Job.status == "queued", Job.kind.in_(BATCH_KINDS)).count()
     return rows, counts
 
 
@@ -259,6 +267,9 @@ def _context():
             "heartbeat": _span(state.get("heartbeat_age")) if state.get("heartbeat_age") is not None else None,
             "since": _when(state.get("started_at")),
             "worker_alive": state.get("worker_alive"),
+            "threads": len(state.get("workers") or []),
+            "restarted": (state.get("watchdog") or {}).get("restarted", 0),
+            "requeued": (state.get("watchdog") or {}).get("requeued", 0),
         },
         "running": _running_now(),
         "other_running": [op for op in _running_operations() if op["kind"] == "other"],
