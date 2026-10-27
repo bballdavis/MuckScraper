@@ -82,6 +82,9 @@ class OpedPageTests(unittest.TestCase):
         self.assertIn('<span class="ft-section">Opinion &amp; Editorials</span>', page)
         self.assertIn('data-scope="oped"', page)
         self.assertIn('id="feed-filters"', page)
+        self.assertIn('<h1 class="page-title">Opinion &amp; Editorials</h1>', page)
+        self.assertIn('class="view-switch two"', page)
+        self.assertIn('<a class="view-seg on"', page)
         # The same compact card as a one-article story on All Stories.
         self.assertIn('<div class="story compact" id="oped-', page)
         self.assertIn("Tariffs will hurt families", page)

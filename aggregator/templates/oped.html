@@ -5,13 +5,15 @@
 {#- Opinion & Editorials (admin.oped_list, blueprints/admin/oped.py), built
     like the section pages in articles.html (Philip, 2026-10-27): the top
     bar's search (live results are columns) and Filters popover, the filter
-    chips, then compact story cards. Latest draws each column as a
+    chips, the page title and the Headlines-style Columns / By story switch,
+    then compact story cards. Latest draws each column as a
     one-article story (opinion.OpinionCard), By story the stories the
     columns are about, as a section lists them. -#}
 {% block title %}{{ section_title }}{% endblock %}
 {% block section %}{{ section_title }}{% endblock %}
 {% block head %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/story_card.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/headline_views.css') }}">
 {% endblock %}
 {% block styles %}
     <style>
@@ -23,6 +25,9 @@
             margin: 0 auto;
             position: relative;
         }
+        /* The page title and view switch as on Headlines (Philip, 2026-10-27). */
+        .page-title { font-size: var(--fs-page-title); font-weight: 800; color: var(--accent-text); letter-spacing: -0.5px; padding: 4px 0 16px; }
+        .view-switch.two { grid-template-columns: repeat(2, 1fr); }
         .bias-none { background-color: #ddd; color: #666; }
         .empty { text-align: center; padding: 80px 0; color: var(--text-faint); font-style: italic; }
         @media (max-width: 900px) {
@@ -38,13 +43,6 @@
 {% call feed_topbar(section_title, url_for('admin.oped_list'), active_search_query,
                     {'view': base.view, 'range': active_range, 'leaning': active_leaning},
                     suggest_scope='oped', placeholder='Search columns and outlets') %}
-    <div>
-        <span class="fp-label">Show</span>
-        <div class="fp-segment">
-            <a href="{{ url_for('admin.oped_list', **dict(base, view=none)) }}" class="{{ 'active' if active_view != 'story' }}"{% if active_view != 'story' %} aria-current="true"{% endif %}>Columns</a>
-            <a href="{{ url_for('admin.oped_list', **dict(base, view='story')) }}" class="{{ 'active' if active_view == 'story' }}"{% if active_view == 'story' %} aria-current="true"{% endif %}>By story</a>
-        </div>
-    </div>
     <div>
         <span class="fp-label">Time range</span>
         <div class="fp-segment">
@@ -71,15 +69,25 @@
 {% block body %}
 <div class="main">
     {% include '_flashes.html' %}
+    <h1 class="page-title">{{ section_title }}</h1>
+    {#- Columns / By story as the Headlines view switch (headline_views.css),
+        not a Filters option (Philip, 2026-10-27). -#}
+    <nav class="view-switch two" aria-label="{{ section_title }} views">
+        {%- for key, label, view_icon, rule, count in [
+            ('latest', 'Columns', 'message-square', 'Newest columns first', total),
+            ('story', 'By story', 'layers', 'The news stories the columns are about', story_total)] %}
+        <a class="view-seg{{ ' on' if key == active_view else '' }}" href="{{ url_for('admin.oped_list', **dict(base, view=key if key == 'story' else none)) }}"{% if key == active_view %} aria-current="page"{% endif %}>
+            <span class="view-name">{{ icon(view_icon) }}{{ label }}<span class="view-count">{{ count }}</span></span>
+            <span class="view-rule">{{ rule }}</span>
+        </a>
+        {%- endfor %}
+    </nav>
     <div class="active-filters">
         {%- set n = story_total if active_view == 'story' else total %}
         <p>{{ '{:,}'.format(n) }} {% if active_view == 'story' %}stor{{ 'y' if n == 1 else 'ies' }} with columns{% else %}column{{ '' if n == 1 else 's' }}{% endif %}{% if active_search_query %} matching “{{ active_search_query }}”{% endif %}</p>
         <div class="filter-chips">
             {% if active_search_query %}
             <a class="filter-chip" href="{{ url_for('admin.oped_list', **dict(base, q=none)) }}" aria-label="Clear search {{ active_search_query }}">“{{ active_search_query }}” {{ icon('x') }}</a>
-            {% endif %}
-            {% if active_view == 'story' %}
-            <a class="filter-chip" href="{{ url_for('admin.oped_list', **dict(base, view=none)) }}" aria-label="Show latest columns instead">By story {{ icon('x') }}</a>
             {% endif %}
             {% if active_range != 'all' %}
             <a class="filter-chip" href="{{ url_for('admin.oped_list', **dict(base, range='all')) }}" aria-label="Remove filter: last {{ dict(time_ranges)[active_range]|lower }}">Last {{ dict(time_ranges)[active_range]|lower }} {{ icon('x') }}</a>
