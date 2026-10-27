@@ -113,3 +113,25 @@ def lead_image(articles, headline):
     """The photo for a story's card, or None when no article has one."""
     ranked = scored(articles, headline)
     return ranked[0][1].image_url if ranked else None
+
+
+def image_focus(articles, image_url):
+    """{"x", "y"}: where the subject of `image_url` is, 0..1 from the left
+    and top, from whichever of `articles` carries that photo
+    (news_fetcher/image_focus.py), or None, which clients crop around the
+    center."""
+    if not image_url:
+        return None
+    for a in articles:
+        x, y = getattr(a, "image_focus_x", None), getattr(a, "image_focus_y", None)
+        if a.image_url == image_url and x is not None and y is not None:
+            return {"x": x, "y": y}
+    return None
+
+
+def object_position(focus):
+    """CSS object-position for a focus: the subject sits at the same share
+    of the frame as of the photo, so any crop keeps it in view."""
+    if not focus:
+        return "50% 50%"
+    return f"{focus['x'] * 100:.0f}% {focus['y'] * 100:.0f}%"

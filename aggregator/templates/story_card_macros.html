@@ -169,7 +169,8 @@
    the newest outlet's logo on a tile with the outlet's name, else the name
    alone, else a plain icon. A photo or logo that fails to load drops to the
    next step. Logos come from news_fetcher/outlet_logos.py; /api/v1 serves
-   the same chain as image_url then logo_url. #}
+   the same chain as image_url then logo_url. The photo is cropped around
+   its subject (image_focus, news_fetcher/image_focus.py), else its center. #}
 {% macro card_image(story) -%}
 {%- set photo = story.lead_image_url %}
 {%- set lead = (story.display_articles if story.display_articles is defined else story.articles)|map(attribute='outlet')|select|list %}
@@ -177,7 +178,7 @@
 {%- set source = logo_outlet or lead|first %}
 <div class="story-image{{ '' if photo else ' is-fallback' }}" aria-hidden="true">
     {%- if photo %}
-    <img class="story-photo" src="{{ photo }}" alt="" loading="lazy" onerror="this.parentNode.classList.add('photo-failed')">
+    <img class="story-photo" src="{{ photo }}" alt="" loading="lazy" style="object-position: {{ story.lead_image_focus|object_position }}" onerror="this.parentNode.classList.add('photo-failed')">
     {%- endif %}
     {%- if source %}
     <span class="story-image-source{{ '' if logo_outlet else ' no-logo' }}">
