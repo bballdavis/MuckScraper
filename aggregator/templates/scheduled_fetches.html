@@ -18,6 +18,7 @@
     <label class="add-field wide" data-mode="query"><span>NewsAPI query</span><input type="text" name="newsapi_query" value="{{ (f.newsapi_query or '') if f else '' }}" placeholder="e.g. (AI OR &quot;machine learning&quot;) AND regulation"></label>
     <label class="add-field" data-mode="top"><span>Country</span><input type="text" name="newsapi_country" value="{{ (f.newsapi_country or '') if f else '' }}" placeholder="e.g. us"></label>
     <label class="add-field" data-mode="top"><span>NewsAPI category</span><input type="text" name="newsapi_category" value="{{ (f.newsapi_category or '') if f else '' }}" placeholder="e.g. business"></label>
+    <label class="add-field wide" data-mode="top"><span>NewsAPI sources (instead of country and category)</span><input type="text" name="newsapi_sources" value="{{ (f.newsapi_sources or '') if f else '' }}" placeholder="e.g. bbc-news,reuters"></label>
     <label class="add-field"><span>GNews query</span><input type="text" name="gnews_query" value="{{ (f.gnews_query or '') if f else '' }}"></label>
     <label class="add-field"><span>GNews category</span><input type="text" name="gnews_category" value="{{ (f.gnews_category or '') if f else '' }}"></label>
 </div>
@@ -99,6 +100,7 @@
         <div class="fetch-line">
             <b>NewsAPI</b>
             {%- if fetch.mode == 'query' %} {{ fetch.newsapi_query or '—' }}
+            {%- elif fetch.newsapi_sources %} top · {{ fetch.newsapi_sources }}
             {%- else %} top · {{ fetch.newsapi_country or 'any country' }}{% if fetch.newsapi_category %} · {{ fetch.newsapi_category }}{% endif %}{% endif %}
         </div>
         {%- if fetch.gnews_query or fetch.gnews_category %}

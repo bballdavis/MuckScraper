@@ -43,11 +43,16 @@ def _articles_of(body):
 
 # NewsAPI ----------------------------------------------------------------
 
-def _newsapi_request(kind, mode="top", query=None, country="us", category=None):
-    """One budgeted NewsAPI request (the key goes in a header)."""
+def _newsapi_request(kind, mode="top", query=None, country="us", category=None, sources=None):
+    """One budgeted NewsAPI request (the key goes in a header). Search
+    (/everything) is a day behind on the free plan; top headlines are live."""
     if mode == "query" and query:
         logger.info(f"[NewsAPI] Fetching query: {query}")
         url, params = NEWSAPI_EVERYTHING_URL, {"q": query, "language": "en", "sortBy": "publishedAt", "pageSize": 100}
+    elif sources:
+        # NewsAPI refuses sources together with a country or category.
+        logger.info(f"[NewsAPI] Fetching top headlines (sources={sources})")
+        url, params = NEWSAPI_TOP_URL, {"sources": sources, "pageSize": 100}
     else:
         label = f"country={country}" if country else ""
         label += f" category={category}" if category else ""
@@ -152,10 +157,11 @@ def _fetch_now(provider, topic_name, request):
                 "input_articles": 0, "stored": 0}
 
 
-def fetch_newsapi(topic_name, mode="top", query=None, country="us", category=None):
+def fetch_newsapi(topic_name, mode="top", query=None, country="us", category=None, sources=None):
     """Fetch articles from NewsAPI and store them."""
     return _fetch_now("newsapi", topic_name,
-                      lambda: _newsapi_request("manual", mode=mode, query=query, country=country, category=category))
+                      lambda: _newsapi_request("manual", mode=mode, query=query, country=country,
+                                               category=category, sources=sources))
 
 
 def fetch_gnews(topic_name, query=None, category=None):
@@ -178,6 +184,7 @@ def scheduled_fetches():
             "mode":           row.mode,
             "country":        row.newsapi_country,
             "category":       row.newsapi_category,
+            "sources":        row.newsapi_sources,
             "query":          row.newsapi_query,
             "gnews_query":    row.gnews_query,
             "gnews_category": row.gnews_category,
@@ -195,7 +202,8 @@ def _poll(provider, fetches):
         try:
             if provider == "newsapi":
                 body = _newsapi_request("poll", mode=fetch["mode"], query=fetch["query"],
-                                        country=fetch["country"], category=fetch["category"])
+                                        country=fetch["country"], category=fetch["category"],
+                                        sources=fetch.get("sources"))
             else:
                 body = _gnews_request("poll", query=fetch["gnews_query"], category=fetch["gnews_category"])
         except api_budget.Unavailable as e:
@@ -286,13 +294,13 @@ def cleanup_old_payloads():
 
 
 def fetch_and_store_articles(topic_name, mode="top", query=None,
-                              country="us", category=None,
+                              country="us", category=None, sources=None,
                               gnews_query=None, gnews_category=None):
     """
     Main entry point. Fetches from both NewsAPI and GNews for a given topic.
     """
     newsapi_metrics = fetch_newsapi(topic_name, mode=mode, query=query,
-                                    country=country, category=category)
+                                    country=country, category=category, sources=sources)
     gnews_metrics = fetch_gnews(topic_name, query=gnews_query, category=gnews_category)
     cleanup_old_payloads()
     return {

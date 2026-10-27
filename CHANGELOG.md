@@ -7,6 +7,17 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **NewsAPI live topics and story follow-ups.** NewsAPI's free plan returns
+  search results a day late, so the default US Politics, Science & Health
+  and World News fetches now use its live top headlines (US general, US
+  science, and BBC News, Reuters, AP and Al Jazeera English through the new
+  Sources field on Scheduled fetches; migration `a7c3e9f1b5d2` moves rows
+  still holding the default searches). Each pipeline run then searches
+  NewsAPI for up to four stories that have run for 24 hours and are still
+  getting articles, finding their first day's coverage from other outlets
+  (`news_fetcher/story_followup.py`); shorter stories aren't searched, and
+  each story at most once a day. NewsAPI's polls now plan to use 75% of its
+  limit and the follow-ups at most 20%.
 - **LLM spending caps.** Settings › LLM providers has a Spending caps
   section for Anthropic, Gemini, Groq and OpenRouter: a daily and a monthly
   dollar cap (blank, so unlimited, by default), with today's and this

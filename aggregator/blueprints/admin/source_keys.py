@@ -26,11 +26,14 @@ SOURCES = {
         "Enable the Times Wire and Article Search APIs for the key; it allows 500 requests a day.",
     ),
     "newsapi": (
-        "Top headlines and keyword search for each scheduled fetch, up to 100 articles a request.",
+        "Top headlines for each scheduled fetch, up to 100 articles a request, and a search for each "
+        "story still running after a day, which finds its first day's coverage from other outlets.",
         "https://newsapi.org/register",
-        {"poll": "Scheduled polls", "manual": "Manual fetches"},
+        {"poll": "Scheduled polls", "followup": "Story follow-ups", "manual": "Manual fetches"},
         "One request per active scheduled fetch a poll; pipeline runs store what the polls brought. "
-        "The free Developer plan allows 100 requests a day.",
+        "The free Developer plan allows 100 requests a day and returns search results a day late, so "
+        "polls use the live top headlines and plan to use 75% of the limit. Each pipeline run also "
+        "searches for up to four stories that have run for 24 hours, at most 20% of the limit a day.",
     ),
     "gnews": (
         "Top headlines and search for each scheduled fetch, 10 articles a request on the free plan.",

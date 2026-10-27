@@ -60,6 +60,8 @@ class Provider:
     default_schedule: tuple
     # Calls left in the window that each kind leaves for the others.
     reserves: dict = field(default_factory=dict)
+    # Most of the limit one kind may use in the window, as a share.
+    kind_caps: dict = field(default_factory=dict)
     lock_id: int = 0
 
     @property
@@ -90,11 +92,14 @@ PROVIDERS = {
         reserves={"lookup": 0, "wire": 25, "search": 150}, lock_id=4960513,
     ),
     # The free Developer plan allows 100 requests a day; paid plans more.
+    # Polls plan to use 75% of it and story follow-up searches
+    # (news_fetcher/story_followup.py) at most 20%, leaving 5% for manual
+    # fetches.
     "newsapi": Provider(
         key="newsapi", name="NewsAPI", prefix="NEWS", default_limit=100, max_limit=100000,
-        min_interval_seconds=1, poll_kind="poll", poll_share=0.9,
-        default_schedule=((0, 240), (6, 60), (10, 120), (16, 60), (23, 240)),
-        reserves={"poll": 0, "manual": 0}, lock_id=4960514,
+        min_interval_seconds=1, poll_kind="poll", poll_share=0.75,
+        default_schedule=((0, 240), (6, 60), (10, 120), (16, 75), (23, 240)),
+        reserves={"poll": 0, "manual": 0, "followup": 0}, kind_caps={"followup": 0.2}, lock_id=4960514,
     ),
     # The free plan allows 100 requests a day, one a second, ten articles each.
     "gnews": Provider(
@@ -157,6 +162,14 @@ def daily_limit(p):
     except ValueError:
         limit = p.default_limit
     return max(0, min(limit, p.max_limit))
+
+
+def kind_cap(p, kind):
+    """Most calls of `kind` the provider makes in 24 hours, or None when
+    only the limit bounds it."""
+    p = provider(p)
+    share = p.kind_caps.get(kind)
+    return None if share is None else int(daily_limit(p) * share)
 
 
 def slowdown_share(p):
@@ -295,6 +308,12 @@ def take_slot(p, kind):
         ).scalar()
         if used >= limit - p.reserves.get(kind, 0):
             return None
+        if kind in p.kind_caps:
+            kind_used = conn.execute(
+                sa.select(sa.func.count()).where(mine, calls.c.kind == kind, calls.c.called_at > now - WINDOW)
+            ).scalar()
+            if kind_used >= kind_cap(p, kind):
+                return None
         if last_429 and now - last_429 < PAUSE_AFTER_429:
             return None
         if last:
