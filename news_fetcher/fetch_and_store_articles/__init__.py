@@ -39,6 +39,9 @@ from .providers import (  # noqa: F401
     fetch_gnews,
     cleanup_old_payloads,
     fetch_and_store_articles,
+    ingest_payloads,
+    poll_news_apis_if_due,
+    scheduled_fetches,
 )
 from .outlets import (  # noqa: F401
     apply_outlet_origins,

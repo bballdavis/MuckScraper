@@ -15,16 +15,14 @@ restart. Without a key nothing here makes a request.
 The budget
 ----------
 The key allows 5 requests a minute and 500 a day, shared across every NYT
-API. Each request is a row in nyt_api_calls, and a request is made only
-while fewer than NYT_API_DAILY_LIMIT rows fall in the last 24 hours. A
-rolling window stays under the limit whenever NYT starts its day, and the
-ledger is shared by the scheduler and the web container and survives
-restarts. Requests are spaced MIN_INTERVAL_SECONDS apart, and a 429 pauses
-everything for PAUSE_AFTER_429.
+API. Requests go through news_fetcher/api_budget.py, which keeps the
+ledger shared with NewsAPI and GNews: a rolling 24-hour count under
+NYT_API_DAILY_LIMIT, spacing, a pause after a 429, and the wire's poll
+schedule (NYT_API_SCHEDULE), all editable on Settings › Source API keys.
 
 What the requests buy, most articles per request first:
 - Times Wire (`wire`): everything NYT has published, newest first, up to
-  WIRE_PAGE_SIZE items a request. The scheduler polls it on WIRE_SCHEDULE,
+  WIRE_PAGE_SIZE items a request. The scheduler polls it on NYT_API_SCHEDULE,
   more often in the morning and evening news peaks; one request usually
   covers every item since the last. Items are kept in nyt_wire_items, the
   news sections' ones go to the Breaking poller's headlines at once, and
@@ -38,14 +36,10 @@ RESERVES keeps the cheaper-per-article kinds from starving the others.
 """
 
 import logging
-import os
-import threading
-import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse, urlunparse
-from zoneinfo import ZoneInfo
 
-import requests
+from news_fetcher import api_budget
 
 logger = logging.getLogger(__name__)
 
@@ -53,23 +47,14 @@ ARTICLE_SEARCH_URL = "https://api.nytimes.com/svc/search/v2/articlesearch.json"
 WIRE_URL = "https://api.nytimes.com/svc/news/v3/content/nyt/all.json"
 SOURCE_NAME = "New York Times"
 
-DAILY_CAP = 500  # the key's own limit; NYT_API_DAILY_LIMIT can only go lower
-WINDOW = timedelta(hours=24)
-MIN_INTERVAL_SECONDS = 12.5
-PAUSE_AFTER_429 = timedelta(minutes=15)
-
+PROVIDER = api_budget.PROVIDERS["nyt"]
+DAILY_CAP = PROVIDER.max_limit  # the key's own limit; NYT_API_DAILY_LIMIT can only go lower
 # Calls left in the window that each kind leaves for the others: a wire
 # poll stops with 25 left, so single lookups (an admin rescrape) still work;
 # lead-paragraph searches stop with 150 left, so the wire polls keep going.
-RESERVES = {"lookup": 0, "wire": 25, "search": 150}
+RESERVES = PROVIDER.reserves
+WINDOW = api_budget.WINDOW
 
-# Wire poll interval in minutes by local hour, from WIRE_SCHEDULE's first
-# start hour at or before now: every 3 minutes 6-10am and 4-11pm, every 6
-# minutes midday, every 20 minutes overnight. About 300 requests a day.
-WIRE_TIMEZONE = "America/New_York"
-WIRE_SCHEDULE = [(23, 20), (16, 3), (10, 6), (6, 3), (0, 20)]
-# Past this share of the limit, polls come half as often.
-WIRE_SLOWDOWN_SHARE = 0.75
 # The API caps a request at what it allows (20 in older docs, 500 now);
 # asking for more costs nothing, and _wire_page_size remembers a refusal.
 WIRE_PAGE_SIZE = 500
@@ -98,8 +83,7 @@ _NO_LEAD_SETTING = "nyt_api_no_lead_paragraph_at"
 # 2025 revision. Try them in order and remember the first that works.
 _URL_FILTER_FIELDS = ["url", "web_url"]
 
-_lock = threading.Lock()
-_state = {"filter_field": None, "rejected_key": None, "wire_page_size": None}
+_state = {"filter_field": None, "wire_page_size": None}
 _cache = {}
 _CACHE_MAX_ENTRIES = 1000
 
@@ -109,30 +93,16 @@ def is_nyt_url(url):
     return host == "nytimes.com" or host.endswith(".nytimes.com")
 
 
-def _setting(name, default=""):
-    """A saved admin setting, else the env var, else `default`."""
-    try:
-        from news_fetcher import saved_settings
-    except ImportError:  # before the admin key store (provider-settings) is merged
-        return os.environ.get(name, default)
-    return saved_settings.get(name, default)
-
-
 def _api_key():
-    return (_setting("NYT_API_KEY") or "").strip()
+    return api_budget.api_key(PROVIDER)
 
 
 def daily_limit():
-    try:
-        limit = int(_setting("NYT_API_DAILY_LIMIT", str(DAILY_CAP)) or DAILY_CAP)
-    except ValueError:
-        limit = DAILY_CAP
-    return max(0, min(limit, DAILY_CAP))
+    return api_budget.daily_limit(PROVIDER)
 
 
 def enabled():
-    key = _api_key()
-    return bool(key) and key != _state["rejected_key"]
+    return api_budget.enabled(PROVIDER)
 
 
 def _canonical(url):
@@ -145,101 +115,20 @@ def _utcnow():
     return datetime.utcnow()
 
 
-# The ledger -------------------------------------------------------------
-# Its own connection, so taking a slot never commits the caller's session.
+# Requests ---------------------------------------------------------------
 
-def _ledger():
-    from aggregator.models import NytApiCall, db
-    return db, NytApiCall.__table__
+_Unavailable = api_budget.Unavailable
 
 
 def window_usage(now=None):
     """(calls in the last 24 hours, newest call time, newest 429 time)."""
-    import sqlalchemy as sa
-    db, calls = _ledger()
-    now = now or _utcnow()
-    with db.engine.connect() as conn:
-        used, last = conn.execute(
-            sa.select(sa.func.count(), sa.func.max(calls.c.called_at)).where(calls.c.called_at > now - WINDOW)
-        ).one()
-        last_429 = conn.execute(
-            sa.select(sa.func.max(calls.c.called_at)).where(calls.c.http_status == 429)
-        ).scalar()
-    return used, last, last_429
-
-
-def _take_request_slot(kind):
-    """Wait out the spacing and record a call. Returns its ledger id, or
-    None when this kind's share of the window is spent or NYT said 429."""
-    import sqlalchemy as sa
-    db, calls = _ledger()
-    limit = daily_limit()
-    with _lock, db.engine.begin() as conn:
-        if conn.dialect.name == "postgresql":
-            # Serializes the web and scheduler containers until this commits.
-            conn.execute(sa.text("SELECT pg_advisory_xact_lock(4960513)"))
-        now = _utcnow()
-        used, last = conn.execute(
-            sa.select(sa.func.count(), sa.func.max(calls.c.called_at)).where(calls.c.called_at > now - WINDOW)
-        ).one()
-        last_429 = conn.execute(
-            sa.select(sa.func.max(calls.c.called_at)).where(calls.c.http_status == 429)
-        ).scalar()
-        if used >= limit - RESERVES.get(kind, 0):
-            return None
-        if last_429 and now - last_429 < PAUSE_AFTER_429:
-            return None
-        if last:
-            wait = (last - now).total_seconds() + MIN_INTERVAL_SECONDS
-            if wait > 0:
-                time.sleep(wait)
-        return conn.execute(
-            calls.insert().values(called_at=_utcnow(), kind=kind).returning(calls.c.id)
-        ).scalar()
-
-
-def _record_result(call_id, http_status, items=None):
-    db, calls = _ledger()
-    with db.engine.begin() as conn:
-        conn.execute(calls.update().where(calls.c.id == call_id).values(http_status=http_status, items=items))
-
-
-class _Unavailable(Exception):
-    """The API can't answer right now (budget spent, rate limited); not cached."""
+    return api_budget.window_usage(PROVIDER, now)
 
 
 def _get(kind, url, params, key, items_of):
     """One budgeted request. Returns the JSON body, or None on a 400 (a
     parameter NYT refuses). `items_of(body)` counts what it returned."""
-    call_id = _take_request_slot(kind)
-    if call_id is None:
-        raise _Unavailable(f"no {kind} requests left in the last 24 hours' budget of {daily_limit()}")
-    # The key rides in the query string, and requests puts the full URL in
-    # its error messages, so errors are re-raised without it.
-    try:
-        response = requests.get(url, params={**params, "api-key": key}, timeout=20)
-    except requests.RequestException as exc:
-        _record_result(call_id, None)
-        raise RuntimeError(f"{type(exc).__name__} from {urlparse(url).path}") from None
-    status = response.status_code
-    if status == 429:
-        _record_result(call_id, status)
-        raise _Unavailable("rate limited (429)")
-    if status in (401, 403):
-        _record_result(call_id, status)
-        # A bad or revoked key: stop spending requests on it until a
-        # different key is saved.
-        _state["rejected_key"] = key
-        raise _Unavailable(f"key rejected (HTTP {status})")
-    if status == 400:
-        _record_result(call_id, status)
-        return None
-    if status >= 400:
-        _record_result(call_id, status)
-        raise RuntimeError(f"HTTP {status} from {urlparse(url).path}")
-    body = response.json()
-    _record_result(call_id, status, items_of(body))
-    return body
+    return api_budget.request(PROVIDER, kind, url, params={**params, "api-key": key}, key=key, items_of=items_of)
 
 
 # Article Search ---------------------------------------------------------
@@ -415,31 +304,15 @@ def poll_wire(now=None):
 
 
 def wire_interval(now=None):
-    """Minutes between wire polls at `now` (UTC), by WIRE_SCHEDULE."""
-    local = (now or _utcnow()).replace(tzinfo=timezone.utc).astimezone(ZoneInfo(WIRE_TIMEZONE))
-    return next(minutes for start, minutes in WIRE_SCHEDULE if local.hour >= start)
-
-
-def _last_wire_poll():
-    import sqlalchemy as sa
-    db, calls = _ledger()
-    with db.engine.connect() as conn:
-        return conn.execute(sa.select(sa.func.max(calls.c.called_at)).where(calls.c.kind == "wire")).scalar()
+    """Minutes between wire polls at `now` (UTC) by the schedule alone."""
+    return api_budget.scheduled_interval(PROVIDER, now)
 
 
 def poll_wire_if_due(now=None):
     """The scheduler calls this every minute; it polls when the schedule's
-    interval has passed. Returns poll_wire's metrics, or None."""
-    if not enabled():
-        return None
-    now = now or _utcnow()
-    interval = wire_interval(now)
-    used, _, _ = window_usage(now)
-    if used >= WIRE_SLOWDOWN_SHARE * daily_limit():
-        interval *= 2
-    last = _last_wire_poll()
-    # A few seconds' slack, so a poll that took a while doesn't skip a beat.
-    if last and now - last < timedelta(minutes=interval, seconds=-30):
+    interval (stretched to fit the budget) has passed. Returns poll_wire's
+    metrics, or None."""
+    if not api_budget.poll_due(PROVIDER, now):
         return None
     return poll_wire(now)
 
@@ -587,29 +460,13 @@ def lookup_article(url):
 
 
 def usage_summary(now=None):
-    """For Settings > Source API keys: the last 24 hours by kind, and what
+    """For Settings › Source API keys: the shared budget summary plus what
     the wire brought."""
-    import sqlalchemy as sa
     from aggregator.models import NytWireItem
-    db, calls = _ledger()
     now = now or _utcnow()
     since = now - WINDOW
-    with db.engine.connect() as conn:
-        rows = conn.execute(
-            sa.select(calls.c.kind, sa.func.count(), sa.func.coalesce(sa.func.sum(calls.c.items), 0))
-            .where(calls.c.called_at > since).group_by(calls.c.kind)
-        ).all()
-    kinds = {kind: {"requests": n, "items": int(items)} for kind, n, items in rows}
-    used = sum(k["requests"] for k in kinds.values())
-    wire = kinds.get("wire", {"requests": 0, "items": 0})
     return {
-        "limit": daily_limit(),
-        "used": used,
-        "left": max(0, daily_limit() - used),
-        "kinds": kinds,
-        "items_per_wire_request": round(wire["items"] / wire["requests"]) if wire["requests"] else None,
+        **api_budget.usage_summary(PROVIDER, now),
         "wire_items": NytWireItem.query.filter(NytWireItem.first_seen_at > since).count(),
         "ingested": NytWireItem.query.filter(NytWireItem.ingested_at > since).count(),
-        "last_wire_poll": _last_wire_poll(),
-        "interval": wire_interval(now),
     }

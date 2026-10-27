@@ -7,6 +7,30 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **LLM spending caps.** Settings › LLM providers has a Spending caps
+  section for Anthropic, Gemini, Groq and OpenRouter: a daily and a monthly
+  dollar cap (blank, so unlimited, by default), with today's and this
+  month's spend against them. Every call is kept in `llm_usage` with its
+  tokens and cost; OpenRouter reports its own cost, Anthropic models have
+  built-in prices, and any provider's price per million tokens can be
+  entered. Once a cap is reached (Eastern time days and calendar months)
+  that provider gets no more calls until the period turns. Ollama and LM
+  Studio are never capped.
+- **Source API budgets for NYT, NewsAPI and GNews.** The NYT request ledger
+  is now `source_api_calls`, shared by every news source API
+  (`news_fetcher/api_budget.py`): a rolling 24-hour count under each
+  provider's daily limit, request spacing, and a 15-minute pause after a
+  429. NewsAPI and GNews are no longer fetched only inside pipeline runs:
+  the scheduler polls each on its own time-of-day schedule (one request per
+  active scheduled fetch), keeps the payloads, and the next run stores
+  their articles. A schedule that would spend more than the provider's
+  share of its limit stretches to fit, and past the slow-down percent polls
+  come half as often.
+- **Settings › Source API keys redesign.** Each provider gets a card with
+  the last 24 hours against its limit (by kind of request and by hour), the
+  current poll interval and next poll, an editable schedule of time-of-day
+  bands with a live estimate of requests a day, and its key, daily limit
+  and slow-down percent.
 - **Feed scan order.** Settings › RSS feeds has a Scan order choice: most
   reliable first (the default, by the outlet's reporting grade, ungraded
   feeds last), alphabetical, or date added. Every run fetches each bucket's
