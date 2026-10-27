@@ -7,6 +7,15 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Changed
+- **Story photos crop around their subject.** Each recent article photo gets
+  a focal point (where a face or the most eye-catching part is), found every
+  10 minutes from a 96px copy of the photo: spectral-residual saliency plus a
+  skin-tone map, no model (`news_fetcher/image_focus.py`, Pillow and numpy).
+  Web cards set CSS `object-position` from it, and `/api/v1` story and
+  article images carry `image_focus` (`{x, y}`, 0 to 1 from the left and
+  top, or null for the center) so the app crops around it too. Migration
+  `b6e2f9c4a8d1` adds `articles.image_focus_x`, `_y` and `_at`; photos older
+  than 3 days keep the center.
 - **Story photos match the story.** A story's card photo (site cards and
   `image_url` in `/api/v1`) is now the photo of the article whose title best
   matches the story headline and the other outlets' titles, not the newest

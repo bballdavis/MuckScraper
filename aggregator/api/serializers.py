@@ -15,6 +15,7 @@ from aggregator.opinion import leaning
 from aggregator.outlet_origins import is_international
 from aggregator.outlet_reporting import reporting_for
 from aggregator.story_analysis import parse as parse_analysis
+from aggregator.story_image import image_focus
 
 DEK_MAX_CHARS = 280
 
@@ -107,6 +108,14 @@ def _story_image(story, edition_story=None):
     return story.lead_image_url
 
 
+def _story_focus(story, image_url):
+    return image_focus(story.site_articles, image_url)
+
+
+def _article_focus(article):
+    return None if article.is_roundup else image_focus([article], article.image_url)
+
+
 def _story_logo(story):
     """The newest outlet logo among the story's articles: what a card shows
     when `image_url` is null. Clients draw it fitted on a plain tile, not
@@ -120,12 +129,14 @@ def _story_logo(story):
 def story_summary(story, edition_story=None):
     """A story card: the iOS StorySummary."""
     articles = story.site_articles
+    image_url = _story_image(story, edition_story)
     return {
         "id": story.id,
         "section": _section(story),
         "headline": story.display_headline,
         "dek": _dek(story.summary),
-        "image_url": _story_image(story, edition_story),
+        "image_url": image_url,
+        "image_focus": _story_focus(story, image_url),
         "logo_url": _story_logo(story),
         "coverage": coverage(story),
         "source_count": len({a.outlet.name if a.outlet else a.source for a in articles}),
@@ -172,6 +183,7 @@ def article_card(article):
         "url": _http_url(article.url),
         "published_at": iso(article.date),
         "image_url": None if article.is_roundup else _http_url(article.image_url),
+        "image_focus": _article_focus(article),
         "summary": summary_paragraph(article.summary) or None,
         "copy_of": copy_label(article),
     }
@@ -254,11 +266,13 @@ def topic(t):
 
 
 def search_story_hit(story):
+    image_url = _story_image(story)
     return {
         "kind": "story",
         "id": story.id,
         "title": story.display_headline,
-        "image_url": _story_image(story),
+        "image_url": image_url,
+        "image_focus": _story_focus(story, image_url),
         "logo_url": _story_logo(story),
         "source_count": len({a.outlet.name if a.outlet else a.source for a in story.site_articles}),
         "updated_at": iso(story.last_updated),
@@ -272,6 +286,7 @@ def search_article_hit(article):
         "story_id": article.story_id,
         "title": article.title,
         "image_url": None if article.is_roundup else _http_url(article.image_url),
+        "image_focus": _article_focus(article),
         "outlet": outlet(article.outlet, article.source),
         "leaning": _article_leaning(article),
         "published_at": iso(article.date),

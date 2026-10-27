@@ -185,6 +185,12 @@ class Story(db.Model):
         from aggregator.story_image import lead_image
         return lead_image(self.site_articles, self.display_headline)
 
+    @property
+    def lead_image_focus(self):
+        """Where the card photo's subject is, or None (crop the center)."""
+        from aggregator.story_image import image_focus
+        return image_focus(self.site_articles, self.lead_image_url)
+
 
 
 @db.event.listens_for(Story.summary, "set")
@@ -253,6 +259,12 @@ class Article(db.Model):
     # Set when outlet_logos.retry_missing_images fetched the page again for an
     # og:image, found or not, so each article is retried once.
     image_checked_at = db.Column(db.DateTime, nullable=True)
+    # Where the photo's subject is, 0..1 from the left and top, so crops keep
+    # it in frame; null = center. image_focus_at marks the photo as checked
+    # (news_fetcher/image_focus.py).
+    image_focus_x = db.Column(db.Float, nullable=True)
+    image_focus_y = db.Column(db.Float, nullable=True)
+    image_focus_at = db.Column(db.DateTime, nullable=True)
     search_vector = deferred(db.Column(TSVECTOR, db.Computed(ARTICLE_SEARCH_VECTOR_SQL, persisted=True)))
 
     topics = db.relationship("Topic", secondary=article_topics, back_populates="articles")

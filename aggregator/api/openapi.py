@@ -28,6 +28,12 @@ _URL = {"type": ["string", "null"], "format": "uri"}
 # Logos are square icons: draw them fitted on a tile, not cropped.
 _LOGO = {"type": ["string", "null"], "format": "uri",
          "description": "Outlet logo for when image_url is null; fit it, don't crop it"}
+# Where the photo's subject is (news_fetcher/image_focus.py): crop so this
+# point stays in frame. Null = unknown, crop around the center.
+_FOCUS = {"oneOf": [{"type": "object", "required": ["x", "y"], "properties": {
+    "x": {"type": "number", "minimum": 0, "maximum": 1, "description": "From the left"},
+    "y": {"type": "number", "minimum": 0, "maximum": 1, "description": "From the top"}}}, {"type": "null"}],
+    "description": "The photo's focal point, 0..1; null = crop around the center"}
 _LEANING = {"type": "string", "enum": ["left", "center", "right", "unrated"]}
 _PARAS = {"type": "array", "items": _S}
 
@@ -59,7 +65,7 @@ SCHEMAS = {
     "StorySummary": _obj(
         ["id", "section", "headline", "dek", "image_url", "logo_url", "coverage", "source_count", "updated_at",
          "is_summarized", "has_analysis", "has_ai_headline", "has_updates", "breaking"],
-        id=_I, section=_S, headline=_S, dek=_NS, image_url=_URL, logo_url=_LOGO, coverage=_ref("Coverage"),
+        id=_I, section=_S, headline=_S, dek=_NS, image_url=_URL, image_focus=_FOCUS, logo_url=_LOGO, coverage=_ref("Coverage"),
         source_count=_I, updated_at=_DT, is_summarized=_B, has_analysis=_B, has_ai_headline=_B, has_updates=_B,
         breaking={"oneOf": [_ref("BreakingChip"), {"type": "null"}],
                   "description": "Set while the story is breaking: show the Breaking chip, with these details "
@@ -92,7 +98,7 @@ SCHEMAS = {
     "ArticleCard": _obj(
         ["id", "story_id", "title", "outlet", "leaning", "url", "published_at", "image_url", "summary", "copy_of"],
         id=_I, story_id=_NI, title=_S, outlet=_ref("Outlet"), leaning=_LEANING, url=_URL,
-        published_at=_NDT, image_url=_URL, summary=_NS, copy_of=_NS),
+        published_at=_NDT, image_url=_URL, image_focus=_FOCUS, summary=_NS, copy_of=_NS),
     "OpinionPiece": _obj(
         ["id", "title", "outlet", "leaning", "url", "published_at", "stance", "story_id"],
         id=_I, title=_S, outlet=_ref("Outlet"), leaning=_LEANING, url=_URL, published_at=_NDT,
@@ -110,7 +116,7 @@ SCHEMAS = {
                         hide_single=_B),
     "SearchHit": {"type": "object", "required": ["kind", "id", "title"], "properties": {
         "kind": {"type": "string", "enum": ["story", "article"]}, "id": _I, "story_id": _NI, "title": _S,
-        "image_url": _URL, "logo_url": _LOGO, "source_count": _I, "updated_at": _NDT, "outlet": _ref("Outlet"),
+        "image_url": _URL, "image_focus": _FOCUS, "logo_url": _LOGO, "source_count": _I, "updated_at": _NDT, "outlet": _ref("Outlet"),
         "leaning": _LEANING, "published_at": _NDT}},
     "FeedHeadline": _obj(["title", "outlet", "url", "published_at"], title=_S, outlet=_S, url=_URL, published_at=_DT),
     "BreakingItem": _obj(
