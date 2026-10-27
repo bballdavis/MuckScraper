@@ -176,8 +176,8 @@ def _run_ai_task(payload):
         story = Story.query.get(resource_id)
         if story is None:
             raise RuntimeError(f"Story {resource_id} no longer exists.")
-        if len(story.articles) < 2:
-            raise RuntimeError("Story analysis requires at least two articles.")
+        if not story.can_analyze:
+            raise RuntimeError("Story analysis requires at least two sources.")
         report = generate_deep_report(story)
         if not report:
             raise RuntimeError("No story analysis was generated.")

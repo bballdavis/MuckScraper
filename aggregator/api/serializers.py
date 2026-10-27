@@ -129,7 +129,7 @@ def story_summary(story, edition_story=None):
         "image_url": _story_image(story, edition_story),
         "logo_url": _story_logo(story),
         "coverage": coverage(story),
-        "source_count": len({a.outlet.name if a.outlet else a.source for a in articles}),
+        "source_count": story.source_count,
         "updated_at": iso(story.last_updated),
         "is_summarized": bool((story.summary or "").strip()),
         "has_analysis": bool((story.deep_report or "").strip()),

@@ -118,7 +118,7 @@ class RegenerateTests(unittest.TestCase):
 
     def test_regenerate_only_with_new_sources(self):
         from types import SimpleNamespace as NS
-        story = NS(id=5, deep_report="The story: x", articles=[1, 2, 3])
+        story = NS(id=5, deep_report="The story: x", articles=[1, 2, 3], can_analyze=True)
         self.assertIn("act-done", self._render(story, 0))
         html = self._render(story, 2)
         self.assertIn("Regenerate multi-source analysis", html)

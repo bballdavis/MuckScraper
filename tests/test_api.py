@@ -520,6 +520,14 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertEqual((r.get_json()["state"], r.get_json()["step"]), ("pending", "summary"))
         self._clear_newsbox()
 
+    def test_two_articles_from_one_outlet_are_one_source(self):
+        from aggregator.models import Article, Story
+        story = Story(title="Wire story")
+        story.articles = [Article(title="Wire story", url="https://wire.example/1", source="Wire"),
+                          Article(title="Wire story, updated", url="https://wire.example/2", source="Wire")]
+        self.assertEqual(story.source_count, 1)
+        self.assertFalse(story.can_analyze)
+
     def test_unsummarized_story_queues_one_job_and_turns_ready(self):
         from aggregator import db, jobs
         from aggregator.models import Job, Story

@@ -69,15 +69,15 @@ _TIME = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 # Queueing ---------------------------------------------------------------
 
 def can_analyze(story):
-    """Whether the story has the two or more articles a multi-source
-    analysis compares. Clients hide their analysis buttons when it hasn't
-    (StorySummary.can_analyze)."""
-    return len(story.articles) >= 2
+    """Whether the story has the two or more sources a multi-source analysis
+    compares (Story.can_analyze). Clients hide their analysis buttons when it
+    hasn't (StorySummary.can_analyze)."""
+    return story.can_analyze
 
 
 def _needs(story, depth):
     """The parts `depth` asks for on this story. Analysis needs two or more
-    articles; with fewer, the summary stands in for it."""
+    sources; with fewer, the summary stands in for it."""
     parts = set(_PARTS.get(depth, _PARTS["summary"]))
     if "analysis" in parts and not can_analyze(story):
         parts = (parts - {"analysis"}) | {"summary"}

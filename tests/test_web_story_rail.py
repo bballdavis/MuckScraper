@@ -34,16 +34,18 @@ class StoryRailTests(unittest.TestCase):
             reader = User(username="reader", email="r@example.com", role="reader")
             reader.set_password("password123")
             outlet = Outlet(name="Daily", bias_score=3)
+            # A second outlet, so the multi-article stories have two sources.
+            other = Outlet(name="Weekly", bias_score=3)
             now = datetime.utcnow().replace(microsecond=0)
             bare = Story(title="Bare story")
             done = Story(title="Done story", summary="What happened.", deep_report="Left: one view.")
             single = Story(title="Single source")
             grew = Story(title="Grew since", summary="What happened.", deep_report="Left: one view.")
-            db.session.add_all([editor, reader, outlet, bare, done, single, grew])
+            db.session.add_all([editor, reader, outlet, other, bare, done, single, grew])
             db.session.flush()
             # Fetched before the summary and analysis were written...
             for n, story in enumerate([bare, bare, done, done, single, grew, grew]):
-                db.session.add(Article(title=f"A{n}", url=f"https://daily.example/{n}", outlet=outlet,
+                db.session.add(Article(title=f"A{n}", url=f"https://daily.example/{n}", outlet=(outlet, other)[n % 2],
                                        date=now, fetched_at=now - timedelta(hours=1),
                                        scrape_status="success", story_id=story.id))
             # ...and one that arrived after them.
