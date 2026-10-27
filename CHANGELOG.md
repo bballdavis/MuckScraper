@@ -7,6 +7,20 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Changed
+- **Story photos match the story.** A story's card photo (site cards and
+  `image_url` in `/api/v1`) is now the photo of the article whose title best
+  matches the story headline and the other outlets' titles, not the newest
+  article's. A late off-angle piece (a Washington reaction story with a Trump
+  photo on a Brazil election) no longer takes over the card. A headline word
+  in the photo's file name, a wire photo several outlets ran, and a high
+  reporting grade also count; ties go to the newest
+  (`aggregator/story_image.py`).
+- **Mobile API: a story's section is the one most of its articles share.**
+  New articles are tagged with their own topics rather than all of the
+  story's, and a card's `section` is the topic most of its articles carry,
+  so one US-angle article no longer files a foreign election under US
+  Politics. Articles stored before this carry every topic the story had
+  when they arrived, which favors the story's first topic.
 - **Mobile API: section lists say what's trending.** `GET /api/v1/stories`
   cards carry `why`, Trending's "4 outlets in 6h", or null when no outlet
   reported the story in the last 6 hours, so the iOS app shows it on every

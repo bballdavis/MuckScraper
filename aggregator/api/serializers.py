@@ -85,17 +85,26 @@ def coverage(story):
 
 
 def _section(story):
+    """The story's topic that most of its articles carry, ties to the
+    sidebar's order. A story collects every topic any of its articles was
+    classified under, so the first one in sidebar order alone let a single
+    Washington-angle piece put a Brazil election in US Politics."""
     topics = sorted(story.topics, key=lambda t: (t.sort_order is None, t.sort_order or 0, t.name))
-    return topics[0].name if topics else "News"
+    if not topics:
+        return "News"
+    ids = {t.id for t in topics}
+    votes = {}
+    for article in story.site_articles:
+        for t in getattr(article, "topics", None) or []:
+            if t.id in ids:
+                votes[t.id] = votes.get(t.id, 0) + 1
+    return max(topics, key=lambda t: votes.get(t.id, 0)).name
 
 
 def _story_image(story, edition_story=None):
     if edition_story is not None and _http_url(edition_story.source_image_url):
         return edition_story.source_image_url
-    for article in sorted(story.site_articles, key=lambda a: a.date or dt.min, reverse=True):
-        if not article.is_roundup and _http_url(article.image_url):
-            return article.image_url
-    return None
+    return story.lead_image_url
 
 
 def _story_logo(story):

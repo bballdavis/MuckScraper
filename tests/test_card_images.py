@@ -100,8 +100,8 @@ def _outlet(name, logo=None, id=1):
     return SimpleNamespace(id=id, name=name, logo_url=logo, bias_score=3.0)
 
 
-def _article(outlet, image=None, date=datetime(2026, 10, 22), roundup=False):
-    return SimpleNamespace(outlet=outlet, image_url=image, date=date, is_roundup=roundup)
+def _article(outlet, image=None, date=datetime(2026, 10, 22), roundup=False, title=""):
+    return SimpleNamespace(outlet=outlet, image_url=image, date=date, is_roundup=roundup, title=title)
 
 
 class SerializerTests(unittest.TestCase):
@@ -127,7 +127,9 @@ class CardImageTemplateTests(unittest.TestCase):
     def render(self, articles):
         env = Environment(loader=FileSystemLoader(TEMPLATES))
         env.globals.update(url_for=lambda *a, **k: "/", current_back=lambda: "", can=lambda r: False)
-        story = SimpleNamespace(articles=articles, display_articles=articles)
+        from aggregator.story_image import lead_image
+        story = SimpleNamespace(articles=articles, display_articles=articles,
+                                lead_image_url=lead_image(articles, ""))
         tpl = env.from_string("{% from 'story_card_macros.html' import card_image with context %}{{ card_image(story) }}")
         return tpl.render(story=story)
 

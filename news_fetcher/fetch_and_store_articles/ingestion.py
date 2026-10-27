@@ -543,9 +543,12 @@ def store_articles(articles_data, topic_name, provider=None):
         story.articles.append(new_article)
         db.session.add(new_article)
 
-        # Tag article with same topics as story
+        # Tag the article with its own topics, not all of the story's: the
+        # API's section is the topic most of a story's articles carry
+        # (aggregator/api/serializers.py _section), so one off-angle article
+        # can't relabel the story.
         for t in story.topics:
-            if t not in new_article.topics:
+            if t.name in classified_topic_names and t not in new_article.topics:
                 new_article.topics.append(t)
 
         # Headlines are no longer generated here. They run in one batch pass
