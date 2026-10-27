@@ -20,7 +20,9 @@ internet. The web app and admin stay on your network.
    the header themselves.
 3. In **Settings › API**, enter the public address
    (`https://api.example.com`), pick a user and press **Create pairing code**.
-4. In MuckScroller, scan the QR code or type the code. The code works once
+4. In MuckScroller, scan the QR code or type the code. The QR code holds a
+   `muckscroller://pair?code=…&server=…&site=…` link, so scanning it also
+   fills in the API's address and the site's (for the links the app shares). The code works once
    and expires after 10 minutes. The phone gets a device token; no password
    crosses the internet.
 
@@ -102,10 +104,10 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 | `GET /editions?cursor=&limit=` | Published editions, newest first |
 | `GET /editions/latest`, `/editions/{id}` | An edition and its ranked story cards |
 | `GET /opinion?edition=` | The edition's Opinion page: stories with their columns by leaning |
-| `GET /headlines?view=trending\|latest\|controversial&cursor=&limit=` | Headlines' live views, as on the web page (`aggregator/headline_views.py`). Trending (the default): 3+ outlets in the last 24 hours, by headline score. Latest: every story from the last 24 hours, newest first, each with a `group` (`Last hour`, `Last 6 hours`, `Earlier`). Controversial: 2+ left and 2+ right outlets in the last 48 hours, by framing gap and op-eds. Cards add a short `why` for beside the L/C/R pill, `newest_at`, `framing_gap` and `opeds`. `views` gives each view's label, description and count for the switcher; stories the user read are left out and counted in `hidden_read`. |
-| `GET /stories?topic=&range=&single=&cursor=&limit=` | The story feed, filtered like All Stories. Omitted filters use the user's feed defaults. |
-| `GET /stories/{id}` | Summary, deep report, opinion roundup, articles and columns by leaning. Articles from unrated outlets based outside the US are grouped under `international`, apart from `unrated`. |
-| `GET /articles/{id}` | Title, outlet, leaning, summary, analysis, link, and scraped text when allowed. `is_summarizing` and `is_rating_bias` say whether its summary or lean rating is still being written. |
+| `GET /headlines?view=trending\|latest\|controversial&topic=&cursor=&limit=` | Headlines' live views, as on the web page (`aggregator/headline_views.py`). Trending (the default): 3+ outlets in the last 24 hours, by headline score. Latest: every story from the last 24 hours, newest first, each with a `group` (`Last hour`, `Last 6 hours`, `Earlier`). Controversial: 2+ left and 2+ right outlets in the last 48 hours, by framing gap and op-eds. Cards add a short `why` for beside the L/C/R pill, `newest_at`, `framing_gap` and `opeds`. `views` gives each view's label, description and count for the switcher; stories the user read are left out and counted in `hidden_read`. `topic` (a topic name, `404` if unknown) gives that section its own three views, keeping only stories mostly about it. |
+| `GET /stories?topic=&range=&single=&cursor=&limit=` | The story feed, filtered like All Stories. Omitted filters use the user's feed defaults. A `topic` keeps the stories mostly about it (`aggregator/sections.py`), not every story one article tagged. |
+| `GET /stories/{id}` | Summary, deep report, opinion roundup, articles and columns by leaning. `analysis_sections` is the deep report split as the story page lays it out: `[{label, kind, paragraphs, empty}]`, `kind` one of `lead`, `left`, `center`, `right`, `next`, `other`, `empty` marking a side with no sources. Articles from unrated outlets based outside the US are grouped under `international`, apart from `unrated`. |
+| `GET /articles/{id}` | Title, outlet, leaning, summary, analysis, link, and scraped text when allowed. `is_summarizing` and `is_rating_bias` say whether its summary or lean rating is still being written. `lean_source` is `outlet` or where the article's own rating came from, with its `lean_reason`. |
 | `POST /articles/{id}/summarize` | Needs the summarize scope. Queues the article's own summary (the web page's summary button): `200` when it already has one, `202` queued, `409 no_text` when MuckScraper couldn't read the article. Poll `/articles/{id}`. Counts against the daily summary limit. |
 | `POST /articles/{id}/rate-bias` | Needs the summarize scope. Queues a rating of the article's own lean from its title and opening (`202`). Once done, its `leaning` and the story's L / C / R counts use it instead of the outlet's. Counts against the daily summary limit. |
 | `GET /search?q=&kind=stories\|articles&range=&limit=` | Compact hits for as-you-type search |
@@ -129,6 +131,8 @@ except `/health`, `/openapi.json` and `/devices/pair` needs
 | `GET /me/bookmarks/{id}/versions/{n}` | The time capsule itself (below) |
 | `GET /me/bookmarks/{id}/versions/{n}/assets/{name}` | A saved picture, page PDF or screenshot |
 | `GET /me/bookmarks/{id}/export` | Every ready version as a zip of `v<n>/snapshot.json` and `v<n>/assets/` |
+
+Story cards (editions, `/stories`, `/headlines`, the deck, NewsBox, bookmarks) carry `image_url` and `image_focus` (`{x, y}` from 0 to 1, the photo's focal point to crop around, or null; article cards too), `logo_url` and `source_name` (the outlet a card names when it has no photo: under its logo, or alone as a masthead), `coverage`, `source_count` (distinct outlets), `is_summarized`, `has_analysis`, `can_analyze` (two or more outlets, so an analysis can be asked for), `has_ai_headline`, and `breaking` (the Breaking chip's details, or null). `section` is the topic most of the story's articles carry. Search hits carry `image_focus` and `source_name` too.
 
 Outlets carry `country` (an ISO code, set only for outlets based outside the US) and `funding` (`public`, `state` or null). An outlet abroad takes its lean from AllSides, else from Media Bias/Fact Check or Ad Fontes Media where they rate it on the US scale; one none of them rates stays `unrated` and is never guessed. Story `coverage` counts those unrated articles as `international`, outside `left`/`center`/`right`.
 
