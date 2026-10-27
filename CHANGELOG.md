@@ -31,6 +31,13 @@ All notable changes to MuckScraper are documented here.
   current poll interval and next poll, an editable schedule of time-of-day
   bands with a live estimate of requests a day, and its key, daily limit
   and slow-down percent.
+- **Feed scan order.** Settings › RSS feeds has a Scan order choice: most
+  reliable first (the default, by the outlet's reporting grade, ungraded
+  feeds last), alphabetical, or date added. Every run fetches each bucket's
+  feeds in that order, and the page lists them that way with each feed's
+  outlet and grade. A feed remembers the outlet its articles came in under
+  (`rss_feeds.source_name`, migration `d2b7e4a9c6f1`), so unlabelled feeds
+  are graded after their first fetch.
 - **Settings › Pipeline › Tasks.** One page for what the scheduler is doing:
   the pipeline run in progress with its current step and stages, every
   recurring task (pipeline hours, Breaking News feeds, photo focal points,
