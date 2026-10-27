@@ -6,11 +6,29 @@ All notable changes to MuckScraper are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Feeds for the thin sections.** 26 default feeds so Sports, Sci/Tech,
+  Buss/Fin, International News and Other have stories of their own: BBC
+  Sport, The Guardian Sport, CBS Sports, Yahoo Sports, NPR Sports; Ars
+  Technica, The Verge, TechCrunch, BBC Technology, BBC Science &
+  Environment, NPR Science, NPR Technology, The Guardian Science, Science
+  News, Space.com; CNBC Top News, BBC Business, NPR Business, The Guardian
+  Business; BBC World, NPR World; NPR Health, NPR Culture, BBC Entertainment
+  & Arts, The Guardian Culture, Variety. Migration `f3c8a1e6d2b9` only
+  inserts feeds that are missing.
+
 ### Changed
 - **Mobile API: Trending, Latest and Controversial for each section.**
   `GET /api/v1/headlines` takes `topic=`, giving that section's own stories
-  in the three views, with counts and `hidden_read` for the section. An
-  unknown topic is a 404. Without `topic` it is Headlines as before.
+  in the three views, with counts and `hidden_read` for the section (the
+  same one-third rule as the section pages). An unknown topic is a 404. Without `topic` it is Headlines as before.
+- **Sections show their own stories.** A section page (site, `GET
+  /api/v1/stories?topic=` and NewsBox section rules) lists a story only when
+  at least a third of its articles carry that topic. A big story collects
+  every topic any of its articles was classified under, so Sports, Sci/Tech
+  and Other used to fill up with the same stories Headlines leads with
+  (`aggregator/sections.py`). An empty section page now says "No Sports
+  stories in the last 24 hours" with a link to all time.
 - **Story photos match the story.** A story's card photo (site cards and
   `image_url` in `/api/v1`) is now the photo of the article whose title best
   matches the story headline and the other outlets' titles, not the newest

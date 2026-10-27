@@ -20,6 +20,7 @@ from sqlalchemy import func
 
 from aggregator import jobs, skips
 from aggregator.models import (Article, Edition, EditionStory, NewsBoxItem, Story, SummarySchedule, Topic, db)
+from aggregator.sections import in_section
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +69,18 @@ _TIME = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 
 # Queueing ---------------------------------------------------------------
 
+def can_analyze(story):
+    """Whether the story has the two or more articles a multi-source
+    analysis compares. Clients hide their analysis buttons when it hasn't
+    (StorySummary.can_analyze)."""
+    return len(story.articles) >= 2
+
+
 def _needs(story, depth):
     """The parts `depth` asks for on this story. Analysis needs two or more
     articles; with fewer, the summary stands in for it."""
     parts = set(_PARTS.get(depth, _PARTS["summary"]))
-    if "analysis" in parts and len(story.articles) < 2:
+    if "analysis" in parts and not can_analyze(story):
         parts = (parts - {"analysis"}) | {"summary"}
     return parts
 
@@ -421,7 +429,7 @@ def _candidates(rule, now):
     topic = Topic.query.filter(func.lower(Topic.name) == rule["section"].lower()).first()
     if topic is None:
         return [], 0
-    stories = (Story.query.join(Article).filter(Story.topics.contains(topic), Article.date >= now - SECTION_WINDOW)
+    stories = (Story.query.join(Article).filter(in_section(topic), Article.date >= now - SECTION_WINDOW)
                .group_by(Story.id).order_by(func.count(Article.id).desc(), func.max(Article.date).desc())
                .limit(max(rule["amount"] * 4, 40)).all())
     return stories, rule["amount"]

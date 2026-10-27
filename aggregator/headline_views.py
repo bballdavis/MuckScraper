@@ -27,7 +27,8 @@ from sqlalchemy.orm import selectinload
 from aggregator import db
 from aggregator.article_copies import original_articles
 from aggregator.article_signals import bias_bucket_for_score
-from aggregator.models import Article, OpinionPiece, Story, story_topics
+from aggregator.models import Article, OpinionPiece, Story
+from aggregator.sections import in_section
 from aggregator.story_rank import _signal_rows, score_signals
 
 VIEWS = ("trending", "latest", "controversial")
@@ -161,11 +162,13 @@ def build(now=None, hidden_ids=frozenset(), topic_id=None):
 
 
 def _topic_story_ids(topic_id, story_ids):
-    """The ones of `story_ids` tagged with the topic."""
+    """The ones of `story_ids` in the topic's section (aggregator/sections.py):
+    every big story carries nearly every topic, so filtering on its topics
+    alone made each section's Trending the same as Headlines'."""
     if not story_ids:
         return set()
-    return {sid for (sid,) in db.session.query(story_topics.c.story_id)
-            .filter(story_topics.c.topic_id == topic_id, story_topics.c.story_id.in_(story_ids))}
+    return {sid for (sid,) in db.session.query(Story.id)
+            .filter(Story.id.in_(story_ids), in_section(topic_id))}
 
 
 def load_stories(entries):

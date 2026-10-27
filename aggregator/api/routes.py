@@ -14,6 +14,7 @@ from aggregator import article_jobs, article_lean, db, feed_prefs, headline_view
 from aggregator.models import Article, Edition, EditionStory, OpinionPiece, Story, Topic
 from aggregator.opinion import published_edition_opinion_cards
 from aggregator.search import SearchUnavailableError, search_article_ids, search_story_ids
+from aggregator.sections import in_section
 
 from . import api, API_VERSION, serializers as ser, settings
 from .auth import redeem_pairing_code, require_token
@@ -225,7 +226,7 @@ def stories():
         topic = Topic.query.filter_by(name=args["topic"]).first()
         if topic is None:
             raise ApiError(404, "not_found", "No such topic.")
-        query = query.filter(Story.topics.contains(topic))
+        query = query.filter(in_section(topic))
     rows = (query.options(*_story_load()).order_by(func.max(Article.date).desc(), Story.id.desc())
             .offset(offset).limit(limit + 1).all())
     cards = _annotate_read([ser.story_summary(s) for s in rows])
