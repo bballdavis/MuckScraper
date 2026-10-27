@@ -7,6 +7,10 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Changed
+- **Mobile API: Trending, Latest and Controversial for each section.**
+  `GET /api/v1/headlines` takes `topic=`, giving that section's own stories
+  in the three views, with counts and `hidden_read` for the section. An
+  unknown topic is a 404. Without `topic` it is Headlines as before.
 - **Story photos match the story.** A story's card photo (site cards and
   `image_url` in `/api/v1`) is now the photo of the article whose title best
   matches the story headline and the other outlets' titles, not the newest
