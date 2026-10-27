@@ -51,9 +51,32 @@ def parse_feed(feed_url, etag=None, modified=None):
 
 
 def _active_feed_urls(bucket):
-    """Enabled RssFeed URLs for a bucket (general / right_enrichment / left_enrichment / op_ed)."""
+    """Enabled RssFeed URLs for a bucket (general / right_enrichment / left_enrichment / op_ed),
+    in the scan order set on Settings › RSS feeds (aggregator/feed_order.py)."""
+    from aggregator.feed_order import sort_feeds
     from aggregator.models import RssFeed
-    return [f.url for f in RssFeed.query.filter_by(bucket=bucket, enabled=True).all()]
+    return [f.url for f in sort_feeds(RssFeed.query.filter_by(bucket=bucket, enabled=True).all())]
+
+
+def _remember_feed_outlet(feed_url, articles):
+    """Keep the outlet a feed's articles came in under on its RssFeed rows, so
+    an unlabelled feed can be ordered by reporting grade. Its own connection,
+    like the scheduler's status rows, so it never commits a run's work."""
+    from collections import Counter
+    from aggregator import db
+    from news_fetcher.fetch_and_store_articles.outlets import normalize_source_name
+    names = Counter(normalize_source_name(a.get("source_name")) for a in articles if a.get("source_name"))
+    if not names:
+        return
+    name = names.most_common(1)[0][0]
+    try:
+        with db.engine.begin() as conn:
+            conn.execute(db.text(
+                "UPDATE rss_feeds SET source_name = :name "
+                "WHERE url = :url AND source_name IS DISTINCT FROM :name"
+            ), {"name": name, "url": feed_url})
+    except Exception as e:
+        logger.warning(f"  [RSS] Couldn't record the outlet for {feed_url[:60]}: {e}")
 
 
 def _feed_fallback_url(feed_url):
@@ -66,7 +89,10 @@ def _feed_fallback_url(feed_url):
 
 def _fetch_with_fallback(feed_url, **kwargs):
     """fetch_feed() with the feed's fallback_url, if one is set."""
-    return fetch_feed(feed_url, fallback_url=_feed_fallback_url(feed_url), **kwargs)
+    source_name, articles = fetch_feed(feed_url, fallback_url=_feed_fallback_url(feed_url), **kwargs)
+    if articles:
+        _remember_feed_outlet(feed_url, articles)
+    return source_name, articles
 
 
 def _feed_failed(feed):

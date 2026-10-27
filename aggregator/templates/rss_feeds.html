@@ -1,5 +1,6 @@
 {% extends 'settings_base.html' %}
 {% from 'icons.html' import icon %}
+{% from 'story_card_macros.html' import reporting_tag %}
 {% block title %}RSS Feeds{% endblock %}
 {% block settings_key %}rss{% endblock %}
 {% block settings_body %}
@@ -7,6 +8,23 @@
     <h1>RSS feeds</h1>
     <p>General ingestion runs every fetch. Right and left enrichment feeds backfill bias-skewed stories. Everything in an Op Ed feed goes to the Op/Ed section, never the news. A URL can sit in more than one bucket. A fallback feed (e.g. a Google News <code>site:</code> search) is fetched instead whenever the feed answers with an error.</p>
 </div>
+
+<section class="panel">
+    <div class="panel-head"><h2>Scan order</h2></div>
+    <form method="POST" action="{{ url_for('admin.save_rss_scan_order') }}" class="panel-body scan-order">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <p class="muted">The order each run fetches the feeds in every bucket, and the order they're listed below. With most reliable first, the better-sourced feeds are in even when a run is cut short. A feed's grade comes from its label or the outlet its articles come in under; a new feed is ungraded until its first fetch.</p>
+        <div class="scan-order-choices" role="radiogroup" aria-label="Scan order">
+            {%- for key, label, hint in scan_orders %}
+            <label class="scan-order-choice">
+                <input type="radio" name="order" value="{{ key }}" {{ 'checked' if key == scan_order else '' }} onchange="this.form.requestSubmit()">
+                <span><strong>{{ label }}</strong><span class="muted">{{ hint }}</span></span>
+            </label>
+            {%- endfor %}
+        </div>
+        <noscript><button type="submit" class="btn">{{ icon('save') }} Save order</button></noscript>
+    </form>
+</section>
 
 <section class="panel">
     <div class="panel-head"><h2>Add a feed</h2></div>
@@ -48,6 +66,7 @@
             {%- set f = 'feed-' ~ feed.id %}
             <tr id="{{ f }}" class="{{ 'is-off' if not feed.enabled else '' }}">
                 <td class="cell-main" style="width: 55%;">
+                    <div class="feed-name"><strong>{{ feed_name(feed) }}</strong>{{ reporting_tag(feed) }}</div>
                     <div class="feed-url">{{ feed.url }}</div>
                     <input type="url" form="{{ f }}-form" class="fallback-input" name="fallback_url" value="{{ feed.fallback_url or '' }}" placeholder="Fallback feed if this one fails (optional)" aria-label="Fallback feed URL">
                 </td>

@@ -539,6 +539,16 @@ class RssFeed(db.Model):
     # Fetched instead when `url` answers with an HTTP error or can't be
     # parsed; normally a Google News search feed for the same outlet/section.
     fallback_url = db.Column(db.String, nullable=True)
+    # The outlet its articles last came in under (normalize_source_name), so
+    # an unlabelled feed still has a reporting grade for the scan order
+    # (aggregator/feed_order.py).
+    source_name = db.Column(db.String, nullable=True)
+
+    @property
+    def reporting(self):
+        """The outlet's reporting level (aggregator/outlet_reporting.py), or None."""
+        from aggregator.outlet_reporting import reporting_for
+        return reporting_for(self.label) or reporting_for(self.source_name)
 
 
 class PromptTemplate(db.Model):
