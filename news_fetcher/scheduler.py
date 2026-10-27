@@ -23,6 +23,7 @@ from news_fetcher import llm_client
 from datetime import datetime, timedelta, timezone
 import logging
 import sys
+import threading
 import os
 import requests
 import json
@@ -1170,14 +1171,14 @@ if __name__ == "__main__":
 
     with app.app_context():
         prune_finished()
-        # Only fetch on startup if enough time has passed
-        if should_fetch_now():
-            run_all_fetches(
-                run_full_pipeline=should_run_full_pipeline(
-                    last_fetch=get_last_fetch_time(),
-                )
-            )
-        else:
+        # Only fetch on startup if enough time has passed. The run itself is a
+        # job below: run here, before scheduler.start(), it held up every
+        # interval job (Breaking News, NewsBox schedules) for the hour or more
+        # it takes, and with a few deploys a day the Breaking poller hardly
+        # ran (2026-10-27).
+        startup_fetch = should_fetch_now()
+        startup_full = startup_fetch and should_run_full_pipeline(last_fetch=get_last_fetch_time())
+        if not startup_fetch:
             logging.info("Skipping startup fetch.")
 
         schedule_entries = (
@@ -1193,10 +1194,34 @@ if __name__ == "__main__":
         schedule_snapshot = [(e.hour, e.run_full_pipeline) for e in schedule_entries]
         set_scheduler_started_at()
 
+    # One pipeline run at a time: a scheduled hour that comes while the
+    # startup run (or a long earlier run) is still going is skipped, as it
+    # was when the startup run blocked the scheduler.
+    pipeline_lock = threading.Lock()
+
+    def run_pipeline(run_full_pipeline):
+        if not pipeline_lock.acquire(blocking=False):
+            logging.info("Skipping a pipeline run: the previous one is still going.")
+            return
+        try:
+            run_all_fetches(run_full_pipeline=run_full_pipeline)
+        finally:
+            pipeline_lock.release()
+
     scheduler = BlockingScheduler()
+    if startup_fetch:
+        scheduler.add_job(
+            run_pipeline,
+            trigger="date",
+            run_date=datetime.now(timezone.utc),
+            args=[startup_full],
+            id="pipeline_startup",
+            name=f"Startup {'full pipeline' if startup_full else 'fetch-only'} run",
+            misfire_grace_time=None,
+        )
     for hour, run_full_pipeline in schedule_snapshot:
         scheduler.add_job(
-            (lambda full=run_full_pipeline: run_all_fetches(run_full_pipeline=full)),
+            (lambda full=run_full_pipeline: run_pipeline(full)),
             trigger=CronTrigger(hour=hour, minute=0, timezone=TIMEZONE),
             id=f"pipeline_schedule_{hour}",
             name=f"Scheduled {'full pipeline' if run_full_pipeline else 'fetch-only'} run at {hour}:00 ({TIMEZONE})",

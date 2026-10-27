@@ -2,6 +2,7 @@
 
 import feedparser
 import logging
+import requests
 from collections import Counter
 from datetime import datetime
 from datetime import timedelta
@@ -15,6 +16,38 @@ logger = logging.getLogger(__name__)
 
 RIGHT_ENRICHMENT_TOPIC = "Targeted Right RSS Enrichment"
 LEFT_ENRICHMENT_TOPIC = "Targeted Left RSS Enrichment"
+
+
+# Seconds to connect, then between bytes. feedparser's own fetch has no
+# timeout: on 2026-10-27 one stalled feed held the scheduler's startup run,
+# and the Breaking News poller waiting behind it, for hours.
+FEED_TIMEOUT = (10, 30)
+FEED_ACCEPT = "application/atom+xml,application/rdf+xml,application/rss+xml,application/xml;q=0.9,text/xml;q=0.8,*/*;q=0.1"
+
+
+def parse_feed(feed_url, etag=None, modified=None):
+    """feedparser.parse(feed_url), fetched with a timeout. Like feedparser, a
+    request that fails comes back as an empty bozo result (so fallbacks
+    apply), and a 304 to a conditional GET as status 304 with no entries."""
+    headers = {"User-Agent": feedparser.USER_AGENT, "Accept": FEED_ACCEPT}
+    if etag:
+        headers["If-None-Match"] = etag
+    if modified:
+        headers["If-Modified-Since"] = modified
+    try:
+        response = requests.get(feed_url, headers=headers, timeout=FEED_TIMEOUT)
+    except requests.RequestException as e:
+        return feedparser.FeedParserDict(bozo=1, bozo_exception=e, entries=[], feed=feedparser.FeedParserDict())
+    if response.status_code == 304:
+        return feedparser.FeedParserDict(status=304, bozo=0, entries=[], feed=feedparser.FeedParserDict())
+    # feedparser looks headers up in lower case.
+    feed = feedparser.parse(response.content,
+                            response_headers={k.lower(): v for k, v in response.headers.items()})
+    feed["status"] = response.status_code
+    feed["href"] = response.url
+    feed["etag"] = response.headers.get("ETag")
+    feed["modified"] = response.headers.get("Last-Modified")
+    return feed
 
 
 def _active_feed_urls(bucket):
@@ -155,7 +188,7 @@ def fetch_feed(feed_url, max_entries=30, fallback_url=None):
     2026-10-14 and took its op-eds out of the Op/Ed mix.
     """
     try:
-        feed = feedparser.parse(feed_url)
+        feed = parse_feed(feed_url)
         if fallback_url and _feed_failed(feed):
             logger.warning(
                 f"  [RSS] {feed_url[:60]} failed (HTTP {feed.get('status', '-')}); "
@@ -189,12 +222,12 @@ def read_feed_headlines(feed_url, max_entries=30, fallback_url=None, etag=None, 
     no Google link lookups, nothing stored or scraped. `etag`/`modified`
     make it a conditional GET. Returns (articles, feed_url_read, etag,
     modified); articles is None when the feed answered 304 Not Modified."""
-    feed = feedparser.parse(feed_url, etag=etag, modified=modified)
+    feed = parse_feed(feed_url, etag=etag, modified=modified)
     if feed.get("status") == 304:
         return None, feed_url, etag, modified
     if fallback_url and _feed_failed(feed):
         feed_url = fallback_url
-        feed = feedparser.parse(feed_url)
+        feed = parse_feed(feed_url)
     _, articles = _entries_from_feed(feed, feed_url, max_entries)
     return articles, feed_url, feed.get("etag"), feed.get("modified")
 
