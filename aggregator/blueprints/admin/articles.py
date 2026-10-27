@@ -149,9 +149,8 @@ def list_articles(per_page=25, force_multi=False):
     for story in stories:
         apply_aggregator_filter(story)
         story_bias_totals(story)
-        # Distinct outlets, counting an article with no outlet row by its raw
-        # source name, as the Search page's Sources column does.
-        story.source_count = len({a.outlet.name if a.outlet else a.source for a in story.articles})
+        # The card's outlet count is Story.source_count (models.py), a
+        # read-only property, so nothing is set here.
 
     if force_multi:
         active_nav = "grouped"
