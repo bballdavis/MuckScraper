@@ -1,44 +1,105 @@
 # news_fetcher/nyt_api.py
-"""The New York Times' free Article Search API, for paywalled NYT articles.
+"""The New York Times' free developer APIs, for paywalled NYT articles.
 
 The scraper leaves a paywalled nytimes.com article headline-only (no crawler
 user agent, no headless browser -- see news_fetcher/scraper.py). NYT's own
-developer API gives the abstract and the article's opening paragraph for free,
-under its API terms, so a NYT article gets that much text to summarize instead
-of the one-line RSS description.
+developer APIs give the abstract and the opening paragraph for free, under
+its API terms, so a NYT article gets that much text to summarize instead of
+the one-line RSS description. No NYT API gives the full text.
 
 Needs NYT_API_KEY (a free key from developer.nytimes.com), set on Settings >
 Source API keys or in the environment. Both it and NYT_API_DAILY_LIMIT are
-read on every lookup, so a key saved in the admin takes effect without a
-restart. Without a key, lookup_article() always returns None.
+read on every request, so a key saved in the admin takes effect without a
+restart. Without a key nothing here makes a request.
 
-The key allows 5 requests a minute and 500 a day, shared across every NYT API.
-Calls are spaced NYT_API_MIN_INTERVAL_SECONDS apart and stop for the day at
-NYT_API_DAILY_LIMIT; both counters are per process, which is fine because only
-the scheduler container ingests articles.
+The budget
+----------
+The key allows 5 requests a minute and 500 a day, shared across every NYT
+API. Each request is a row in nyt_api_calls, and a request is made only
+while fewer than NYT_API_DAILY_LIMIT rows fall in the last 24 hours. A
+rolling window stays under the limit whenever NYT starts its day, and the
+ledger is shared by the scheduler and the web container and survives
+restarts. Requests are spaced MIN_INTERVAL_SECONDS apart, and a 429 pauses
+everything for PAUSE_AFTER_429.
+
+What the requests buy, most articles per request first:
+- Times Wire (`wire`): everything NYT has published, newest first, up to
+  WIRE_PAGE_SIZE items a request. The scheduler polls it on WIRE_SCHEDULE,
+  more often in the morning and evening news peaks; one request usually
+  covers every item since the last. Items are kept in nyt_wire_items, the
+  news sections' ones go to the Breaking poller's headlines at once, and
+  pipeline runs ingest them as articles (ingest_wire_items).
+- Article Search (`search`): the lead paragraph, which the wire doesn't
+  have, for ten wire items a request (search_lead_paragraphs).
+- Article Search for one URL (`lookup`): only for a NYT article the wire
+  never listed, such as an older one an admin rescrapes.
+
+RESERVES keeps the cheaper-per-article kinds from starving the others.
 """
 
 import logging
 import os
 import threading
 import time
-from datetime import date
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse, urlunparse
+from zoneinfo import ZoneInfo
 
 import requests
 
 logger = logging.getLogger(__name__)
 
-NYT_API_MIN_INTERVAL_SECONDS = 12.5
 ARTICLE_SEARCH_URL = "https://api.nytimes.com/svc/search/v2/articlesearch.json"
+WIRE_URL = "https://api.nytimes.com/svc/news/v3/content/nyt/all.json"
+SOURCE_NAME = "New York Times"
+
+DAILY_CAP = 500  # the key's own limit; NYT_API_DAILY_LIMIT can only go lower
+WINDOW = timedelta(hours=24)
+MIN_INTERVAL_SECONDS = 12.5
+PAUSE_AFTER_429 = timedelta(minutes=15)
+
+# Calls left in the window that each kind leaves for the others: a wire
+# poll stops with 25 left, so single lookups (an admin rescrape) still work;
+# lead-paragraph searches stop with 150 left, so the wire polls keep going.
+RESERVES = {"lookup": 0, "wire": 25, "search": 150}
+
+# Wire poll interval in minutes by local hour, from WIRE_SCHEDULE's first
+# start hour at or before now: every 3 minutes 6-10am and 4-11pm, every 6
+# minutes midday, every 20 minutes overnight. About 300 requests a day.
+WIRE_TIMEZONE = "America/New_York"
+WIRE_SCHEDULE = [(23, 20), (16, 3), (10, 6), (6, 3), (0, 20)]
+# Past this share of the limit, polls come half as often.
+WIRE_SLOWDOWN_SHARE = 0.75
+# The API caps a request at what it allows (20 in older docs, 500 now);
+# asking for more costs nothing, and _wire_page_size remembers a refusal.
+WIRE_PAGE_SIZE = 500
+WIRE_FALLBACK_PAGE_SIZE = 20
+# After downtime a poll pages back this many requests at most.
+WIRE_MAX_PAGES = 3
+
+# Sections whose items become articles and Breaking headlines. Opinion
+# comes in through the NYT Opinion feed; lifestyle and games sections stay out.
+NEWS_SECTIONS = {
+    "u.s.", "us", "world", "politics", "business", "business day", "technology", "science",
+    "health", "climate", "new york", "n.y. / region", "the upshot", "sports", "weather", "education",
+}
+SKIP_ITEM_TYPES = {"video", "audio", "podcast", "slideshow", "recipe", "crossword"}
+INGEST_MAX_AGE = timedelta(hours=36)
+INGEST_PER_RUN = 120
+SEARCH_BATCH = 10  # one Article Search page
+SEARCH_MAX_BATCHES_PER_RUN = 15
+SEARCH_RETRY_FOR = timedelta(hours=12)
+# When a whole batch comes back without a lead paragraph, the API no longer
+# has the field; stop asking for this long.
+SEARCH_NO_LEAD_PAUSE = timedelta(days=7)
+_NO_LEAD_SETTING = "nyt_api_no_lead_paragraph_at"
 
 # Article Search has filtered on `web_url` for years and on `url` since its
-# 2025 revision. Try them in order and remember the first that finds anything,
-# so a working filter costs one request per article.
+# 2025 revision. Try them in order and remember the first that works.
 _URL_FILTER_FIELDS = ["url", "web_url"]
 
 _lock = threading.Lock()
-_state = {"last_call": 0.0, "day": None, "calls_today": 0, "filter_field": None, "rejected_key": None}
+_state = {"filter_field": None, "rejected_key": None, "wire_page_size": None}
 _cache = {}
 _CACHE_MAX_ENTRIES = 1000
 
@@ -61,11 +122,12 @@ def _api_key():
     return (_setting("NYT_API_KEY") or "").strip()
 
 
-def _daily_limit():
+def daily_limit():
     try:
-        return int(_setting("NYT_API_DAILY_LIMIT", "450") or 450)
+        limit = int(_setting("NYT_API_DAILY_LIMIT", str(DAILY_CAP)) or DAILY_CAP)
     except ValueError:
-        return 450
+        limit = DAILY_CAP
+    return max(0, min(limit, DAILY_CAP))
 
 
 def enabled():
@@ -79,89 +141,475 @@ def _canonical(url):
     return urlunparse((parts.scheme or "https", parts.netloc.lower(), parts.path, "", "", ""))
 
 
-def _take_request_slot(daily_limit):
-    """Wait for the rate limit. Returns False once today's budget is spent."""
-    with _lock:
-        today = date.today()
-        if _state["day"] != today:
-            _state["day"] = today
-            _state["calls_today"] = 0
-        if _state["calls_today"] >= daily_limit:
-            return False
-        wait = _state["last_call"] + NYT_API_MIN_INTERVAL_SECONDS - time.monotonic()
-        if wait > 0:
-            time.sleep(wait)
-        _state["last_call"] = time.monotonic()
-        _state["calls_today"] += 1
-        return True
+def _utcnow():
+    return datetime.utcnow()
+
+
+# The ledger -------------------------------------------------------------
+# Its own connection, so taking a slot never commits the caller's session.
+
+def _ledger():
+    from aggregator.models import NytApiCall, db
+    return db, NytApiCall.__table__
+
+
+def window_usage(now=None):
+    """(calls in the last 24 hours, newest call time, newest 429 time)."""
+    import sqlalchemy as sa
+    db, calls = _ledger()
+    now = now or _utcnow()
+    with db.engine.connect() as conn:
+        used, last = conn.execute(
+            sa.select(sa.func.count(), sa.func.max(calls.c.called_at)).where(calls.c.called_at > now - WINDOW)
+        ).one()
+        last_429 = conn.execute(
+            sa.select(sa.func.max(calls.c.called_at)).where(calls.c.http_status == 429)
+        ).scalar()
+    return used, last, last_429
+
+
+def _take_request_slot(kind):
+    """Wait out the spacing and record a call. Returns its ledger id, or
+    None when this kind's share of the window is spent or NYT said 429."""
+    import sqlalchemy as sa
+    db, calls = _ledger()
+    limit = daily_limit()
+    with _lock, db.engine.begin() as conn:
+        if conn.dialect.name == "postgresql":
+            # Serializes the web and scheduler containers until this commits.
+            conn.execute(sa.text("SELECT pg_advisory_xact_lock(4960513)"))
+        now = _utcnow()
+        used, last = conn.execute(
+            sa.select(sa.func.count(), sa.func.max(calls.c.called_at)).where(calls.c.called_at > now - WINDOW)
+        ).one()
+        last_429 = conn.execute(
+            sa.select(sa.func.max(calls.c.called_at)).where(calls.c.http_status == 429)
+        ).scalar()
+        if used >= limit - RESERVES.get(kind, 0):
+            return None
+        if last_429 and now - last_429 < PAUSE_AFTER_429:
+            return None
+        if last:
+            wait = (last - now).total_seconds() + MIN_INTERVAL_SECONDS
+            if wait > 0:
+                time.sleep(wait)
+        return conn.execute(
+            calls.insert().values(called_at=_utcnow(), kind=kind).returning(calls.c.id)
+        ).scalar()
+
+
+def _record_result(call_id, http_status, items=None):
+    db, calls = _ledger()
+    with db.engine.begin() as conn:
+        conn.execute(calls.update().where(calls.c.id == call_id).values(http_status=http_status, items=items))
 
 
 class _Unavailable(Exception):
     """The API can't answer right now (budget spent, rate limited); not cached."""
 
 
-def _search(field, url, key):
-    """Docs matching `field:("url")`, or None when NYT rejects the field."""
-    daily_limit = _daily_limit()
-    if not _take_request_slot(daily_limit):
-        raise _Unavailable(f"daily budget of {daily_limit} requests spent")
-    response = requests.get(
-        ARTICLE_SEARCH_URL,
-        params={"fq": f'{field}:("{url}")', "api-key": key},
-        timeout=15,
-    )
-    if response.status_code == 429:
+def _get(kind, url, params, key, items_of):
+    """One budgeted request. Returns the JSON body, or None on a 400 (a
+    parameter NYT refuses). `items_of(body)` counts what it returned."""
+    call_id = _take_request_slot(kind)
+    if call_id is None:
+        raise _Unavailable(f"no {kind} requests left in the last 24 hours' budget of {daily_limit()}")
+    # The key rides in the query string, and requests puts the full URL in
+    # its error messages, so errors are re-raised without it.
+    try:
+        response = requests.get(url, params={**params, "api-key": key}, timeout=20)
+    except requests.RequestException as exc:
+        _record_result(call_id, None)
+        raise RuntimeError(f"{type(exc).__name__} from {urlparse(url).path}") from None
+    status = response.status_code
+    if status == 429:
+        _record_result(call_id, status)
         raise _Unavailable("rate limited (429)")
-    if response.status_code in (401, 403):
+    if status in (401, 403):
+        _record_result(call_id, status)
         # A bad or revoked key: stop spending requests on it until a
         # different key is saved.
         _state["rejected_key"] = key
-        raise _Unavailable(f"key rejected (HTTP {response.status_code})")
-    if response.status_code == 400:
+        raise _Unavailable(f"key rejected (HTTP {status})")
+    if status == 400:
+        _record_result(call_id, status)
         return None
-    response.raise_for_status()
-    return (response.json().get("response") or {}).get("docs") or []
+    if status >= 400:
+        _record_result(call_id, status)
+        raise RuntimeError(f"HTTP {status} from {urlparse(url).path}")
+    body = response.json()
+    _record_result(call_id, status, items_of(body))
+    return body
 
 
-def _doc_for(url, key):
+# Article Search ---------------------------------------------------------
+
+def _search_docs(kind, field, urls, key):
+    """Docs whose `field` is one of `urls` (one page, so ten at most), or
+    None when NYT rejects the field."""
+    quoted = " ".join(f'"{u}"' for u in urls)
+    body = _get(kind, ARTICLE_SEARCH_URL, {"fq": f"{field}:({quoted})"}, key,
+                lambda b: len((b.get("response") or {}).get("docs") or []))
+    if body is None:
+        return None
+    return (body.get("response") or {}).get("docs") or []
+
+
+def _docs_for(kind, urls, key):
+    """{canonical url: doc} for whichever of `urls` Article Search has."""
     fields = [_state["filter_field"]] if _state["filter_field"] else _URL_FILTER_FIELDS
+    wanted = set(urls)
     for field in fields:
-        for doc in _search(field, url, key) or []:
-            if _canonical(doc.get("web_url") or doc.get("url") or "") == url:
-                _state["filter_field"] = field
-                return doc
-    return None
+        docs = _search_docs(kind, field, urls, key)
+        if docs is None:
+            continue
+        found = {}
+        for doc in docs:
+            url = _canonical(doc.get("web_url") or doc.get("url") or "")
+            if url in wanted:
+                found[url] = doc
+        if found:
+            _state["filter_field"] = field
+            return found
+    return {}
 
 
-def _paragraphs(doc):
-    """Abstract, then the opening paragraph, without repeats."""
+def _text(value):
+    return " ".join((value or "").split())
+
+
+def _paragraphs(*texts):
+    """The texts in order, without empties or one repeating another."""
     seen = []
-    for key in ("abstract", "lead_paragraph", "snippet"):
-        text = " ".join((doc.get(key) or "").split())
+    for text in map(_text, texts):
         if text and not any(text == other or text in other for other in seen):
             seen.append(text)
     return seen
 
 
+def _doc_paragraphs(doc):
+    return _paragraphs(doc.get("abstract"), doc.get("lead_paragraph"), doc.get("snippet"))
+
+
+# Times Wire -------------------------------------------------------------
+
+def _parse_time(value):
+    try:
+        parsed = datetime.fromisoformat((value or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
+def _wire_image(item):
+    media = [m for m in item.get("multimedia") or [] if isinstance(m, dict) and m.get("url")]
+    if not media:
+        return None
+    return max(media, key=lambda m: (m.get("width") or 0) * (m.get("height") or 0))["url"]
+
+
+def _wire_row(item, now):
+    url = item.get("url") or ""
+    title = _text(item.get("title"))
+    if not is_nyt_url(url) or not title:
+        return None
+    return {
+        "url": _canonical(url)[:2000],
+        "title": title[:500],
+        "abstract": _text(item.get("abstract")) or None,
+        "section": (item.get("section") or "")[:100] or None,
+        "subsection": (item.get("subsection") or "")[:100] or None,
+        "byline": _text(item.get("byline"))[:300] or None,
+        "item_type": (item.get("item_type") or "")[:50] or None,
+        "image_url": (_wire_image(item) or "")[:2000] or None,
+        "published_at": min(_parse_time(item.get("published_date")) or now, now),
+        "first_seen_at": now,
+    }
+
+
+def is_news_item(row):
+    if (row.get("item_type") or "").lower() in SKIP_ITEM_TYPES:
+        return False
+    sections = {(row.get("section") or "").lower(), (row.get("subsection") or "").lower()}
+    return bool(sections & NEWS_SECTIONS)
+
+
+def _store_wire_rows(rows):
+    """Insert rows not stored yet; refresh the title and abstract of the
+    rest. Returns the new rows."""
+    from aggregator.models import NytWireItem, db
+    if not rows:
+        return []
+    by_url = {r["url"]: r for r in rows}
+    existing = {item.url: item for item in NytWireItem.query.filter(NytWireItem.url.in_(list(by_url))).all()}
+    new = []
+    for url, row in by_url.items():
+        item = existing.get(url)
+        if item is None:
+            db.session.add(NytWireItem(**row))
+            new.append(row)
+        else:
+            item.title = row["title"]
+            item.abstract = row["abstract"] or item.abstract
+            item.image_url = row["image_url"] or item.image_url
+    db.session.commit()
+    return new
+
+
+def _wire_page_size():
+    return _state["wire_page_size"] or WIRE_PAGE_SIZE
+
+
+def poll_wire(now=None):
+    """Read the Times Wire from the newest item back to the last one already
+    stored (WIRE_MAX_PAGES requests at most), store the new items, and hand
+    the news sections' ones to the Breaking poller. Returns a metrics dict."""
+    from aggregator import breaking
+    metrics = {"requests": 0, "items": 0, "new": 0, "headlines": 0}
+    if not enabled():
+        return {**metrics, "status": "skipped", "reason": "no key"}
+    key = _api_key()
+    offset = 0
+    new_rows = []
+    for _ in range(WIRE_MAX_PAGES):
+        size = _wire_page_size()
+        try:
+            body = _get("wire", WIRE_URL, {"limit": size, "offset": offset}, key,
+                        lambda b: len(b.get("results") or []))
+        except _Unavailable as exc:
+            logger.info("[NYT API] Wire poll stopped: %s", exc)
+            metrics["status"] = "unavailable"
+            break
+        metrics["requests"] += 1
+        if body is None:
+            if size == WIRE_FALLBACK_PAGE_SIZE:
+                break
+            # NYT refused the page size: use the documented one from now on.
+            _state["wire_page_size"] = WIRE_FALLBACK_PAGE_SIZE
+            continue
+        results = body.get("results") or []
+        stamp = now or _utcnow()
+        rows = [r for r in (_wire_row(item, stamp) for item in results) if r]
+        new = _store_wire_rows(rows)
+        new_rows.extend(new)
+        metrics["items"] += len(results)
+        # Stop at the first page that reaches items we already had, or at
+        # the end of what the wire holds.
+        if len(new) < len(rows) or len(results) < size:
+            break
+        offset += len(results)
+    metrics["new"] = len(new_rows)
+    headlines = [
+        {"title": r["title"], "url": r["url"], "source_name": SOURCE_NAME, "published_at": r["published_at"],
+         "image_url": r["image_url"], "content": r["abstract"]}
+        for r in new_rows if is_news_item(r)
+    ]
+    if headlines:
+        metrics["headlines"] = breaking.store_headlines(headlines, WIRE_URL, now)
+    metrics.setdefault("status", "ok")
+    logger.info("[NYT API] Wire: %(requests)s request(s), %(items)s items, %(new)s new, "
+                "%(headlines)s Breaking headlines", metrics)
+    return metrics
+
+
+def wire_interval(now=None):
+    """Minutes between wire polls at `now` (UTC), by WIRE_SCHEDULE."""
+    local = (now or _utcnow()).replace(tzinfo=timezone.utc).astimezone(ZoneInfo(WIRE_TIMEZONE))
+    return next(minutes for start, minutes in WIRE_SCHEDULE if local.hour >= start)
+
+
+def _last_wire_poll():
+    import sqlalchemy as sa
+    db, calls = _ledger()
+    with db.engine.connect() as conn:
+        return conn.execute(sa.select(sa.func.max(calls.c.called_at)).where(calls.c.kind == "wire")).scalar()
+
+
+def poll_wire_if_due(now=None):
+    """The scheduler calls this every minute; it polls when the schedule's
+    interval has passed. Returns poll_wire's metrics, or None."""
+    if not enabled():
+        return None
+    now = now or _utcnow()
+    interval = wire_interval(now)
+    used, _, _ = window_usage(now)
+    if used >= WIRE_SLOWDOWN_SHARE * daily_limit():
+        interval *= 2
+    last = _last_wire_poll()
+    # A few seconds' slack, so a poll that took a while doesn't skip a beat.
+    if last and now - last < timedelta(minutes=interval, seconds=-30):
+        return None
+    return poll_wire(now)
+
+
+# Pipeline runs ----------------------------------------------------------
+
+def _no_lead_paragraph_since():
+    from aggregator.models import AppSetting
+    setting = AppSetting.query.filter_by(key=_NO_LEAD_SETTING).first()
+    return _parse_time(setting.value) if setting and setting.value else None
+
+
+def _set_no_lead_paragraph(now):
+    from aggregator.models import AppSetting, db
+    setting = AppSetting.query.filter_by(key=_NO_LEAD_SETTING).first() or AppSetting(key=_NO_LEAD_SETTING)
+    setting.value = now.isoformat()
+    db.session.add(setting)
+
+
+def _ingest_candidates(now, limit):
+    from aggregator.models import NytWireItem
+    rows = (
+        NytWireItem.query
+        .filter(NytWireItem.ingested_at.is_(None), NytWireItem.published_at >= now - INGEST_MAX_AGE)
+        .order_by(NytWireItem.published_at.desc())
+        .limit(limit * 3)
+        .all()
+    )
+    return [r for r in rows if is_news_item({"section": r.section, "subsection": r.subsection,
+                                             "item_type": r.item_type})][:limit]
+
+
+def search_lead_paragraphs(now=None, items=None):
+    """Add Article Search's lead paragraph to wire items about to be
+    ingested, ten per request. Returns how many items it searched."""
+    from aggregator.models import db
+    now = now or _utcnow()
+    if not enabled():
+        return 0
+    paused = _no_lead_paragraph_since()
+    if paused and now - paused < SEARCH_NO_LEAD_PAUSE:
+        return 0
+    pending = [i for i in (items if items is not None else _ingest_candidates(now, INGEST_PER_RUN))
+               if i.searched_at is None]
+    key = _api_key()
+    searched = 0
+    for start in range(0, min(len(pending), SEARCH_BATCH * SEARCH_MAX_BATCHES_PER_RUN), SEARCH_BATCH):
+        batch = pending[start:start + SEARCH_BATCH]
+        try:
+            docs = _docs_for("search", [i.url for i in batch], key)
+        except _Unavailable as exc:
+            logger.info("[NYT API] Lead paragraphs stopped: %s", exc)
+            break
+        except Exception as exc:
+            logger.info("[NYT API] Lead paragraph search failed: %s", exc)
+            break
+        for item in batch:
+            doc = docs.get(item.url)
+            if doc:
+                item.lead_paragraph = _text(doc.get("lead_paragraph")) or None
+                item.abstract = item.abstract or _text(doc.get("abstract")) or None
+            # Search indexes an article a while after the wire lists it, so
+            # a new one it doesn't have yet is tried again next run.
+            if doc or now - item.published_at > SEARCH_RETRY_FOR:
+                item.searched_at = now
+        searched += len(batch)
+        if docs and not any(_text(d.get("lead_paragraph")) for d in docs.values()):
+            logger.info("[NYT API] Article Search returned no lead paragraphs; pausing those searches")
+            _set_no_lead_paragraph(now)
+            db.session.commit()
+            break
+        db.session.commit()
+    return searched
+
+
+def ingest_wire_items(now=None):
+    """Store the news sections' wire items from the last INGEST_MAX_AGE as
+    articles, through the normal ingestion (dedup, grouping, bias), after
+    searching their lead paragraphs. Their text comes from the stored item
+    (lookup_article), so this costs no per-article requests."""
+    from aggregator.models import db
+    from news_fetcher.fetch_and_store_articles import store_articles
+    now = now or _utcnow()
+    items = _ingest_candidates(now, INGEST_PER_RUN)
+    if not items:
+        return {"provider": "nyt_wire", "status": "ok", "input_articles": 0, "stored": 0, "searched": 0}
+    searched = search_lead_paragraphs(now, items)
+    articles = [{
+        "title": i.title,
+        "content": i.abstract or "",
+        "url": i.url,
+        "source_name": SOURCE_NAME,
+        "published_at": i.published_at,
+        "image_url": i.image_url,
+        "author": i.byline,
+    } for i in items]
+    metrics = store_articles(articles, "Global News", provider="nyt_wire")
+    for i in items:
+        i.ingested_at = now
+    db.session.commit()
+    metrics.update(status="ok", searched=searched)
+    return metrics
+
+
+# The scraper's fallback -------------------------------------------------
+
+def _stored_paragraphs(url):
+    """The abstract and lead paragraph of a stored wire item, or None."""
+    try:
+        from aggregator.models import NytWireItem
+        item = NytWireItem.query.filter_by(url=url).first()
+    except Exception:
+        return None
+    if item is None:
+        return None
+    return _paragraphs(item.abstract, item.lead_paragraph) or None
+
+
 def lookup_article(url):
-    """The NYT API's abstract and opening paragraph for `url` as a list of
-    paragraphs, or None when the key is unset, the URL isn't NYT's, the daily
-    budget is spent, or the API has no record of it."""
+    """The NYT abstract and opening paragraph for `url` as a list of
+    paragraphs, or None when the key is unset, the URL isn't NYT's, the
+    budget is spent, or NYT has no record of it. A wire item answers without
+    a request; anything else costs one Article Search request."""
     if not enabled() or not is_nyt_url(url):
         return None
     canonical = _canonical(url)
+    stored = _stored_paragraphs(canonical)
+    if stored:
+        return stored
     if canonical in _cache:
         return _cache[canonical]
     try:
-        doc = _doc_for(canonical, _api_key())
+        doc = _docs_for("lookup", [canonical], _api_key()).get(canonical)
     except _Unavailable as exc:
         logger.info("  [NYT API] Skipping %s: %s", canonical[:80], exc)
         return None
     except Exception as exc:
         logger.info("  [NYT API] Lookup failed for %s: %s", canonical[:80], exc)
         return None
-    paragraphs = _paragraphs(doc) if doc else None
+    paragraphs = _doc_paragraphs(doc) if doc else None
     if len(_cache) >= _CACHE_MAX_ENTRIES:
         _cache.clear()
     _cache[canonical] = paragraphs or None
     return _cache[canonical]
+
+
+def usage_summary(now=None):
+    """For Settings > Source API keys: the last 24 hours by kind, and what
+    the wire brought."""
+    import sqlalchemy as sa
+    from aggregator.models import NytWireItem
+    db, calls = _ledger()
+    now = now or _utcnow()
+    since = now - WINDOW
+    with db.engine.connect() as conn:
+        rows = conn.execute(
+            sa.select(calls.c.kind, sa.func.count(), sa.func.coalesce(sa.func.sum(calls.c.items), 0))
+            .where(calls.c.called_at > since).group_by(calls.c.kind)
+        ).all()
+    kinds = {kind: {"requests": n, "items": int(items)} for kind, n, items in rows}
+    used = sum(k["requests"] for k in kinds.values())
+    wire = kinds.get("wire", {"requests": 0, "items": 0})
+    return {
+        "limit": daily_limit(),
+        "used": used,
+        "left": max(0, daily_limit() - used),
+        "kinds": kinds,
+        "items_per_wire_request": round(wire["items"] / wire["requests"]) if wire["requests"] else None,
+        "wire_items": NytWireItem.query.filter(NytWireItem.first_seen_at > since).count(),
+        "ingested": NytWireItem.query.filter(NytWireItem.ingested_at > since).count(),
+        "last_wire_poll": _last_wire_poll(),
+        "interval": wire_interval(now),
+    }
