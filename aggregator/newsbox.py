@@ -95,6 +95,18 @@ def _has(story, depth):
     return True
 
 
+def _stale(story, depth):
+    """The written parts `depth` asks for that sources have arrived since
+    (Story.new_sources_for_*): what a refresh writes again."""
+    parts = _needs(story, depth)
+    stale = set()
+    if "summary" in parts and (story.summary or "").strip() and story.new_sources_for_summary:
+        stale.add("summary")
+    if "analysis" in parts and (story.deep_report or "").strip() and story.new_sources_for_analysis:
+        stale.add("analysis")
+    return stale
+
+
 def has_parts(story, depth):
     """Public name for _has, for aggregator/breaking.py."""
     return _has(story, depth)
@@ -118,10 +130,13 @@ def _covers(have, want):
     return _PARTS.get(want, _PARTS["summary"]) <= _PARTS.get(have, _PARTS["summary"])
 
 
-def queue_story(user_id, story, origin, depth="summary", run_id=None):
+def queue_story(user_id, story, origin, depth="summary", run_id=None, refresh=False):
     """Put `story` in the user's NewsBox and make sure its summary gets
     written. Returns (item, queued): queued is True when a job was added.
-    Caller commits (enqueue commits too, when it runs)."""
+    With `refresh`, parts of `depth` that sources have arrived since are
+    written again (the app's Refresh buttons). Caller commits (enqueue
+    commits too, when it runs)."""
+    stale = sorted(_stale(story, depth)) if refresh else []
     item = NewsBoxItem.query.filter_by(user_id=user_id, story_id=story.id).first()
     if item is None:
         prev_state = prev_depth = None
@@ -133,7 +148,7 @@ def queue_story(user_id, story, origin, depth="summary", run_id=None):
         prev_state, prev_depth = item.state, item.depth
         item.depth = _deeper(item.depth, depth)
     db.session.flush()
-    if _has(story, item.depth):
+    if _has(story, item.depth) and not stale:
         if item.state != "ready":
             item.state, item.ready_at, item.error, item.is_unread = "ready", datetime.utcnow(), None, True
         item.step = None
@@ -141,8 +156,15 @@ def queue_story(user_id, story, origin, depth="summary", run_id=None):
         return item, False
     covered = ((prev_state in UNFINISHED and _covers(prev_depth, item.depth))
                or _job_in_flight(story.id, item.depth, exclude_id=item.id))
-    item.state, item.error, item.step = "pending", None, _next_step(story, item.depth)
+    item.state, item.error = "pending", None
+    item.step = "summary" if "summary" in stale else ("analysis" if stale else _next_step(story, item.depth))
     db.session.flush()
+    if stale:
+        # A job already queued writes only what is missing, so a refresh
+        # always gets its own; the job checks again that the part is stale.
+        jobs.enqueue(JOB_KIND, {"story_id": story.id, "depth": item.depth, "refresh": stale},
+                     priority=JOB_PRIORITY)
+        return item, True
     if covered:
         return item, False
     jobs.enqueue(JOB_KIND, {"story_id": story.id, "depth": item.depth}, priority=JOB_PRIORITY)
@@ -237,25 +259,29 @@ def run_summary_job(payload):
     db.session.commit()
 
     depth = payload.get("depth") if payload.get("depth") in DEPTHS else "summary"
-    if not _has(story, depth):
+    # Checked again here: another refresh may have rewritten it already.
+    stale = _stale(story, depth) & set(payload.get("refresh") or ())
+    if stale or not _has(story, depth):
         from news_fetcher.llm_client import TIER_QUALITY
         from news_fetcher.summarizer import check_ollama_status, generate_deep_report, summarize_story
         if not check_ollama_status(TIER_QUALITY):
             raise RuntimeError("The summarization model is offline.")
         parts = _needs(story, depth)
-        if "summary" in parts and not (story.summary or "").strip():
+        if "summary" in parts and ("summary" in stale or not (story.summary or "").strip()):
             _set_step(story.id, "summary")
             summary = summarize_story(story)
             if not summary:
                 raise RuntimeError("No summary was written.")
             story.summary = summary
+            story.summary_generated_at = datetime.utcnow()  # even when the text came back the same
             db.session.commit()
-        if not _has(story, depth):
+        if "analysis" in stale or not _has(story, depth):
             _set_step(story.id, "analysis")
             report = generate_deep_report(story)
             if not report:
                 raise RuntimeError("No analysis was written.")
             story.deep_report = report
+            story.deep_report_generated_at = datetime.utcnow()
             db.session.commit()
 
     now = datetime.utcnow()

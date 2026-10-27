@@ -27,6 +27,12 @@ def _item_query():
         joinedload(NewsBoxItem.story).options(*_story_load()), joinedload(NewsBoxItem.feed_entry))
 
 
+def _flag(value):
+    if not isinstance(value, bool):
+        raise bad("Must be true or false.")
+    return value
+
+
 def _own_item(story_id):
     item = _item_query().filter_by(story_id=story_id).first()
     if item is None:
@@ -38,14 +44,17 @@ def _own_item(story_id):
 @require_token("summarize")
 def summarize_story(story_id):
     """Send a story to the user's NewsBox: 200 when it is already summarized
-    (ready to read), 202 when a summary has been queued (pending)."""
-    body = json_body(depth=enum(*newsbox.DEPTHS), origin=enum("requested", "saved"))
+    (ready to read), 202 when a summary has been queued (pending). With
+    refresh, a summary or analysis that sources have arrived since is
+    written again (the app's Refresh buttons)."""
+    body = json_body(depth=enum(*newsbox.DEPTHS), origin=enum("requested", "saved"), refresh=_flag)
     story = Story.query.options(*_story_load()).get(story_id)
     if story is None:
         raise ApiError(404, "not_found", "Not found.")
     if NewsBoxItem.query.filter_by(user_id=g.user.id, story_id=story_id).first() is None:
         check_summaries(g.user)
-    item, _ = newsbox.queue_story(g.user.id, story, body["origin"] or "requested", body["depth"] or "summary")
+    item, _ = newsbox.queue_story(g.user.id, story, body["origin"] or "requested", body["depth"] or "summary",
+                                 refresh=bool(body["refresh"]))
     db.session.commit()
     return jsonify(ser.newsbox_item(item)), 200 if item.state == "ready" else 202
 
@@ -71,12 +80,7 @@ def get_newsbox():
 @api.route("/me/newsbox/<int:story_id>", methods=["PATCH"])
 @require_token()
 def update_newsbox_item(story_id):
-    def flag(value):
-        if not isinstance(value, bool):
-            raise bad("Must be true or false.")
-        return value
-
-    body = json_body(is_unread=flag)
+    body = json_body(is_unread=_flag)
     item = _own_item(story_id)
     if body["is_unread"] is not None:
         item.is_unread = body["is_unread"]
