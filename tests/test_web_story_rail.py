@@ -63,6 +63,14 @@ class StoryRailTests(unittest.TestCase):
             page = client.get(f"/story/{story_id}").get_data(as_text=True)
         return re.search(r'<div class="rail-stack".*?<a class="float-back"', page, re.S).group(0)
 
+    def _page(self, story_id):
+        client = self.web.test_client()
+        with client.session_transaction() as session:
+            session["_user_id"] = str(self.ids["reader"])
+            session["_fresh"] = True
+        with mock.patch("aggregator.blueprints.public.check_ollama_status", return_value=True):
+            return client.get(f"/story/{story_id}").get_data(as_text=True)
+
     def test_both_buttons_until_generated(self):
         rail = self._rail(self.ids["bare"])
         self.assertIn('aria-label="Generate executive summary"', rail)
@@ -91,6 +99,17 @@ class StoryRailTests(unittest.TestCase):
         rail = self._rail(self.ids["bare"], user="reader")
         self.assertNotIn("executive summary", rail)
         self.assertIn("read-toggle", rail)
+
+    def test_open_in_app_link(self):
+        # Hidden until the page's script sees iOS (2026-10-27).
+        page = self._page(self.ids["bare"])
+        self.assertIn('<div class="app-handoff" id="app-handoff" hidden>', page)
+        self.assertIn(f'href="muckscroller://story/{self.ids['bare']}"', page)
+
+    def test_no_open_in_app_link_with_the_api_off(self):
+        with mock.patch("aggregator.api.settings.load", return_value={"enabled": False}):
+            page = self._page(self.ids["bare"])
+        self.assertNotIn("muckscroller://", page)
 
 
 if __name__ == "__main__":

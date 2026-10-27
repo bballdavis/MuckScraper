@@ -1,0 +1,40 @@
+{#- "Open in MuckScroller" for a story on an iPhone or iPad: a link to the
+    app's own scheme, muckscroller://story/<id>. Shared links are this site's
+    https address, which only opens the app by itself with universal links
+    (IOS_APP_IDS plus a paid Apple team's entitlement); this gets there
+    without them (Philip, 2026-10-27). Hidden until the script sees iOS;
+    Not now hides it on this browser. Shown only while the API is on. -#}
+{% macro app_handoff(path) -%}
+<div class="app-handoff" id="app-handoff" hidden>
+    <span class="app-handoff-text">Have MuckScroller?</span>
+    <a class="app-handoff-open" href="muckscroller://{{ path }}">Open in app</a>
+    <button type="button" class="app-handoff-close" aria-label="Not now">&times;</button>
+</div>
+<style>
+    .app-handoff { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding: 10px 12px 10px 16px;
+        background: var(--surface); border: 1px solid var(--border); border-radius: 14px; font-size: 15px; }
+    .app-handoff[hidden] { display: none; }
+    .app-handoff-text { flex: 1; color: var(--text-muted); }
+    .app-handoff-open { padding: 7px 14px; border-radius: 999px; background: var(--accent); color: #fff;
+        font-weight: 600; text-decoration: none; white-space: nowrap; }
+    .app-handoff-close { border: 0; background: transparent; color: var(--text-faint); font-size: 22px; line-height: 1;
+        padding: 2px 4px; cursor: pointer; }
+</style>
+<script>
+(function () {
+    var bar = document.getElementById('app-handoff');
+    var KEY = 'muck.appHandoff.dismissed';
+    // iPadOS reports itself as a Mac; touch points tell them apart.
+    var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var dismissed = false;
+    try { dismissed = localStorage.getItem(KEY) === '1'; } catch (e) {}
+    if (!ios || dismissed) return;
+    bar.hidden = false;
+    bar.querySelector('.app-handoff-close').addEventListener('click', function () {
+        bar.hidden = true;
+        try { localStorage.setItem(KEY, '1'); } catch (e) {}
+    });
+})();
+</script>
+{%- endmacro %}
