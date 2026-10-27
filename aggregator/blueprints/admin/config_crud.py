@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import abort, jsonify, render_template, request, redirect, url_for
 from aggregator.permissions import ROLE_ADMIN, role_required
 from sqlalchemy import func
-from aggregator import db
+from aggregator import db, feed_order
 from aggregator.models import AppSetting, Topic, RssFeed, PromptTemplate, PipelineSchedule, ScheduledFetch, IngestionBlock
 from news_fetcher.prompt_registry import validate_prompt_text, invalidate_cache as invalidate_prompt_cache, KNOWN_VARS as PROMPT_KNOWN_VARS
 
@@ -60,11 +60,21 @@ RSS_FEED_BUCKETS = ["general", "right_enrichment", "left_enrichment", "op_ed"]
 @admin.route("/rss-feeds")
 @role_required(ROLE_ADMIN)
 def rss_feeds_page():
+    # Listed in the order they're fetched.
+    order = feed_order.current()
     feeds_by_bucket = {
-        bucket: RssFeed.query.filter_by(bucket=bucket).order_by(RssFeed.url.asc()).all()
+        bucket: feed_order.sort_feeds(RssFeed.query.filter_by(bucket=bucket).all(), order)
         for bucket in RSS_FEED_BUCKETS
     }
-    return render_template("rss_feeds.html", feeds_by_bucket=feeds_by_bucket, buckets=RSS_FEED_BUCKETS)
+    return render_template("rss_feeds.html", feeds_by_bucket=feeds_by_bucket, buckets=RSS_FEED_BUCKETS,
+                           scan_order=order, scan_orders=feed_order.CHOICES, feed_name=feed_order.feed_name)
+
+
+@admin.route("/rss-feeds/order", methods=["POST"])
+@role_required(ROLE_ADMIN)
+def save_rss_scan_order():
+    feed_order.save(request.form.get("order", ""))
+    return redirect(url_for("admin.rss_feeds_page"))
 
 
 @admin.route("/rss-feeds/add", methods=["POST"])

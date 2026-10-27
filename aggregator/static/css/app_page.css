@@ -261,6 +261,14 @@
     .add-grid > .btn { justify-self: stretch; }
 }
 .feed-url { font-size: 13px; word-break: break-all; }
+.feed-name { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 2px; font-size: 14px; }
+/* RSS feeds › Scan order (aggregator/feed_order.py). */
+.scan-order p { margin: 0 0 12px; }
+.scan-order-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.scan-order-choice { display: flex; align-items: flex-start; gap: 8px; flex: 1 1 200px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.scan-order-choice:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.scan-order-choice input { margin-top: 3px; }
+.scan-order-choice > span { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
 .app-page .page-body .data-table input.fallback-input { width: 100%; margin-top: 6px; height: 28px; font-size: 12px; }
 
 /* Phones: a table marked stack-sm drops its header and wraps each row,
