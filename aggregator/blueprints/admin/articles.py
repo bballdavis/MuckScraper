@@ -7,6 +7,7 @@ from sqlalchemy import case, func, or_
 from aggregator import article_lean, db, feed_prefs
 from aggregator.models import Article, Outlet, Story, Topic
 from aggregator.search import SearchUnavailableError, search_story_ids
+from aggregator.sections import in_section
 from aggregator.story_view import apply_aggregator_filter
 from news_fetcher.llm_client import TIER_QUALITY
 
@@ -88,7 +89,7 @@ def list_articles(per_page=25, force_multi=False):
     if active_label:
         topic = Topic.query.filter_by(name=active_label).first()
         if topic:
-            query = query.filter(Story.topics.contains(topic))
+            query = query.filter(in_section(topic))
         else:
             query = query.filter(False)
 
