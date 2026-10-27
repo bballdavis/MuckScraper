@@ -14,24 +14,34 @@ code flow and PKCE S256. Register this exact callback, using your own origin:
 https://reader.example.com/auth/oidc/callback
 ```
 
-Configure the application through environment variables or your deployment's
-secret injection mechanism. Never commit client secrets.
+Then fill in **Settings › Sign-in** (`/admin/settings/sign-in`) as an admin.
+Nothing goes in `.env`: the settings live in the database, and the client
+secret is encrypted like the LLM and source API keys (Fernet, with a key from
+`CONFIG_ENCRYPTION_KEY`, else derived from `SECRET_KEY`). The page shows only
+its last four characters; it never comes back to the browser and is never
+logged. A save reaches every web worker within 15 seconds, without a restart.
 
-```dotenv
-OIDC_ENABLED=true
-OIDC_ISSUER_URL=https://identity.example.com/realms/readers
-OIDC_CLIENT_ID=muckscraper
-OIDC_CLIENT_SECRET=inject-a-client-secret
-OIDC_REDIRECT_URI=https://reader.example.com/auth/oidc/callback
-OIDC_PROVIDER_NAME=Organization sign-in
-OIDC_SCOPES=openid profile email groups
-OIDC_ALLOWED_GROUPS=["news-readers"]
-OIDC_ROLE_MAPPING={"news-operators":"scraper","news-admins":"admin"}
-OIDC_CREATE_USERS=false
-OIDC_ALLOW_PASSWORD_LOGIN=true
-OIDC_AUTO_LOGIN=false
-OIDC_SESSION_LIFETIME_SECONDS=3600
-```
+| Field | What it does |
+| --- | --- |
+| OIDC sign-in on | Adds "Sign in with …" to the sign-in page |
+| Issuer URL | Must match the provider's `iss` exactly |
+| Client ID, Client secret | From the client you registered |
+| Callback URL | Prefilled with this site's `/auth/oidc/callback` |
+| Button label | "Sign in with *label*" |
+| Scopes | Space separated; must include `openid` |
+| Groups claim | Defaults to `groups` |
+| Allowed groups | Comma separated; blank allows any verified identity |
+| Admin groups, Scraper groups | Role mapping, see below |
+| Create accounts on first sign-in | Off by default |
+| Provider only | Hides the password form and refuses password sign-in |
+| Go straight to the provider | Auto-login from the sign-in page |
+| Session length | 1 minute to 24 hours, default 60 minutes |
+
+Turning sign-in on needs the settings page itself opened over HTTPS (directly
+or through a proxy that sends `X-Forwarded-Proto: https`), because it makes
+the session and remember-me cookies HTTPS-only. Settings that are saved as on
+but incomplete, or a secret that no longer decrypts after a key change, leave
+OIDC unavailable and password sign-in working.
 
 Apply database migrations before enabling OIDC. The identity migration only
 creates a new table; it does not reset users, change passwords, or copy news data.
@@ -41,7 +51,7 @@ separately and register the same external URL at the provider.
 
 The provider must return a signed ID token with a verified email address.
 Group restrictions and role mappings use a string array in the signed token;
-the claim name defaults to `groups`, configurable with `OIDC_GROUPS_CLAIM`.
+the claim name defaults to `groups`, configurable as **Groups claim**.
 Claims available only from a separate UserInfo endpoint are not used.
 
 ## Accounts and linking
@@ -52,7 +62,9 @@ Email and username collisions refuse sign-in rather than overwriting an account.
 Existing email length and uniqueness constraints remain in force.
 
 Automatic account creation is off. An administrator can explicitly bind an
-independently verified provider subject to an existing active account:
+independently verified provider subject to an existing active account, under
+**Linked accounts** on Settings › Sign-in (which also unlinks one) or from the
+shell:
 
 ```sh
 flask --app aggregator.app link-oidc-identity --username existing-reader --subject verified-subject
@@ -64,18 +76,19 @@ Repeated application to the same account is harmless; replacing a binding with
 another account is refused. The command never looks up a subject by email and
 does not change the account's password or role.
 
-Set `OIDC_CREATE_USERS=true` to allow verified identities to create accounts.
+Turn on **Create accounts on first sign-in** to allow verified identities to create accounts.
 Generated usernames do not use the provider's display name. New accounts have
 no usable local password and start as Readers unless explicit role mapping
 grants a higher role. Disabled local accounts cannot be reactivated by OIDC.
 
 ## Access and roles
 
-`OIDC_ALLOWED_GROUPS=[]` accepts any otherwise valid identity from the configured
-issuer. A nonempty list requires membership of at least one named group.
-With `OIDC_ROLE_MAPPING={}`, existing roles remain locally managed.
+Blank **Allowed groups** accepts any otherwise valid identity from the
+configured issuer. A list requires membership of at least one named group.
+With both **Admin groups** and **Scraper groups** blank, existing roles remain
+locally managed (Settings › Users).
 
-A nonempty role mapping is authoritative at each successful OIDC sign-in. The
+A role mapping is authoritative at each successful OIDC sign-in. The
 highest matching role wins; an identity with no mapped role becomes a Reader.
 This also applies to explicitly linked local accounts. Admin mappings grant
 full administrative access, so use narrowly controlled groups. A change that
@@ -83,12 +96,15 @@ would demote the final active administrator refuses sign-in and leaves the
 account unchanged. Retain and test an administrator recovery route before
 disabling local login.
 
-`OIDC_ALLOW_PASSWORD_LOGIN=false` removes the password form and refuses password
-sign-in POSTs. It does not invalidate sessions issued before the setting changed;
+**Provider only** removes the password form and refuses password sign-in
+POSTs. It can only be turned on by an admin who signed in with the provider,
+so a broken provider setup can't lock every admin out. If the provider later
+breaks, `flask --app aggregator.app disable-oidc` on the server turns OIDC off
+and password sign-in back on. It does not invalidate sessions issued before the setting changed;
 plan a session-key rotation separately if existing local sessions must be revoked.
 `PUBLIC_READ_ACCESS` remains an independent, explicit setting.
 
-Set `OIDC_AUTO_LOGIN=true` to send signed-out visitors from the login page
+Turn on **Go straight to the provider** to send signed-out visitors from the login page
 directly to the configured provider. The default is false. Public reading pages
 remain public when enabled separately. The original local return path is
 preserved through the existing OIDC flow.
@@ -127,8 +143,11 @@ is not implemented.
 ## Verification
 
 ```sh
-PYTHONPATH=. pytest -q tests/test_oidc.py
+API_TEST_DATABASE_URL=postgresql://... PYTHONPATH=. pytest -q tests/test_oidc.py
 ```
+
+The tests use the scratch Postgres database the API tests use (its tables are
+dropped and recreated) and save settings the way the settings page does.
 
 Authentication tests exercise the real Authlib verifier with signed fixture
 tokens, SQL identity bindings, Flask sessions and CSRF. Provider HTTP boundaries

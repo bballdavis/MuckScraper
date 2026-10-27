@@ -106,7 +106,7 @@ muckscraper/
 │   └── templates/                  # Jinja templates
 ├── docker_restart_proxy/           # Small service that lets the admin UI restart containers (and the MCP server read logs)
 ├── mcp_server/                     # Optional read-only MCP server for AI assistants (docs/MCP.md)
-├── docs/                           # Longer guides (MCP.md, API.md)
+├── docs/                           # Longer guides (MCP.md, API.md, OIDC.md)
 ├── migrations/                     # Alembic migration files
 ├── news_fetcher/
 │   ├── fetch_and_store_articles/   # Ingestion, grouping, and edition publishing (package)

@@ -18,6 +18,7 @@ SETTINGS_SECTIONS = [
         ("overview", "Overview", "admin.tools_page", None, False),
         ("users", "Users", "admin.users_page", User, False),
         ("api", "API", "admin.api_page", None, True),
+        ("signin", "Sign-in", "admin.sign_in_page", None, True),
     ]),
     ("Sources", [
         ("topics", "Topics", "admin.topics_page", Topic, False),

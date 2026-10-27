@@ -1,10 +1,11 @@
 """Optional OpenID Connect login using the existing account and permission model.
 
-Only trusted server configuration selects the issuer and role policy. Identity
-is an exact issuer/subject binding, never a matching email or forwarded header.
+Only trusted server configuration selects the issuer and role policy: an
+admin sets it on Settings › Sign-in (aggregator/oidc_settings.py), not the
+environment. Identity is an exact issuer/subject binding, never a matching
+email or forwarded header.
 """
 import hashlib
-import json
 import secrets
 import time
 from datetime import datetime
@@ -14,7 +15,7 @@ import click
 from flask import abort, current_app, redirect, request, session, url_for
 from flask_login import current_user, login_user, logout_user
 
-from aggregator import db
+from aggregator import db, oidc_settings
 from aggregator.accounts import email_error, other_active_admins
 from aggregator.models import OIDCIdentity, ROLE_ADMIN, ROLE_READER, ROLES, User
 
@@ -23,55 +24,34 @@ class OIDCRefused(ValueError):
     """A fixed refusal class; exception details must never reach logs or pages."""
 
 
-def _switch(environ, name, default):
-    value = environ.get(name, str(default)).lower().strip()
-    if value not in {"true", "false", "1", "0"}:
-        raise ValueError(f"{name} must be true or false")
-    return value in {"true", "1"}
+def current_config(fresh=False):
+    """The saved configuration (upper-case keys), or None when OIDC is off."""
+    return oidc_settings.runtime(fresh=fresh)
 
 
-def _https_url(value, name):
-    parsed = urlsplit(value)
-    if (parsed.scheme != "https" or not parsed.hostname or parsed.username or
-            parsed.password or parsed.query or parsed.fragment):
-        raise ValueError(f"{name} must be an HTTPS URL without credentials, query or fragment")
-    return value
+def remote(config):
+    """The Authlib client for `config`, rebuilt when the provider settings
+    change so a save takes effect without a restart."""
+    app = current_app._get_current_object()
+    fingerprint = hashlib.sha256("\0".join(
+        config[name] for name in ("ISSUER_URL", "CLIENT_ID", "CLIENT_SECRET", "SCOPES")).encode()).hexdigest()
+    if app.extensions.get("muckscraper_oidc_fingerprint") != fingerprint:
+        from authlib.integrations.flask_client import OAuth
+
+        oauth = OAuth(app)
+        app.extensions["muckscraper_oidc"] = oauth.register(
+            "muckscraper", client_id=config["CLIENT_ID"], client_secret=config["CLIENT_SECRET"],
+            server_metadata_url=config["ISSUER_URL"].rstrip("/") + "/.well-known/openid-configuration",
+            client_kwargs={"scope": config["SCOPES"], "code_challenge_method": "S256", "timeout": 15},
+            claims_options={"iss": {"essential": True, "value": config["ISSUER_URL"]}},
+        )
+        app.extensions["muckscraper_oidc_fingerprint"] = fingerprint
+    return app.extensions["muckscraper_oidc"]
 
 
-def configuration(environ):
-    if not _switch(environ, "OIDC_ENABLED", False):
-        return None
-    config = {}
-    for name in ("ISSUER_URL", "CLIENT_ID", "CLIENT_SECRET", "REDIRECT_URI"):
-        value = environ.get("OIDC_" + name, "")
-        if not value.strip():
-            raise ValueError(f"OIDC_{name} is required when OIDC is enabled")
-        config[name] = value
-    for name in ("ISSUER_URL", "REDIRECT_URI"):
-        _https_url(config[name], "OIDC_" + name)
-    config["SCOPES"] = environ.get("OIDC_SCOPES", "openid profile email groups")
-    if "openid" not in config["SCOPES"].split():
-        raise ValueError("OIDC_SCOPES must include openid")
-    config["PROVIDER_NAME"] = environ.get("OIDC_PROVIDER_NAME", "OpenID Connect")
-    config["GROUPS_CLAIM"] = environ.get("OIDC_GROUPS_CLAIM", "groups")
-    if not config["GROUPS_CLAIM"] or not 1 <= len(config["PROVIDER_NAME"]) <= 100:
-        raise ValueError("Invalid OIDC claim name or provider label")
-    config["ALLOWED_GROUPS"] = json.loads(environ.get("OIDC_ALLOWED_GROUPS", "[]"))
-    if (not isinstance(config["ALLOWED_GROUPS"], list) or
-            any(not isinstance(g, str) or not g for g in config["ALLOWED_GROUPS"])):
-        raise ValueError("OIDC_ALLOWED_GROUPS must be a JSON array of group names")
-    config["ROLE_MAPPING"] = json.loads(environ.get("OIDC_ROLE_MAPPING") or "{}")
-    if (not isinstance(config["ROLE_MAPPING"], dict) or any(
-            not isinstance(g, str) or not g or role not in ROLES
-            for g, role in config["ROLE_MAPPING"].items())):
-        raise ValueError("OIDC_ROLE_MAPPING must map group names to supported roles")
-    config["CREATE_USERS"] = _switch(environ, "OIDC_CREATE_USERS", False)
-    config["ALLOW_PASSWORD_LOGIN"] = _switch(environ, "OIDC_ALLOW_PASSWORD_LOGIN", True)
-    config["AUTO_LOGIN"] = _switch(environ, "OIDC_AUTO_LOGIN", False)
-    config["SESSION_LIFETIME_SECONDS"] = int(environ.get("OIDC_SESSION_LIFETIME_SECONDS", "3600"))
-    if not 60 <= config["SESSION_LIFETIME_SECONDS"] <= 86400:
-        raise ValueError("OIDC_SESSION_LIFETIME_SECONDS must be between 60 and 86400")
-    return config
+_COOKIE_FLAGS = dict(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_HTTPONLY=True,
+                     SESSION_COOKIE_SAMESITE="Lax", REMEMBER_COOKIE_SECURE=True,
+                     REMEMBER_COOKIE_HTTPONLY=True, REMEMBER_COOKIE_SAMESITE="Lax")
 
 
 def identity_key(issuer, subject):
@@ -146,9 +126,23 @@ def resolve_user(claims, config):
     return user, key
 
 
-def init_app(app, environ):
-    config = configuration(environ)
-    app.config["OIDC"] = config
+def bind(user, subject, config):
+    """Bind `subject` at the configured issuer to `user`. Returns "created"
+    or "exists"; raises OIDCRefused for an invalid subject or one already
+    bound elsewhere. Never replaces a binding. Caller commits."""
+    key = identity_key(config["ISSUER_URL"], subject)
+    binding = OIDCIdentity.query.filter_by(identity_key=key).first()
+    if binding:
+        if binding.user_id != user.id or binding.issuer != config["ISSUER_URL"] or binding.subject != subject:
+            raise OIDCRefused()
+        return "exists"
+    db.session.add(OIDCIdentity(user=user, identity_key=key, issuer=config["ISSUER_URL"], subject=subject))
+    return "created"
+
+
+def init_app(app):
+    plain_cookies = {name: app.config.get(name) for name in _COOKIE_FLAGS}
+
     @app.context_processor
     def account_presentation():
         if not current_user.is_authenticated:
@@ -156,23 +150,17 @@ def init_app(app, environ):
         if session.get("auth_method") == "oidc":
             return {"account_display_name": session.get("oidc_display_name") or current_user.email or "Account"}
         return {"account_display_name": current_user.username}
-    if config:
-        from authlib.integrations.flask_client import OAuth
 
-        oauth = OAuth(app)
-        app.extensions["muckscraper_oidc"] = oauth.register(
-            "muckscraper", client_id=config["CLIENT_ID"], client_secret=config["CLIENT_SECRET"],
-            server_metadata_url=config["ISSUER_URL"].rstrip("/") + "/.well-known/openid-configuration",
-            client_kwargs={"scope": config["SCOPES"], "code_challenge_method": "S256", "timeout": 15},
-            claims_options={"iss": {"essential": True, "value": config["ISSUER_URL"]}},
-        )
-        app.config.update(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_HTTPONLY=True,
-                          SESSION_COOKIE_SAMESITE="Lax", REMEMBER_COOKIE_SECURE=True,
-                          REMEMBER_COOKIE_HTTPONLY=True, REMEMBER_COOKIE_SAMESITE="Lax")
+    @app.before_request
+    def oidc_cookie_policy():
+        # Turned on, OIDC needs HTTPS (its callback is HTTPS), so cookies are
+        # Secure and SameSite=Lax; turned off they are back to the app's own.
+        app.config.update(_COOKIE_FLAGS if current_config() else plain_cookies)
 
     @app.before_request
     def expire_oidc_session():
         if session.get("auth_method") == "oidc":
+            config = current_config()
             key = session.get("oidc_identity")
             if (not config or session.get("oidc_expires_at", 0) <= time.time()
                     or not current_user.is_authenticated or not OIDCIdentity.query.filter_by(
@@ -192,48 +180,58 @@ def init_app(app, environ):
     @click.option("--subject", required=True)
     @click.option("--apply", "apply_binding", is_flag=True)
     def link_identity(username, subject, apply_binding):
-        """Bind a verified provider subject to an existing account; dry-run by default."""
+        """Bind a verified provider subject to an existing account; dry-run by default.
+        Settings › Sign-in does the same from the browser."""
+        config = current_config(fresh=True)
         if not config:
             raise click.ClickException("OIDC is not enabled")
         try:
-            key = identity_key(config["ISSUER_URL"], subject)
+            identity_key(config["ISSUER_URL"], subject)
         except OIDCRefused:
             raise click.ClickException("Invalid subject") from None
         user = User.query.filter_by(username=username, is_active=True).first()
         if not user:
             raise click.ClickException("Active account not found")
-        binding = OIDCIdentity.query.filter_by(identity_key=key).first()
-        if binding and (binding.user_id != user.id or binding.issuer != config["ISSUER_URL"]
-                        or binding.subject != subject):
-            raise click.ClickException("Identity already bound; replacement refused")
-        if binding:
+        try:
+            result = bind(user, subject, config)
+        except OIDCRefused:
+            raise click.ClickException("Identity already bound; replacement refused") from None
+        if result == "exists":
             click.echo("Binding already exists; no change.")
         elif apply_binding:
-            db.session.add(OIDCIdentity(user=user, identity_key=key,
-                                        issuer=config["ISSUER_URL"], subject=subject))
             db.session.commit()
             click.echo("Binding created.")
         else:
+            db.session.rollback()
             click.echo("Dry-run: binding can be created; no change.")
+
+    @app.cli.command("disable-oidc")
+    def disable_oidc():
+        """Recovery: turn OIDC sign-in off so password sign-in works again."""
+        values = oidc_settings.load()
+        values["enabled"] = False
+        oidc_settings.save(values, "cli")
+        db.session.commit()
+        click.echo("OIDC sign-in is off; password sign-in is available.")
 
 
 def start():
-    config = current_app.config.get("OIDC")
+    config = current_config()
     if not config:
         abort(404)
-    remote = current_app.extensions["muckscraper_oidc"]
+    client = remote(config)
     # Only one attempt is supported. Discard its old Authlib state too, or
     # abandoned redirects eventually overflow the signed session cookie.
-    prefix = f"_state_{remote.name}_"
+    prefix = f"_state_{client.name}_"
     for key in list(session):
         if key.startswith(prefix):
-            remote.framework.clear_state_data(session, key[len(prefix):])
+            client.framework.clear_state_data(session, key[len(prefix):])
     state = secrets.token_urlsafe(32)
     # A failed or cancelled attempt must leave a usable manual login page.
     session["oidc_auto_login_paused"] = True
     session["oidc_pending"] = {"state": state, "next": safe_next(request.args.get("next"))}
     try:
-        return remote.authorize_redirect(
+        return client.authorize_redirect(
             config["REDIRECT_URI"], state=state)
     except Exception as error:
         current_app.logger.warning("OIDC start refused (%s)", type(error).__name__)
@@ -241,7 +239,7 @@ def start():
 
 
 def callback():
-    config = current_app.config.get("OIDC")
+    config = current_config()
     if not config:
         abort(404)
     pending = session.get("oidc_pending", {})
@@ -250,7 +248,7 @@ def callback():
         abort(403)
     session.pop("oidc_pending", None)
     try:
-        token = current_app.extensions["muckscraper_oidc"].authorize_access_token()
+        token = remote(config).authorize_access_token()
         if not token.get("id_token") or not token.get("userinfo"):
             raise OIDCRefused()
         user, key = resolve_user(token["userinfo"], config)

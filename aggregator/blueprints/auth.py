@@ -1,7 +1,7 @@
 from datetime import datetime
 from urllib.parse import urlparse
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from aggregator import appearance_prefs, db, feed_prefs, reading_prefs
@@ -16,7 +16,8 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for("public.headlines_feed"))
 
-    oidc = current_app.config.get("OIDC")
+    from aggregator.oidc import current_config
+    oidc = current_config()
     if (request.method == "GET" and oidc and oidc["AUTO_LOGIN"]
             and request.args.get("manual") != "1"
             and not session.get("oidc_auto_login_paused")):

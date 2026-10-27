@@ -1,8 +1,11 @@
 """Real signed-token verification, SQL identity bindings and browser sessions.
 
 Only provider HTTP boundaries are mocked. No live identity, key or network is used.
+Settings are saved the way Settings › Sign-in saves them, not read from the
+environment. Needs the scratch Postgres database named by API_TEST_DATABASE_URL,
+like test_api (its tables are dropped and recreated); run with pytest.
 """
-import json
+import os
 import re
 import socket
 import time
@@ -13,31 +16,63 @@ import pytest
 from joserfc import jwt
 from joserfc.jwk import RSAKey
 
-from aggregator import create_app, db
-from aggregator.models import OIDCIdentity, User
-from aggregator.oidc import configuration, identity_key
+from aggregator import create_app, db, oidc, oidc_settings
+from aggregator.models import AppSetting, ConfigSetting, OIDCIdentity, User
+from aggregator.oidc import identity_key
 
 
+TEST_DB = os.environ.get("API_TEST_DATABASE_URL", "")
 ENV = {
     "SECRET_KEY": "fixture-only-oidc-session-secret",
-    "DATABASE_URL": "sqlite://",
-    "OIDC_ENABLED": "true",
+    "DATABASE_URL": TEST_DB,
     "OIDC_ISSUER_URL": "https://issuer.example/tenant",
-    "OIDC_CLIENT_ID": "fixture-client",
-    "OIDC_CLIENT_SECRET": "SECRET_SENTINEL",
-    "OIDC_REDIRECT_URI": "https://reader.example/auth/oidc/callback",
-    "OIDC_ALLOWED_GROUPS": '["readers"]',
-    "OIDC_CREATE_USERS": "true",
 }
+# Saved the way Settings › Sign-in saves them (aggregator/oidc_settings.py).
+SETTINGS = {
+    "enabled": True,
+    "issuer_url": ENV["OIDC_ISSUER_URL"],
+    "client_id": "fixture-client",
+    "redirect_uri": "https://reader.example/auth/oidc/callback",
+    "allowed_groups": ["readers"],
+    "create_users": True,
+}
+CLIENT_SECRET = "SECRET_SENTINEL"
+
+
+def configure(app, secret=None, **changes):
+    """Change the saved OIDC settings, as a save on Settings › Sign-in does."""
+    with app.app_context():
+        values = oidc_settings.load()
+        values.update(changes)
+        oidc_settings.save(values, "test")
+        if secret is not None:
+            oidc_settings.save_secret(secret, "test")
+        db.session.commit()
+
+
+def fresh_app(monkeypatch):
+    """The web app on an empty copy of the full schema, OIDC off."""
+    if not TEST_DB:
+        pytest.skip("set API_TEST_DATABASE_URL to run the OIDC tests")
+    for name in ("SECRET_KEY", "DATABASE_URL"):
+        monkeypatch.setenv(name, ENV[name])
+    from news_fetcher import llm_client
+    monkeypatch.setattr(llm_client, "EMBEDDING_PROVIDER", "ollama")
+    oidc_settings.reset()
+    application = create_app()
+    application.config.update(TESTING=True, SERVER_NAME="reader.example")
+    with application.app_context():
+        db.drop_all()
+        db.create_all()
+    return application
 
 
 @pytest.fixture
 def app(monkeypatch):
-    for name in list(__import__("os").environ):
-        if name.startswith("OIDC_"):
-            monkeypatch.delenv(name)
-    for name, value in ENV.items():
-        monkeypatch.setenv(name, value)
+    if not TEST_DB:
+        pytest.skip("set API_TEST_DATABASE_URL to run the OIDC tests")
+    for name in ("SECRET_KEY", "DATABASE_URL"):
+        monkeypatch.setenv(name, ENV[name])
     # The embedding identity admission is separate from authentication.
     from news_fetcher import llm_client
     monkeypatch.setattr(llm_client, "EMBEDDING_PROVIDER", "ollama")
@@ -46,17 +81,17 @@ def app(monkeypatch):
     application = create_app()
     application.config.update(TESTING=True, SERVER_NAME="reader.example")
     with application.app_context():
-        # These are actual app models, not a mock identity store. Other news tables
-        # are unnecessary for the authentication lifecycle.
-        User.__table__.create(db.engine)
-        OIDCIdentity.__table__.create(db.engine)
+        # These are actual app models, not a mock identity store.
+        db.drop_all()
+        db.create_all()
+    configure(application, secret=CLIENT_SECRET, **SETTINGS)
     # Do not keep an app context across browser requests: Flask's g caches
     # user/CSRF state for that context, unlike separate production requests.
     yield application
     with application.app_context():
         db.session.remove()
-        OIDCIdentity.__table__.drop(db.engine)
-        User.__table__.drop(db.engine)
+        db.engine.dispose()
+    oidc_settings.reset()
     socket.socket.connect.assert_not_called()
     socket.getaddrinfo.assert_not_called()
 
@@ -65,7 +100,8 @@ def app(monkeypatch):
 def flow(app, monkeypatch):
     key = RSAKey.generate_key(2048)
     key.ensure_kid()
-    remote = app.extensions["muckscraper_oidc"]
+    with app.app_context():
+        remote = oidc.remote(oidc.current_config(fresh=True))
     metadata = {
         "issuer": ENV["OIDC_ISSUER_URL"],
         "authorization_endpoint": "https://issuer.example/authorize",
@@ -130,24 +166,25 @@ def test_real_pkce_signed_token_identity_and_session(app, flow):
 
 def test_auto_login_is_opt_in_and_manual_page_remains_available(app, flow):
     client, _, _ = flow
-    assert app.config["OIDC"]["AUTO_LOGIN"] is False
+    with app.app_context():
+        assert oidc_settings.load()["auto_login"] is False
     assert client.get("/auth/login", base_url="https://reader.example").status_code == 200
-    app.config["OIDC"]["AUTO_LOGIN"] = True
+    configure(app, auto_login=True)
     response = client.get("/auth/login?next=/auth/profile", base_url="https://reader.example")
     assert response.location == "/auth/oidc/login?next=/auth/profile"
     assert response.headers["Cache-Control"] == "no-store"
-    app.config["OIDC"]["ALLOW_PASSWORD_LOGIN"] = False
+    configure(app, allow_password_login=False)
     response = client.get("/auth/login?manual=1", base_url="https://reader.example")
     assert response.status_code == 200
     assert b'name="password"' not in response.data
 
 
 @pytest.mark.parametrize("next_path, expected", [
-    ("/auth/profile", "/auth/profile"), ("https://outside.example", "/headlines"),
+    ("/auth/profile", "/auth/profile"), ("https://outside.example", "/"),
 ])
 def test_auto_login_uses_verified_flow_and_safe_return(app, flow, next_path, expected):
     client, _, finish = flow
-    app.config["OIDC"]["AUTO_LOGIN"] = True
+    configure(app, auto_login=True)
     response = client.get("/auth/login", query_string={"next": next_path}, base_url="https://reader.example")
     provider = client.get(response.location, base_url="https://reader.example")
     params = parse_qs(urlsplit(provider.location).query)
@@ -159,7 +196,7 @@ def test_auto_login_uses_verified_flow_and_safe_return(app, flow, next_path, exp
 
 def test_failed_auto_login_does_not_loop(app, flow):
     client, start, finish = flow
-    app.config["OIDC"]["AUTO_LOGIN"] = True
+    configure(app, auto_login=True)
     assert finish(start(), email_verified=False)[0].status_code == 403
     assert client.get("/auth/login", base_url="https://reader.example").status_code == 200
     # The normal sign-in button can retry after a failure.
@@ -168,7 +205,7 @@ def test_failed_auto_login_does_not_loop(app, flow):
 
 def test_auto_login_logout_stays_signed_out(app, flow):
     client, start, finish = flow
-    app.config["OIDC"]["AUTO_LOGIN"] = True
+    configure(app, auto_login=True)
     finish(start())
     response = client.get("/auth/profile", base_url="https://reader.example")
     csrf = re.search(r'name="csrf_token" value="([^"]+)"', response.get_data(as_text=True)).group(1)
@@ -259,7 +296,7 @@ def test_state_is_browser_bound_and_single_use(app, flow):
 @pytest.mark.parametrize("target", ["https://attacker.example", "//attacker.example", "/\\attacker.example", "javascript:alert(1)", "/\n/attacker.example"])
 def test_only_local_return_paths_are_allowed(app, flow, target):
     _, start, finish = flow
-    assert finish(start(target))[0].location == "/headlines"
+    assert finish(start(target))[0].location == "/"
 
 
 def test_email_collision_is_not_account_linking(app, flow):
@@ -276,7 +313,7 @@ def test_email_collision_is_not_account_linking(app, flow):
 
 
 def test_automatic_account_creation_requires_explicit_opt_in(app, flow):
-    app.config["OIDC"]["CREATE_USERS"] = False
+    configure(app, create_users=False)
     _, start, finish = flow
     assert finish(start())[0].status_code == 403
     with app.app_context():
@@ -338,7 +375,7 @@ def test_disabled_account_not_reactivated(app, flow):
 
 def test_role_mapping_is_opt_in_and_uses_existing_permission_model(app, flow):
     client, start, finish = flow
-    app.config["OIDC"]["ROLE_MAPPING"] = {"operators": "scraper", "admins": "admin"}
+    configure(app, role_mapping={"operators": "scraper", "admins": "admin"})
     finish(start(), groups=["readers", "operators"])
     with app.app_context():
         user = User.query.one()
@@ -356,7 +393,7 @@ def test_role_mapping_is_opt_in_and_uses_existing_permission_model(app, flow):
 
 def test_password_forms_and_profile_do_not_bypass_oidc_only(app, flow):
     client, start, finish = flow
-    app.config["OIDC"]["ALLOW_PASSWORD_LOGIN"] = False
+    configure(app, allow_password_login=False)
     response = client.get("/auth/login", base_url="https://reader.example")
     assert b"OpenID Connect" in response.data and b'name="password"' not in response.data
     assert b"SECRET_SENTINEL" not in response.data
@@ -428,7 +465,7 @@ def test_disabled_default_does_not_require_identity_table(monkeypatch):
     html = client.get("/auth/login").get_data(as_text=True)
     token = re.search(r'name="csrf_token" value="([^"]+)"', html).group(1)
     assert client.post("/auth/login?next=javascript:alert(1)", data={
-        "username": "local", "password": "local-password", "csrf_token": token}).location == "/headlines"
+        "username": "local", "password": "local-password", "csrf_token": token}).location == "/"
     with app.app_context():
         db.session.remove()
         User.__table__.drop(db.engine)
@@ -460,18 +497,29 @@ def test_oidc_disabled_legacy_remember_me_logout_clears_cookie(monkeypatch):
         User.__table__.drop(db.engine)
 
 
-@pytest.mark.parametrize("update", [
-    {"OIDC_CLIENT_SECRET": ""}, {"OIDC_ISSUER_URL": "http://issuer.example"},
-    {"OIDC_REDIRECT_URI": "https://user@reader.example/callback"},
-    {"OIDC_SCOPES": "email"}, {"OIDC_ALLOWED_GROUPS": '"readers"'},
-    {"OIDC_ROLE_MAPPING": '{"readers":"owner"}'}, {"OIDC_CREATE_USERS": "yes"},
-    {"OIDC_SESSION_LIFETIME_SECONDS": "0"},
-    {"OIDC_AUTO_LOGIN": "yes"},
+@pytest.mark.parametrize("update, has_secret", [
+    ({}, False), ({"issuer_url": "http://issuer.example"}, True),
+    ({"redirect_uri": "https://user@reader.example/callback"}, True),
+    ({"issuer_url": ""}, True), ({"client_id": ""}, True),
+    ({"scopes": "email"}, True), ({"groups_claim": "has space"}, True),
+    ({"session_lifetime_seconds": 0}, True), ({"provider_name": ""}, True),
 ])
-def test_configuration_errors_refuse_without_values(update):
-    with pytest.raises(ValueError) as error:
-        configuration({**ENV, **update})
-    assert "SECRET_SENTINEL" not in str(error.value)
+def test_settings_errors_refuse_without_values(update, has_secret):
+    values = {**oidc_settings.DEFAULTS, **SETTINGS, **update}
+    problems = oidc_settings.errors(values, has_secret)
+    assert problems
+    assert CLIENT_SECRET not in " ".join(problems)
+
+
+def test_settings_turned_off_save_as_a_draft():
+    assert oidc_settings.errors({**oidc_settings.DEFAULTS, "issuer_url": "https://issuer.example"}, False) == []
+
+
+def test_clean_drops_malformed_saved_values():
+    cleaned = oidc_settings.clean({"enabled": "yes", "allowed_groups": "readers", "role_mapping": {"ops": "owner"},
+                                   "session_lifetime_seconds": 5, "auto_login": True})
+    assert cleaned["enabled"] is False and cleaned["allowed_groups"] == [] and cleaned["role_mapping"] == {}
+    assert cleaned["session_lifetime_seconds"] == 3600 and cleaned["auto_login"] is True
 
 
 def test_repeated_abandoned_logins_keep_one_pending_state(app, flow):
@@ -513,6 +561,8 @@ def test_identity_migration_preserves_existing_accounts(app):
         db.session.add(user)
         db.session.commit()
         user_id = user.id
+        # Postgres: the session's read lock on users would block the DROP.
+        db.session.remove()
         OIDCIdentity.__table__.drop(db.engine)
         path = Path(__file__).resolve().parents[1] / 'migrations/versions/a958c3be014a_add_oidc_identities.py'
         spec = importlib.util.spec_from_file_location('identity_migration', path)
@@ -550,20 +600,6 @@ def test_invalid_callback_state_preserves_the_pending_attempt(app, flow, invalid
     assert finish(params)[0].location == '/auth/profile'
 
 
-def test_compose_web_app_receives_all_oidc_settings():
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parents[1]
-    source = (root / 'docker-compose.yml').read_text()
-    web_service = re.search(r'(?ms)^  app:\n(.*?)(?=^  [^ #\s]|\Z)', source).group(1)
-    environment = dict(re.findall(r'^      (OIDC_[A-Z_]+): \"([^\"]+)\"$', web_service, re.MULTILINE))
-    names = set(re.findall(r'^(OIDC_[A-Z_]+)=', (root / '.env.sample').read_text(), re.MULTILINE))
-    assert names
-    assert names <= environment.keys()
-    for name in names:
-        assert environment[name].startswith('${' + name + ':-')
-
-
 def test_manual_password_page_keeps_same_origin_referrer_for_csrf(app, flow):
     client, start, _ = flow
     response = client.get('/auth/login?manual=1', base_url='https://reader.example')
@@ -573,3 +609,123 @@ def test_manual_password_page_keeps_same_origin_referrer_for_csrf(app, flow):
     response = client.get('/auth/oidc/callback?state=invalid', base_url='https://reader.example')
     assert response.status_code == 403
     assert response.headers['Referrer-Policy'] == 'no-referrer'
+
+
+def _admin_browser(app, base_url="https://reader.example"):
+    """A browser signed in with a password as an admin; CSRF off for brevity."""
+    with app.app_context():
+        admin = User(username="boss", email="boss@example.com", role="admin", is_admin=True, is_active=True)
+        admin.set_password("boss-password")
+        db.session.add(admin)
+        db.session.commit()
+    app.config["WTF_CSRF_ENABLED"] = False
+    client = app.test_client()
+    response = client.post("/auth/login", data={"username": "boss", "password": "boss-password"}, base_url=base_url)
+    assert response.status_code == 302
+    return client
+
+
+def _form(**changes):
+    form = {"enabled": "on", "issuer_url": SETTINGS["issuer_url"], "client_id": "fixture-client",
+            "redirect_uri": SETTINGS["redirect_uri"], "provider_name": "Pocket ID",
+            "scopes": "openid profile email groups", "groups_claim": "groups",
+            "allowed_groups": "readers, editors", "admin_groups": "admins", "scraper_groups": "operators",
+            "create_users": "on", "session_minutes": "90"}
+    form.update(changes)
+    return {k: v for k, v in form.items() if v is not None}
+
+
+def test_settings_page_saves_secret_encrypted_and_never_shows_it(app, caplog):
+    browser = _admin_browser(app)
+    new_secret = "NEW-SECRET-SENTINEL-wxyz"
+    response = browser.post("/admin/settings/sign-in", data=_form(OIDC_CLIENT_SECRET=new_secret),
+                            base_url="https://reader.example")
+    assert response.status_code == 302
+    with app.app_context():
+        row = ConfigSetting.query.get("OIDC_CLIENT_SECRET")
+        assert row.hint == "wxyz" and row.value is None and new_secret not in row.secret_value
+        values = oidc_settings.load()
+        assert values["provider_name"] == "Pocket ID" and values["allowed_groups"] == ["readers", "editors"]
+        assert values["role_mapping"] == {"admins": "admin", "operators": "scraper"}
+        assert values["session_lifetime_seconds"] == 5400
+        assert oidc.current_config(fresh=True)["CLIENT_SECRET"] == new_secret
+        assert new_secret not in AppSetting.query.get(oidc_settings.KEY).value
+    page = browser.get("/admin/settings/sign-in", base_url="https://reader.example").get_data(as_text=True)
+    assert "Saved key ending wxyz" in page and new_secret not in page and CLIENT_SECRET not in page
+    assert "https://reader.example/auth/oidc/callback" in page
+    # A blank secret field keeps the saved one.
+    browser.post("/admin/settings/sign-in", data=_form(), base_url="https://reader.example")
+    with app.app_context():
+        assert oidc.current_config(fresh=True)["CLIENT_SECRET"] == new_secret
+    assert new_secret not in caplog.text and CLIENT_SECRET not in caplog.text
+    browser.post("/auth/logout", base_url="https://reader.example")
+    html = app.test_client().get("/auth/login", base_url="https://reader.example").get_data(as_text=True)
+    assert "Sign in with Pocket ID" in html and new_secret not in html
+
+
+def test_settings_refuse_turning_on_over_plain_http(app):
+    configure(app, enabled=False)
+    browser = _admin_browser(app, base_url="http://reader.example")
+    browser.post("/admin/settings/sign-in", data=_form(), base_url="http://reader.example")
+    with app.app_context():
+        assert oidc_settings.load()["enabled"] is False
+    # Behind a TLS proxy the scheme comes from X-Forwarded-Proto.
+    browser.post("/admin/settings/sign-in", data=_form(), base_url="http://reader.example",
+                 headers={"X-Forwarded-Proto": "https"})
+    with app.app_context():
+        assert oidc_settings.load()["enabled"] is True
+
+
+def test_provider_only_needs_an_admin_signed_in_with_the_provider(app, flow):
+    browser = _admin_browser(app)
+    browser.post("/admin/settings/sign-in", data=_form(oidc_only="on"), base_url="https://reader.example")
+    with app.app_context():
+        assert oidc_settings.load()["allow_password_login"] is True
+    client, start, finish = flow
+    configure(app, role_mapping={"admins": "admin"})
+    assert finish(start(), groups=["readers", "admins"])[0].status_code == 302
+    app.config["WTF_CSRF_ENABLED"] = False
+    client.post("/admin/settings/sign-in", data=_form(oidc_only="on"), base_url="https://reader.example")
+    with app.app_context():
+        assert oidc_settings.load()["allow_password_login"] is False
+
+
+def test_disable_oidc_command_restores_password_sign_in(app):
+    configure(app, allow_password_login=False)
+    result = app.test_cli_runner().invoke(args=["disable-oidc"])
+    assert result.exit_code == 0
+    with app.app_context():
+        assert oidc_settings.load()["enabled"] is False
+        assert oidc.current_config(fresh=True) is None
+    html = app.test_client().get("/auth/login", base_url="https://reader.example").get_data(as_text=True)
+    assert 'name="password"' in html
+
+
+def test_settings_page_links_and_unlinks_accounts(app, flow):
+    browser = _admin_browser(app)
+    with app.app_context():
+        reader = User(username="existing", email="reader@example.com", role="reader", is_active=True)
+        db.session.add(reader)
+        db.session.commit()
+        reader_id = reader.id
+    browser.post("/admin/settings/sign-in/link", data={"user_id": reader_id, "subject": "fixture-subject"},
+                 base_url="https://reader.example")
+    with app.app_context():
+        binding = OIDCIdentity.query.one()
+        assert binding.user_id == reader_id and binding.subject == "fixture-subject"
+        key = binding.identity_key
+    page = browser.get("/admin/settings/sign-in", base_url="https://reader.example").get_data(as_text=True)
+    assert "fixture-subject" in page and "existing" in page
+    _, start, finish = flow
+    assert finish(start())[0].status_code == 302
+    with app.app_context():
+        assert User.query.filter_by(email="reader@example.com").one().id == reader_id
+    browser.post(f"/admin/settings/sign-in/unlink/{key}", base_url="https://reader.example")
+    with app.app_context():
+        assert OIDCIdentity.query.count() == 0
+
+
+def test_settings_page_is_admin_only(app, flow):
+    client, start, finish = flow
+    finish(start())
+    assert client.get("/admin/settings/sign-in", base_url="https://reader.example").status_code == 403

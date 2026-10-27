@@ -58,6 +58,10 @@
             margin-top: 12px;
         }
         .btn { text-decoration: none; }
+        .btn-provider { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 0; }
+        .btn-provider svg { width: 18px; height: 18px; }
+        .or { display: flex; align-items: center; gap: 12px; margin: 22px 0; font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
         .btn:hover { opacity: 0.9; }
         
         .flash {
@@ -99,7 +103,8 @@
 
     {% if oidc_enabled %}
     {% from 'icons.html' import icon %}
-    <a class="btn" href="{{ url_for('auth.oidc_login', next=request.args.get('next', '')) }}">{{ icon('log-in') }} Sign in with {{ oidc_provider_name }}</a>
+    <a class="btn btn-provider" href="{{ url_for('auth.oidc_login', next=request.args.get('next', '')) }}">{{ icon('log-in') }} Sign in with {{ oidc_provider_name }}</a>
+    {% if allow_password_login %}<div class="or">or</div>{% endif %}
     {% endif %}
     {% if allow_password_login %}
     <form method="POST">

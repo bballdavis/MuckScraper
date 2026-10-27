@@ -1,0 +1,181 @@
+{#- Settings › Sign-in (admin.sign_in_page, blueprints/admin/sign_in.py):
+    optional OIDC sign-in (aggregator/oidc.py) with its provider, access and
+    session settings, and the accounts linked to a provider identity. The
+    client secret is saved encrypted, like the LLM and source API keys. -#}
+{% extends 'settings_base.html' %}
+{% from '_config_fields.html' import config_field, config_field_styles %}
+{% block title %}Sign-in{% endblock %}
+{% block settings_key %}signin{% endblock %}
+{% block settings_body %}
+<div class="page-head">
+    <h1>Sign-in</h1>
+    <p>Optional sign-in with an OpenID Connect provider (Authentik, Keycloak, Authelia, Pocket ID and the like), next to or instead of passwords. Accounts, roles and data stay MuckScraper's own: an identity signs in to the account it is linked to.</p>
+</div>
+
+{% include '_flashes.html' %}
+
+<div class="stat-grid">
+    <div class="stat">
+        <span class="stat-label">OIDC sign-in</span>
+        {%- if live %}
+        <span class="stat-value"><span class="dot ok"></span>On</span>
+        <span class="stat-sub">{{ 'Provider only' if not values.allow_password_login else 'Alongside passwords' }}</span>
+        {%- elif values.enabled %}
+        <span class="stat-value"><span class="dot off"></span>Unavailable</span>
+        <span class="stat-sub">Saved as on, but incomplete or the secret can't be decrypted</span>
+        {%- else %}
+        <span class="stat-value"><span class="dot off"></span>Off</span>
+        <span class="stat-sub">Passwords only</span>
+        {%- endif %}
+    </div>
+    <div class="stat">
+        <span class="stat-label">Linked accounts</span>
+        <span class="stat-value">{{ bindings | length }}</span>
+        <span class="stat-sub">{{ 'New accounts on first sign-in' if values.create_users else 'Linked by an admin only' }}</span>
+    </div>
+</div>
+
+<form class="panel config-field-form" method="POST" action="{{ url_for('admin.save_sign_in') }}" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="panel-head">
+        <div>
+            <h2>Provider</h2>
+            <p>Register a confidential web client with the authorization code flow and PKCE (S256), and this callback URL: <code>{{ callback_url }}</code></p>
+        </div>
+    </div>
+    <label class="row">
+        <span><span class="row-label">OIDC sign-in on</span><span class="row-sub">Adds a &ldquo;Sign in with&rdquo; button to the sign-in page. Needs this site on HTTPS: sign-in cookies become HTTPS-only.{% if not https %} This page was opened over plain HTTP, so it can't be turned on from here.{% endif %}</span></span>
+        <span class="switch"><input type="checkbox" name="enabled"{% if values.enabled %} checked{% endif %}><span aria-hidden="true"></span></span>
+    </label>
+    <div class="row">
+        <span><label class="row-label" for="issuer_url">Issuer URL</label><span class="row-sub">Must match the provider's <code>iss</code> exactly, e.g. https://auth.example.com/application/o/muckscraper/</span></span>
+        <input type="url" id="issuer_url" name="issuer_url" value="{{ values.issuer_url }}" placeholder="https://" class="wide-input" spellcheck="false">
+    </div>
+    <div class="row">
+        <span><label class="row-label" for="client_id">Client ID</label></span>
+        <input type="text" id="client_id" name="client_id" value="{{ values.client_id }}" class="wide-input" spellcheck="false">
+    </div>
+    <div class="row secret-row">
+        {{ config_field(secret) }}
+        <span class="row-sub">Encrypted with a key from {{ 'CONFIG_ENCRYPTION_KEY' if key_source == 'CONFIG_ENCRYPTION_KEY' else 'SECRET_KEY (set CONFIG_ENCRYPTION_KEY to use a separate one)' }} and never shown again after saving.</span>
+    </div>
+    <div class="row">
+        <span><label class="row-label" for="redirect_uri">Callback URL</label><span class="row-sub">The address the provider sends people back to. Register the same one there.</span></span>
+        <input type="url" id="redirect_uri" name="redirect_uri" value="{{ values.redirect_uri or callback_url }}" class="wide-input" spellcheck="false">
+    </div>
+    <div class="row">
+        <span><label class="row-label" for="provider_name">Button label</label><span class="row-sub">Shown as &ldquo;Sign in with &hellip;&rdquo;</span></span>
+        <input type="text" id="provider_name" name="provider_name" value="{{ values.provider_name }}" maxlength="100" class="wide-input">
+    </div>
+    <div class="row">
+        <span><label class="row-label" for="scopes">Scopes</label><span class="row-sub">Space separated; must include openid</span></span>
+        <input type="text" id="scopes" name="scopes" value="{{ values.scopes }}" class="wide-input" spellcheck="false">
+    </div>
+
+    <div class="panel-head panel-sub"><div><h2>Access and roles</h2><p>Groups come from a string array claim in the signed ID token. The provider must also send a verified email.</p></div></div>
+    <div class="row">
+        <span><label class="row-label" for="groups_claim">Groups claim</label></span>
+        <input type="text" id="groups_claim" name="groups_claim" value="{{ values.groups_claim }}" class="wide-input" spellcheck="false">
+    </div>
+    <div class="row">
+        <span><label class="row-label" for="allowed_groups">Allowed groups</label><span class="row-sub">Comma separated. Blank lets any verified identity from this provider in.</span></span>
+        <input type="text" id="allowed_groups" name="allowed_groups" value="{{ values.allowed_groups | join(', ') }}" class="wide-input" spellcheck="false">
+    </div>
+    <div class="row">
+        <span><label class="row-label" for="admin_groups">Admin groups</label><span class="row-sub">With admin or scraper groups set, roles follow the provider at every sign-in (highest wins, anyone else is a Reader). Both blank: roles stay as set in Users.</span></span>
+        <input type="text" id="admin_groups" name="admin_groups" value="{{ admin_groups | join(', ') }}" class="wide-input" spellcheck="false">
+    </div>
+    <div class="row">
+        <span><label class="row-label" for="scraper_groups">Scraper groups</label></span>
+        <input type="text" id="scraper_groups" name="scraper_groups" value="{{ scraper_groups | join(', ') }}" class="wide-input" spellcheck="false">
+    </div>
+    <label class="row">
+        <span><span class="row-label">Create accounts on first sign-in</span><span class="row-sub">Off: only accounts linked below can sign in with the provider. On: a new identity gets a Reader account (or its mapped role) with no password. Matching emails never link accounts.</span></span>
+        <span class="switch"><input type="checkbox" name="create_users"{% if values.create_users %} checked{% endif %}><span aria-hidden="true"></span></span>
+    </label>
+
+    <div class="panel-head panel-sub"><div><h2>Sign-in page and sessions</h2></div></div>
+    <label class="row">
+        <span><span class="row-label">Provider only</span><span class="row-sub">Hides the password form and refuses password sign-in. {% if not oidc_session %}Sign in with the provider as an admin first, so you can't lock yourself out.{% else %}If the provider breaks, <code>flask --app aggregator.app disable-oidc</code> on the server turns passwords back on.{% endif %}</span></span>
+        <span class="switch"><input type="checkbox" name="oidc_only"{% if not values.allow_password_login %} checked{% endif %}><span aria-hidden="true"></span></span>
+    </label>
+    <label class="row">
+        <span><span class="row-label">Go straight to the provider</span><span class="row-sub">The sign-in page sends visitors on to the provider. After a sign-out or a failed attempt it stays put; <code>/auth/login?manual=1</code> always shows it.</span></span>
+        <span class="switch"><input type="checkbox" name="auto_login"{% if values.auto_login %} checked{% endif %}><span aria-hidden="true"></span></span>
+    </label>
+    <div class="row">
+        <span><label class="row-label" for="session_minutes">Session length (minutes)</label><span class="row-sub">A provider sign-in ends after this, however active. 1 to 1440.</span></span>
+        <input type="number" id="session_minutes" name="session_minutes" value="{{ lifetime_minutes }}" min="1" max="1440" required class="num-input">
+    </div>
+    <div class="panel-foot">
+        <button type="submit" class="btn">Save sign-in settings</button>
+    </div>
+</form>
+
+<section class="panel" id="linked">
+    <div class="panel-head">
+        <div>
+            <h2>Linked accounts</h2>
+            <p>Each provider identity (its subject, the <code>sub</code> claim) signs in to one account. Link an existing account with a subject you've checked at the provider.</p>
+        </div>
+    </div>
+    {%- if bindings %}
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead><tr><th>Account</th><th>Subject</th><th></th></tr></thead>
+            <tbody>
+            {%- for b in bindings %}
+                <tr>
+                    <td><strong>{{ b.user.username }}</strong><span class="row-sub">{{ b.user.role_label }}{% if not b.user.is_active %} · disabled{% endif %}</span></td>
+                    <td><code class="subject" title="{{ b.subject }}">{{ b.subject }}</code>{% if live and b.issuer != values.issuer_url %}<span class="row-sub">Another issuer: won't sign in</span>{% endif %}</td>
+                    <td class="num">
+                        <form method="POST" action="{{ url_for('admin.unlink_sign_in_identity', identity_key=b.identity_key) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-quiet">Unlink</button>
+                        </form>
+                    </td>
+                </tr>
+            {%- endfor %}
+            </tbody>
+        </table>
+    </div>
+    {%- else %}
+    <div class="row"><span class="muted">No linked accounts yet.</span></div>
+    {%- endif %}
+    {%- if live %}
+    <form class="row link-form" method="POST" action="{{ url_for('admin.link_sign_in_identity') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label><span class="row-label">Account</span>
+            <select name="user_id" required>
+                {%- for u in users %}<option value="{{ u.id }}">{{ u.username }}</option>{% endfor %}
+            </select>
+        </label>
+        <label class="grow"><span class="row-label">Subject</span>
+            <input type="text" name="subject" required maxlength="255" spellcheck="false" placeholder="The sub claim from the provider">
+        </label>
+        <button type="submit" class="btn">Link</button>
+    </form>
+    {%- endif %}
+</section>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .settings-content .row > span:first-child { flex: 1 1 280px; min-width: 0; }
+    .wide-input { width: 360px; max-width: 100%; }
+    .num-input { width: 110px; }
+    .panel-sub { border-top: 1px solid var(--border); }
+    .secret-row { display: block; }
+    .secret-row > .row-sub { margin-top: 6px; }
+    .config-field-form .secret-row .field { grid-template-columns: minmax(0, 1fr) 360px; }
+    .config-field-form .secret-row .field > label { font-size: 14px; font-weight: 700; color: var(--text); }
+    .config-field-form .secret-row .field-meta { grid-column: 1 / -1; }
+    .subject { font-size: 12px; overflow-wrap: anywhere; }
+    .link-form { justify-content: flex-start; align-items: flex-end; }
+    .link-form label { display: flex; flex-direction: column; gap: 4px; }
+    .link-form .grow { flex: 1 1 240px; }
+    .link-form .grow input { width: 100%; }
+    @media (max-width: 600px) { .config-field-form .secret-row .field { grid-template-columns: 1fr; } }
+    {{ config_field_styles() }}
+</style>
+{% endblock %}
