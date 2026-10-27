@@ -63,6 +63,9 @@ def https_url_error(value, label):
     return None
 
 
+_DISCOVERY_SUFFIX = "/.well-known/openid-configuration"
+
+
 def _group_list(raw):
     return [g for g in raw if isinstance(g, str) and _GROUP_RE.match(g)] if isinstance(raw, list) else []
 
@@ -77,6 +80,10 @@ def clean(raw):
     for name in ("issuer_url", "client_id", "redirect_uri", "provider_name", "scopes", "groups_claim"):
         if isinstance(raw.get(name), str) and raw[name].strip():
             out[name] = raw[name].strip()[:500]
+    # A pasted discovery address names the issuer plus this suffix; the
+    # client adds the suffix itself, so keep only the issuer.
+    if out["issuer_url"].endswith(_DISCOVERY_SUFFIX):
+        out["issuer_url"] = out["issuer_url"][:-len(_DISCOVERY_SUFFIX)]
     out["allowed_groups"] = _group_list(raw.get("allowed_groups"))
     mapping = raw.get("role_mapping")
     if isinstance(mapping, dict):

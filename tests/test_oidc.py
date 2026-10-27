@@ -729,3 +729,8 @@ def test_settings_page_is_admin_only(app, flow):
     client, start, finish = flow
     finish(start())
     assert client.get("/admin/settings/sign-in", base_url="https://reader.example").status_code == 403
+
+
+def test_settings_strip_pasted_discovery_address():
+    values = oidc_settings.clean({"issuer_url": "https://issuer.example/tenant/.well-known/openid-configuration"})
+    assert values["issuer_url"] == "https://issuer.example/tenant"
