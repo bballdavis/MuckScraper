@@ -44,7 +44,7 @@
                         <span>{{ target.outlet.name }}{{ outlet_flag(target.outlet) }}</span>
                         {% call grade_pill(target.outlet) %}{{ outlet_bias_tag(target.outlet, unrated=false) }}{% endcall %}
                         {% endif %}
-                        <span>Read <span class="local-date" data-utc="{{ item.read_at.isoformat() }}Z">{{ item.read_at|short_datetime }}</span></span>
+                        <span>Read <span class="local-date" data-utc="{{ item.read_at.isoformat() }}Z">{{ item.read_at|relative_time }}</span></span>
                     </div>
                 </div>
                 <button type="button" class="btn btn-quiet btn-square rr-unmark" data-mark-unread aria-label="Mark unread">{{ icon('undo') }}<span class="tip" role="tooltip"><strong>Mark unread</strong>{% if kind == 'story' %} Brings it back to Headlines.{% else %} Takes it off this list.{% endif %}</span></button>

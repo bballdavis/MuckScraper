@@ -20,6 +20,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
     <title>{{ article.title }} — MuckScraper</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <script src="{{ url_for('static', filename='js/theme_toggle.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/feed_header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reads.css') }}">
     {% if can('scraper') %}<link rel="stylesheet" href="{{ url_for('static', filename='css/lean_modal.css') }}">{% endif %}

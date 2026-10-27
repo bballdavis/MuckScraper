@@ -21,6 +21,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
     <title>{{ story.display_headline }} — MuckScraper</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <script src="{{ url_for('static', filename='js/theme_toggle.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/feed_header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reads.css') }}">
     <script src="{{ url_for('static', filename='js/feed_header.js') }}" defer></script>
@@ -422,7 +423,7 @@
                     <div class="article-main">
                         <div class="article-meta">
                             <span class="article-outlet">{{ article.outlet.name }}</span>{{ outlet_flag(article.outlet) }}
-                            <span class="local-date" data-utc="{{ article.date.isoformat() }}Z">{{ article.date|short_datetime }}</span>
+                            <span class="local-date" data-utc="{{ article.date.isoformat() }}Z">{{ article.date|relative_time }}</span>
                             {% call grade_pill(article.outlet) %}{{ outlet_bias_tag(article.outlet, unrated=false) }}{% endcall %}
                         </div>
                         <a href="{{ url_for('public.view_article', article_id=article.id, back=incoming_back()) }}" class="article-link">{{ article.title }}</a>

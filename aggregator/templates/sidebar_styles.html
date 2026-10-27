@@ -38,6 +38,14 @@
     box-shadow: none;
 }
 
+/* Collapsed from first paint when the reader left it collapsed
+   (html[data-sidebar], static/js/theme_toggle.js); the .collapsed class takes
+   over once sidebar_script.html runs. Desktop only: phones start closed. */
+@media (min-width: 769px) and (min-height: 501px) {
+    html[data-sidebar="collapsed"] .sidebar { width: 0; min-width: 0; border-right: none; box-shadow: none; }
+    html[data-sidebar="collapsed"] .sidebar + .sidebar-toggle-btn { left: 0; }
+}
+
 .sidebar-inner {
     display: flex;
     flex-direction: column;

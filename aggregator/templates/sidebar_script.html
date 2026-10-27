@@ -41,6 +41,8 @@
             sidebar.classList.toggle('collapsed', collapsed);
             setSidebarButton(btn, !collapsed);
         }
+        // The class now holds the state theme_toggle.js set before paint.
+        document.documentElement.removeAttribute('data-sidebar');
     }
     // On phones the button sits just below the page's top bar instead of on
     // top of it (it hid the "M" of MuckScraper). The bars differ in height
