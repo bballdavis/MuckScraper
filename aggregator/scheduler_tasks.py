@@ -24,7 +24,8 @@ RUN_NOW_PREFIX = "task_run_now_v1:"
 CONTROL_SECONDS = 15
 # A heartbeat older than this means the scheduler isn't running.
 STALE_AFTER = timedelta(minutes=2)
-# A pipeline step with no progress for this long is shown as stuck.
+# A pipeline step with no progress for this long is shown as slow. The
+# watchdog (aggregator/workers.py) requeues a job whose heartbeat stops.
 STEP_STUCK_AFTER = timedelta(minutes=20)
 
 # Tasks the page lists, in order: id -> (name, what it does). Pipeline hours
@@ -36,6 +37,7 @@ TASKS = {
     "breaking_feeds": ("Breaking News feeds", "Read the general feeds' headlines and flag breaking events"),
     "image_focus": ("Photo focal points", "Find where to crop new story photos"),
     "nyt_wire": ("NYT Times Wire", "Poll the Times Wire on its own schedule, within the daily NYT budget"),
+    "news_api_polls": ("NewsAPI and GNews", "Poll each on its own schedule within its daily budget; runs store the articles"),
     "newsbox_schedules": ("NewsBox schedules", "Queue each reader's scheduled summaries when they're due"),
 }
 # Recurring tasks that can't be paused from the page (the page itself needs them).
@@ -115,15 +117,18 @@ def _short_summary(summary):
     return {k: v for k, v in summary.items() if isinstance(v, (int, float, str, bool)) and len(str(v)) < 80} or None
 
 
-def write_state(started_at, jobs, worker_alive, schedule_loaded_at):
-    """The heartbeat: every scheduled task's next run, and whether the queue
-    worker thread is up."""
+def write_state(started_at, jobs, worker_alive, schedule_loaded_at, workers=None, restarted=0, requeued=0):
+    """The heartbeat: every scheduled task's next run, whether the queue
+    worker threads are all up, each thread's job, and how often the
+    watchdog has restarted a thread or requeued a job since start."""
     write_json(STATE_KEY, {
         "heartbeat_at": _iso(_now()),
         "started_at": _iso(started_at),
         "worker_alive": worker_alive,
         "schedule_loaded_at": _iso(schedule_loaded_at),
         "jobs": jobs,
+        "workers": workers or [],
+        "watchdog": {"restarted": restarted, "requeued": requeued},
     })
 
 

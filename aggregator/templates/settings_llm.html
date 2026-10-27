@@ -89,6 +89,8 @@
                 <span class="row-label">{{ p.name }}</span>
                 {%- if p.is_new %}<span class="chip chip-new">NEW</span>{% endif %}
                 {%- if p.saved_count %}<span class="chip chip-saved">{{ p.saved_count }} saved</span>{% endif %}
+                {%- if p.spend and p.spend.blocked %}<span class="chip chip-danger">{{ p.spend.blocked|capitalize }} cap reached</span>
+                {%- elif p.spend and (p.spend.daily_cap is not none or p.spend.monthly_cap is not none) %}<span class="chip">${{ '%.2f'|format(p.spend.today) }} today</span>{% endif %}
             </span>
             <span class="provider-side">
             <span class="role-toggles" role="group" aria-label="Jobs {{ p.name }} does">
@@ -117,6 +119,45 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             {%- if p.about %}<p class="provider-about">{{ p.about }}</p>{% endif %}
             {%- for f in p.fields %}{{ config_field(f) }}{% endfor %}
+            {%- if p.spend_fields %}
+            {%- set sp = p.spend %}
+            {%- set sf = p.spend_fields %}
+            <fieldset class="spend">
+                <legend>Spending caps</legend>
+                {%- if sp %}
+                <div class="spend-meters">
+                    {%- for label, amount, cap, share, calls in [('Today', sp.today, sp.daily_cap, sp.daily_share, sp.calls_today), ('This month', sp.month, sp.monthly_cap, sp.monthly_share, sp.calls_month)] %}
+                    <div class="spend-meter{% if cap is not none and amount >= cap %} is-over{% endif %}">
+                        <div class="spend-line">
+                            <span class="spend-label">{{ label }}</span>
+                            <span class="spend-amount">${{ '%.2f'|format(amount) }}</span>
+                            <span class="spend-cap">{% if cap is not none %}of ${{ '%.2f'|format(cap) }}{% else %}no cap{% endif %}</span>
+                            <span class="spend-calls">{{ calls }} call{{ '' if calls == 1 else 's' }}</span>
+                        </div>
+                        <div class="spend-bar"><i style="width: {{ ((share or 0) * 100)|round(1) }}%"></i></div>
+                    </div>
+                    {%- endfor %}
+                </div>
+                {%- endif %}
+                <div class="spend-grid">
+                    {%- for key, hint in [('SPEND_DAILY_USD', 'Unlimited'), ('SPEND_MONTHLY_USD', 'Unlimited'), ('PRICE_INPUT', ('%g'|format(p.spend_price[0])) if p.spend_price else ('Reported' if p.spend_reports_cost else 'Not set')), ('PRICE_OUTPUT', ('%g'|format(p.spend_price[1])) if p.spend_price else ('Reported' if p.spend_reports_cost else 'Not set'))] %}
+                    {%- set f = sf[key] %}
+                    <label class="spend-field" for="{{ f.name }}">
+                        <span class="spend-field-label">{{ f.label }}</span>
+                        <span class="money"><span aria-hidden="true">$</span><input type="number" id="{{ f.name }}" name="{{ f.name }}" value="{{ f.saved or f.env }}" min="0" step="0.01" inputmode="decimal" placeholder="{{ hint }}"></span>
+                        <code>{{ f.name }}</code>
+                    </label>
+                    {%- endfor %}
+                </div>
+                <p class="spend-note">
+                    {%- if p.spend_reports_cost %}OpenRouter reports each call's cost, so no price is needed.
+                    {%- elif p.spend_price %}Priced at ${{ '%g'|format(p.spend_price[0]) }} in / ${{ '%g'|format(p.spend_price[1]) }} out per million tokens{% if p.spend_model %} for {{ p.spend_model }}{% endif %}{% if not (sf.PRICE_INPUT.saved or sf.PRICE_OUTPUT.saved) %} (built in){% endif %}.
+                    {%- else %}<strong>Set the input and output price</strong> for {{ p.spend_model or 'this model' }}, or calls count as free and the caps can't stop them.{% endif %}
+                    Days and months run on Eastern time. A provider at its cap gets no more calls until it resets, and the work waits as if the provider were down.
+                    {%- if sp and sp.unpriced %} {{ sp.unpriced }} call{{ '' if sp.unpriced == 1 else 's' }} this month had no price.{% endif %}
+                </p>
+            </fieldset>
+            {%- endif %}
             {%- if p.facts %}
             <dl class="facts">
                 {%- for name, value in p.facts %}
@@ -207,6 +248,33 @@
     .provider-about { font-size: 13px; color: var(--text-muted); max-width: 760px; }
     .provider-form { display: flex; flex-direction: column; gap: 12px; padding: 4px 16px 14px; }
     {{ config_field_styles() }}
+    .spend { margin: 0; padding: 12px 14px 14px; border: 1px solid var(--border); border-radius: 6px; }
+    .spend legend { padding: 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-muted); }
+    .spend-meters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 18px; margin-bottom: 12px; }
+    .spend-line { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+    .spend-label { font-size: 12px; color: var(--text-muted); min-width: 72px; }
+    .spend-amount { font-size: 18px; font-weight: 800; }
+    .spend-cap { font-size: 12px; color: var(--text-muted); }
+    .spend-calls { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+    .spend-bar { height: 6px; margin-top: 5px; border-radius: 3px; background: var(--border); overflow: hidden; }
+    .spend-bar i { display: block; height: 100%; background: var(--accent); }
+    .spend-meter.is-over .spend-bar i { background: var(--risk-danger-text); }
+    .spend-meter.is-over .spend-amount { color: var(--risk-danger-text); }
+    .spend-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 14px; }
+    .spend-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .spend-field-label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+    .spend-field-label small { font-weight: 400; }
+    .spend-field code { font-size: 10px; color: var(--text-muted); overflow-wrap: anywhere; }
+    .money { display: flex; align-items: center; border: 1px solid var(--input-border); border-radius: 4px; background: var(--surface); }
+    .money:focus-within { border-color: var(--accent-light); }
+    .money > span { padding: 0 2px 0 9px; color: var(--text-muted); font-size: 14px; }
+    .app-page .page-body .money input { border: 0; height: 30px; min-width: 0; width: 100%; background: transparent; box-shadow: none; }
+    .spend-note { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: var(--text-muted); }
+    .spend-note strong { color: var(--risk-broad-text); }
+    @media (max-width: 760px) {
+        .spend-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .spend-meters { grid-template-columns: minmax(0, 1fr); }
+    }
     .provider-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
 </style>
 {% endblock %}

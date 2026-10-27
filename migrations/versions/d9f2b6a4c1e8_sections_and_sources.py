@@ -2,7 +2,7 @@
 feed and search serves, feed health, and counts of what each block caught.
 
 Revision ID: d9f2b6a4c1e8
-Revises: c4e9a2f7d1b3
+Revises: f3c8a1d6e2b9
 Create Date: 2026-10-27
 
 Philip (2026-10-27): the Topics settings didn't match the sidebar, a section
@@ -32,7 +32,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = 'd9f2b6a4c1e8'
-down_revision = 'c4e9a2f7d1b3'
+down_revision = 'f3c8a1d6e2b9'
 branch_labels = None
 depends_on = None
 

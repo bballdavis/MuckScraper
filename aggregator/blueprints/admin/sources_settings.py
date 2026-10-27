@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from flask import abort, jsonify, redirect, render_template, request, url_for
 from sqlalchemy import func
 
-from aggregator import db
+from aggregator import db, feed_order
 from aggregator.blocklist import CAUGHT_DAYS, EFFECT_NO_SCRAPE, EFFECT_SKIP, blocklist_rows
 from aggregator.feed_health import health_note, health_of
 from aggregator.models import (
@@ -149,7 +149,7 @@ def reorder_topics():
 
 # --- Sources ---------------------------------------------------------------------------
 
-def _feed_groups(now):
+def _feed_groups(now, order=None):
     """One entry per feed URL: its rows (one per role), sections, health and
     24-hour counts from the Breaking poller's headlines."""
     since = now - timedelta(hours=24)
@@ -183,10 +183,12 @@ def _feed_groups(now):
         group["health"] = health_of(latest) if group["enabled"] else "unknown"
         group["health_note"] = health_note(latest) if group["enabled"] else "Switched off"
         group["last_read_at"] = latest.last_read_at
-        group["name"] = group["label"] or group["url"].split("/")[2]
+        group["name"] = group["label"] or feed_order.feed_name(rows[0])
+        group["feed"] = rows[0]
         group["id"] = rows[0].id
-    order = {"bad": 0, "warning": 1, "good": 2, "unknown": 3}
-    return sorted(groups.values(), key=lambda g: (order[g["health"]], g["name"].lower()))
+    # Listed in the order each run fetches them (aggregator/feed_order.py).
+    by_first_row = {g["feed"].id: g for g in groups.values()}
+    return [by_first_row[f.id] for f in feed_order.sort_feeds([g["feed"] for g in groups.values()], order)]
 
 
 @admin.route("/sources")
@@ -194,7 +196,8 @@ def _feed_groups(now):
 @role_required(ROLE_ADMIN)
 def rss_feeds_page():
     now = datetime.utcnow()
-    feeds = _feed_groups(now)
+    scan_order = feed_order.current()
+    feeds = _feed_groups(now, scan_order)
     searches = ScheduledFetch.query.order_by(ScheduledFetch.sort_order.asc(), ScheduledFetch.id.asc()).all()
     health_counts = {}
     for feed in feeds:
@@ -202,7 +205,16 @@ def rss_feeds_page():
     return render_template(
         "sources.html", feeds=feeds, searches=searches, topics=_ordered_topics(),
         roles=ROLES, role_hints=ROLE_HINTS, health_counts=health_counts,
+        scan_order=scan_order, scan_orders=feed_order.CHOICES,
     )
+
+
+@admin.route("/sources/order", methods=["POST"])
+@admin.route("/rss-feeds/order", methods=["POST"])
+@role_required(ROLE_ADMIN)
+def save_rss_scan_order():
+    feed_order.save(request.form.get("order", ""))
+    return redirect(url_for("admin.rss_feeds_page"))
 
 
 def _form_roles():

@@ -60,6 +60,28 @@ def _mask(value):
     return f"…{value[-4:]}" if len(value) > 8 else "set"
 
 
+def _add_spend(row, llm):
+    """Split a paid provider's spending fields out of its form fields, and
+    add what it has spent (news_fetcher/llm_spend.py)."""
+    from news_fetcher import llm_spend
+    spend_names = {name for name, _, _ in config_store.SPEND_FIELDS.get(row["key"], [])}
+    row["spend_fields"] = {f["name"].split("_", 1)[1]: f for f in row["fields"] if f["name"] in spend_names}
+    row["fields"] = [f for f in row["fields"] if f["name"] not in spend_names]
+    if not spend_names:
+        return
+    model = llm.model_for_tier(llm.TIER_QUALITY) if llm.provider_for_tier(llm.TIER_QUALITY) == row["key"] else None
+    if not model:
+        model = {"anthropic": llm.ANTHROPIC_MODEL, "gemini": llm.GEMINI_MODEL}.get(row["key"]) or \
+            (llm._openai_compatible_config(row["key"]) or {}).get("model") or ""
+    row["spend_model"] = model
+    row["spend_price"] = llm_spend.price(row["key"], model)
+    row["spend_reports_cost"] = row["key"] == "openrouter"
+    try:
+        row["spend"] = llm_spend.summary(row["key"])
+    except Exception:
+        row["spend"] = None
+
+
 def _provider_rows(states):
     from news_fetcher import llm_client as llm
 
@@ -168,6 +190,7 @@ def _provider_rows(states):
             for name, label, kind in config_store.PROVIDER_FIELDS[row["key"]]
         ]
         row["saved_count"] = sum(1 for f in row["fields"] if f["source"] == "saved")
+        _add_spend(row, llm)
         # The facts the form doesn't edit (embedding model, endpoint, ...).
         edited = {f["label"] for f in row["fields"]}
         row["facts"] = [(label, value) for label, value in row["facts"] if label not in edited]
@@ -302,8 +325,10 @@ def assign_llm_role():
     return redirect(url_for("admin.llm_providers_page") + f"#provider-{provider}")
 
 
-def save_fields_form(fields):
+def save_fields_form(fields, values_in=None):
     """Save a form of config_field()s (templates/_config_fields.html).
+    `values_in` gives a field's value when the form sends it some other way
+    (Settings › Source API keys' schedule rows).
     Non-key fields are saved as typed (blank goes back to the environment);
     one that wasn't saved and still shows its environment or default value
     is left alone, so it keeps following the environment. A key field left
@@ -312,7 +337,7 @@ def save_fields_form(fields):
     states = config_store.field_states()
     values = {}
     for name, _, kind in fields:
-        value = request.form.get(name, "").strip()
+        value = (values_in or {}).get(name, request.form.get(name, "")).strip()
         state = states.get(name, {})
         if kind != "secret" and state.get("source") != "saved" and value in (state.get("env"), state.get("default")):
             continue

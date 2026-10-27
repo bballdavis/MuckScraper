@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 import json
 import os
 import re
-from aggregator import db
+import threading
+from aggregator import db, jobs
 from aggregator.article_signals import (
     bias_bucket_for_score, is_media_oped, is_off_section_oped, is_roundup_article,
     low_value_article_reason,
@@ -19,12 +20,14 @@ from aggregator.article_signals import (
 from aggregator.html_safety import strip_title_tags
 from aggregator.models import Article, OpinionPiece, Outlet, Story, Topic, IngestionBlock
 from aggregator.outlet_origins import is_international, lean_abroad_for, origin_for
+from news_fetcher import llm_client
 from news_fetcher.allsides_lookup import get_allsides_score
 from news_fetcher.bylines import clean_byline
 from news_fetcher.outlet_bias_llm import get_outlet_bias_from_llm
 from news_fetcher.scraper import scrape_article
-from news_fetcher.story_grouper import find_or_create_story, get_embedding
+from news_fetcher.story_grouper import find_or_create_story
 from news_fetcher.topic_classifier import classify_article
+from news_fetcher.workpool import map_in_app
 from .outlets import normalize_source_name, source_name_from_url
 
 logger = logging.getLogger(__name__)
@@ -344,9 +347,37 @@ def store_opinion_feed(articles_data):
             metrics["saved"] += 1
         else:
             skip("not_saved")  # already stored, or the save failed (logged)
-    blocks.save_hits()
     db.session.commit()
     return metrics
+
+
+# One batch at a time groups and stores its articles. Feed jobs run side by
+# side (aggregator/workers.py) and everything slow -- scraping, classifying,
+# embedding -- happens before this lock, but grouping has to see every
+# article stored before it: two feeds carrying the same wire story must land
+# in one story, not race to make two. The scheduler is one process, so a
+# thread lock is enough.
+STORE_LOCK = threading.Lock()
+
+
+def _embed_text(title, content):
+    """Title plus a snippet of the feed text: what an article is embedded on."""
+    from news_fetcher.story_grouper import strip_video_prefix
+    from news_fetcher.summarizer import strip_html
+    clean_title = strip_video_prefix(title)
+    if content:
+        snippet = strip_html(content)[:200].strip()
+        return f"{clean_title}. {snippet}"
+    return clean_title
+
+
+def _prepare(candidate):
+    """The network part of storing one article, run on the ingest pool:
+    classify its title and scrape its page. No writes to the batch."""
+    return {
+        "topics": candidate["sections"] or classify_article(candidate["title"], candidate["content"]),
+        "scrape": scrape_article(candidate["url"], fallback_content=candidate["content"]),
+    }
 
 
 def store_articles(articles_data, topic_name, provider=None):
@@ -355,35 +386,18 @@ def store_articles(articles_data, topic_name, provider=None):
     tagging them with the given topic.
     articles_data: list of dicts with keys:
         title, content, url, source_name, published_at, image_url
+
+    In three passes: cheap checks (blocklists, low-value, duplicates); then
+    the slow network work for what's left -- one batched embedding request,
+    and classification and scraping on the shared ingest pool
+    (news_fetcher/workpool.py); then, under STORE_LOCK, grouping and the
+    writes, with the duplicate checks done again for anything another batch
+    stored in the meantime.
     """
     metrics = empty_store_metrics(topic_name, provider=provider, input_articles=len(articles_data))
     stories_touched = set()
 
-    # Pre-fetch recent stories once for the whole batch. This is the hottest
-    # fetch path: every new article compares against this pool, so keep the
-    # lookback configurable while we diagnose runtime trends.
-    # No selectinload(Story.articles) here on purpose: the pgvector query in
-    # find_matching_story_with_metadata() does the real embedding-match work
-    # in SQL and never touches the ORM relationship, so eager-loading every
-    # recent story's articles up front (~40s/run at ~3,440 stories) paid for
-    # a collection almost nothing in the batch actually reads. What does read
-    # story.articles -- the title_overlap_review/embedding_review snippet
-    # lookups (a handful of candidates per call) and this loop's own
-    # story.articles.append() below -- now lazy-loads per story touched,
-    # which is bounded by batch size rather than the whole lookback pool.
-    cutoff = datetime.utcnow() - timedelta(days=GROUPING_LOOKBACK_DAYS)
-    recent_stories = (
-        Story.query
-        .filter(Story.created_at >= cutoff)
-        .all()
-    )
-    logger.info(
-        "  [Grouper] Loaded %s recent stories from the last %s day(s) for matching",
-        len(recent_stories),
-        GROUPING_LOOKBACK_DAYS,
-    )
-
-    # Same reasoning as the story pre-fetch above: every article in the batch
+    # Same reasoning as the story pre-fetch below: every article in the batch
     # is tested against these, so load them once rather than per article.
     blocks = IngestionBlocks()
     # The sections each article's source serves (aggregator/sources.py).
@@ -394,6 +408,8 @@ def store_articles(articles_data, topic_name, provider=None):
     # Sun reprint) are dropped; loaded once per batch.
     outlet_names = {name.lower() for (name,) in db.session.query(Outlet.name) if name}
 
+    candidates = []
+    batch_urls = set()
     for article in articles_data:
         # Some outlets (National Review's culture pieces, e.g. "Not Ready for
         # <i>Primetime</i>") embed formatting tags in their RSS <title>. The
@@ -412,7 +428,7 @@ def store_articles(articles_data, topic_name, provider=None):
         if not title or not raw_url:
             metrics["skipped"]["missing_required"] += 1
             continue
-            
+
         url = normalize_url(raw_url)
 
         if blocks.blocks_url(url):
@@ -436,32 +452,114 @@ def store_articles(articles_data, topic_name, provider=None):
             metrics["skipped"]["blocked_title"] += 1
             continue
 
-        # Check for URL duplicate (normalized)
-        existing = Article.query.filter_by(url=url).first()
-        if existing:
+        # Check for URL duplicate (normalized), in the database or earlier
+        # in this batch.
+        if url in batch_urls or Article.query.filter_by(url=url).first():
             logger.debug(f"Skipping duplicate URL: {title}")
             metrics["skipped"]["duplicate_url"] += 1
             continue
 
         # Check for Title + Source duplicate (catch same article, different URL)
-        # First get/create outlet to have the ID
         outlet = Outlet.query.filter_by(name=source_name).first()
-        if outlet:
-            existing_title = Article.query.filter_by(title=title, outlet_id=outlet.id).first()
-            if existing_title:
-                logger.debug(f"Skipping duplicate Title+Outlet: {title}")
-                metrics["skipped"]["duplicate_title_outlet"] += 1
-                continue
-        
+        if outlet and Article.query.filter_by(title=title, outlet_id=outlet.id).first():
+            logger.debug(f"Skipping duplicate Title+Outlet: {title}")
+            metrics["skipped"]["duplicate_title_outlet"] += 1
+            continue
+
         if not outlet and source_sections.known_outlets_only:
             logger.debug(f"Skipping new outlet {source_name} (search keeps known outlets only): {title}")
             metrics["skipped"]["unknown_outlet"] += 1
             continue
 
-        logger.info(f"Processing: {title}")
-
         if is_roundup_article(title, raw_url):
             image_url = None
+        batch_urls.add(url)
+        candidates.append({
+            "title": title, "content": content, "raw_url": raw_url, "url": url,
+            "source_name": source_name, "published_at": published_at,
+            "image_url": image_url, "author": author,
+            # A source that serves sections tags its articles with them;
+            # anything from a General source is classified in _prepare.
+            "sections": source_sections.sections_for(article),
+        })
+
+    # Opinion pieces saved above, and the block rules' hit counts, are
+    # committed now, so the slow part below doesn't hold the batch's
+    # transaction open.
+    blocks.save_hits()
+    db.session.commit()
+
+    if candidates:
+        # One request for the batch's embeddings, then classify + scrape
+        # side by side. Grouping needs the embedding, the article row needs
+        # the rest, and none of it needs the lock.
+        embeddings = llm_client.get_embeddings([_embed_text(c["title"], c["content"]) for c in candidates])
+        prepared = map_in_app(_prepare, candidates, on_each=jobs.beat)
+        for candidate, embedding, ready in zip(candidates, embeddings, prepared):
+            # Ensure embedding is a list, not a string
+            if isinstance(embedding, str):
+                embedding = json.loads(embedding)
+            candidate.update(ready, embedding=embedding)
+
+        with STORE_LOCK:
+            _store_prepared(candidates, metrics, stories_touched, outlet_names)
+
+    metrics["stories_touched"] = len(stories_touched)
+    logger.info(
+        "Stored %s new articles for topic: %s (provider=%s, skipped=%s)",
+        metrics["stored"],
+        topic_name,
+        provider or "unknown",
+        metrics["skipped"],
+    )
+    return metrics
+
+
+def _store_prepared(candidates, metrics, stories_touched, outlet_names):
+    """Group and write prepared articles; the caller holds STORE_LOCK."""
+    # Pre-fetch recent stories once for the whole batch. This is the hottest
+    # fetch path: every new article compares against this pool, so keep the
+    # lookback configurable while we diagnose runtime trends. Loaded under
+    # the lock, so it includes what other batches stored a moment ago.
+    # No selectinload(Story.articles) here on purpose: the pgvector query in
+    # find_matching_story_with_metadata() does the real embedding-match work
+    # in SQL and never touches the ORM relationship, so eager-loading every
+    # recent story's articles up front (~40s/run at ~3,440 stories) paid for
+    # a collection almost nothing in the batch actually reads. What does read
+    # story.articles -- the title_overlap_review/embedding_review snippet
+    # lookups (a handful of candidates per call) and this loop's own
+    # story.articles.append() below -- now lazy-loads per story touched,
+    # which is bounded by batch size rather than the whole lookback pool.
+    cutoff = datetime.utcnow() - timedelta(days=GROUPING_LOOKBACK_DAYS)
+    recent_stories = (
+        Story.query
+        .filter(Story.created_at >= cutoff)
+        .all()
+    )
+    logger.info(
+        "  [Grouper] Loaded %s recent stories from the last %s day(s) for matching",
+        len(recent_stories),
+        GROUPING_LOOKBACK_DAYS,
+    )
+
+    for candidate in candidates:
+        jobs.beat()
+        title, content, url = candidate["title"], candidate["content"], candidate["url"]
+        source_name, image_url = candidate["source_name"], candidate["image_url"]
+        scrape_result = candidate["scrape"]
+        classified_topic_names = candidate["topics"]
+
+        # Another feed's batch may have stored it while this one was
+        # scraping.
+        if Article.query.filter_by(url=url).first():
+            metrics["skipped"]["duplicate_url"] += 1
+            continue
+        outlet = Outlet.query.filter_by(name=source_name).first()
+        if outlet and Article.query.filter_by(title=title, outlet_id=outlet.id).first():
+            metrics["skipped"]["duplicate_title_outlet"] += 1
+            continue
+
+        logger.info(f"Processing: {title}")
 
         if not outlet:
             country, funding = origin_for(source_name, url)
@@ -500,17 +598,7 @@ def store_articles(articles_data, topic_name, provider=None):
             db.session.flush()
             metrics["new_outlets"] += 1
 
-        # Generate embedding for this article
-        # Use title + snippet for better semantic matching
-        from news_fetcher.story_grouper import strip_video_prefix
-        clean_title = strip_video_prefix(title)
-        embed_text = clean_title
-        if content:
-            from news_fetcher.summarizer import strip_html
-            snippet = strip_html(content)[:200].strip()
-            embed_text = f"{clean_title}. {snippet}"
-        article_embedding = get_embedding(embed_text)
-        
+        article_embedding = candidate["embedding"]
         story, match = find_or_create_story(title, db, Story, recent_stories,
                                             article_embedding=article_embedding,
                                             article_content=content)
@@ -521,10 +609,8 @@ def store_articles(articles_data, topic_name, provider=None):
         if story not in recent_stories:
             recent_stories.append(story)
 
-        # A source that serves sections tags its articles with them;
-        # anything from a General source is classified.
+        # The source's sections, or the classifier's (both found before the lock)
         from aggregator.models import Topic as TopicModel
-        classified_topic_names = source_sections.sections_for(article) or classify_article(title, content)
         for classified_name in classified_topic_names:
             classified_topic = TopicModel.query.filter_by(name=classified_name).first()
             if not classified_topic:
@@ -534,7 +620,6 @@ def store_articles(articles_data, topic_name, provider=None):
             if classified_topic not in story.topics:
                 story.topics.append(classified_topic)
 
-        scrape_result = scrape_article(url, fallback_content=content)
         scraped_content = scrape_result.content
         if scraped_content:
             # Check if this looks like a duplicate login/error page across the outlet
@@ -549,7 +634,7 @@ def store_articles(articles_data, topic_name, provider=None):
                 scrape_result.failure_reason = dup_reason
 
         # A feed without an image often still links a page with an og:image.
-        if not image_url and scrape_result.image_url and not is_roundup_article(title, raw_url):
+        if not image_url and scrape_result.image_url and not is_roundup_article(title, candidate["raw_url"]):
             image_url = scrape_result.image_url
 
         if scraped_content:
@@ -558,23 +643,18 @@ def store_articles(articles_data, topic_name, provider=None):
             from news_fetcher.scraper import sanitize_html
             final_content = sanitize_html(f"<div>{content}</div>") if content else ""
 
-        # Ensure embedding is a list, not a string
-        if isinstance(article_embedding, str):
-            import json
-            article_embedding = json.loads(article_embedding)
-
         new_article = Article(
             title=title,
             content=final_content,
             source=source_name,
-            author=author or clean_byline(scrape_result.author, source_name, outlet_names),
+            author=candidate["author"] or clean_byline(scrape_result.author, source_name, outlet_names),
             outlet_id=outlet.id,
             # story_id is deliberately NOT set here -- the append below establishes
             # it. Setting the FK here as well makes the collection's first lazy
             # load autoflush this row, so the load returns it AND the append adds
             # the same object again, double-counting len(story.articles).
             url=url,
-            date=published_at,
+            date=candidate["published_at"],
             fetched_at=datetime.utcnow(),
             bias_score=outlet.bias_score,
             image_url=image_url,
@@ -619,7 +699,7 @@ def store_articles(articles_data, topic_name, provider=None):
             # so the UI falls back to story.title (original article title)
             story.headline = None
             story.headline_generated_at = None
-                
+
         metrics["stored"] += 1
         metrics["scrape_statuses"][scrape_result.status] = (
             metrics["scrape_statuses"].get(scrape_result.status, 0) + 1
@@ -629,14 +709,4 @@ def store_articles(articles_data, topic_name, provider=None):
         bias_source = outlet.bias_source or "unrated"
         metrics["bias_sources"][bias_source] = metrics["bias_sources"].get(bias_source, 0) + 1
 
-    blocks.save_hits()
     db.session.commit()
-    metrics["stories_touched"] = len(stories_touched)
-    logger.info(
-        "Stored %s new articles for topic: %s (provider=%s, skipped=%s)",
-        metrics["stored"],
-        topic_name,
-        provider or "unknown",
-        metrics["skipped"],
-    )
-    return metrics

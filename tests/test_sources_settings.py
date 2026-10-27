@@ -110,7 +110,7 @@ class SourcesTests(unittest.TestCase):
         from news_fetcher.fetch_and_store_articles import ingestion
         from news_fetcher.scraper import ScrapeResult
         result = ScrapeResult(content=None, status="skipped", method=None, failure_reason=None, http_status=None)
-        with mock.patch.object(ingestion, "get_embedding", return_value=None), \
+        with mock.patch.object(ingestion.llm_client, "get_embeddings", side_effect=lambda texts: [None] * len(texts)), \
              mock.patch.object(ingestion, "scrape_article", return_value=result), \
              mock.patch.object(ingestion, "get_allsides_score", return_value=None), \
              mock.patch.object(ingestion, "get_outlet_bias_from_llm", return_value=None), \
@@ -166,7 +166,7 @@ class SourcesTests(unittest.TestCase):
     # --- feed health -------------------------------------------------------------------
 
     def test_feed_health_needs_attention_after_three_bad_reads(self):
-        from aggregator import feed_health
+        from aggregator import db, feed_health
         from aggregator.models import RssFeed
         url = "https://www.cbc.ca/webfeed/rss/rss-topstories"
         for _ in range(2):
@@ -174,9 +174,12 @@ class SourcesTests(unittest.TestCase):
         feed = RssFeed.query.filter_by(url=url).first()
         self.assertEqual(feed_health.health_of(feed), "warning")
         feed_health.record_feed_read(url, feed_health.STATUS_EMPTY, items=0)
+        # Written on its own connection, so reload the row.
+        db.session.refresh(feed)
         self.assertEqual(feed_health.health_of(feed), "bad")
         self.assertIn("3 bad reads in a row", feed_health.health_note(feed))
         feed_health.record_feed_read(url, feed_health.STATUS_OK, items=12)
+        db.session.refresh(feed)
         self.assertEqual(feed_health.health_of(feed), "good")
         self.assertEqual(feed.failures_in_row, 0)
 

@@ -367,6 +367,7 @@ class Job(db.Model):
     __tablename__ = "jobs"
     __table_args__ = (
         db.Index("ix_jobs_queued", "status", "priority", "id"),
+        db.Index("ix_jobs_run_id", "run_id"),
     )
 
     id          = db.Column(db.Integer, primary_key=True)
@@ -378,6 +379,34 @@ class Job(db.Model):
     started_at  = db.Column(db.DateTime, nullable=True)
     finished_at = db.Column(db.DateTime, nullable=True)
     error       = db.Column(db.Text, nullable=True)
+    # Raised on each claim; a finish only counts for the attempt that claimed
+    # it, so a requeued job's abandoned thread can't overwrite the rerun.
+    attempts     = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    # Moved on while the job makes progress (jobs.beat()); the watchdog
+    # requeues a pipeline job whose heartbeat stops (aggregator/workers.py).
+    heartbeat_at = db.Column(db.DateTime, nullable=True)
+    # The pipeline run (PipelineRun) a stage, feed or story job belongs to.
+    run_id       = db.Column(db.Integer, nullable=True)
+    # What the handler returned (JSON), e.g. a feed job's ingest counts.
+    result       = db.Column(db.Text, nullable=True)
+
+
+class PipelineRun(db.Model):
+    """One pipeline run, carried out as a chain of jobs
+    (news_fetcher/pipeline_run.py). `stage` is where it is, so a restart
+    resumes there; `metrics` is the run's metrics JSON, built up stage by
+    stage."""
+    __tablename__ = "pipeline_runs"
+
+    id                = db.Column(db.Integer, primary_key=True)
+    task_id           = db.Column(db.String(32), nullable=False)
+    run_full_pipeline = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    status            = db.Column(db.String(16), nullable=False, default="running", server_default="running", index=True)
+    stage             = db.Column(db.String(32), nullable=False, default="fetch", server_default="fetch")
+    started_at        = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    finished_at       = db.Column(db.DateTime, nullable=True)
+    metrics           = db.Column(db.Text, nullable=True)
+    error             = db.Column(db.Text, nullable=True)
 
 
 class RawArticlePayload(db.Model):
@@ -391,6 +420,9 @@ class RawArticlePayload(db.Model):
     source     = db.Column(db.String, nullable=False)  # "newsapi" or "gnews"
     topic_name = db.Column(db.String, nullable=False)
     payload    = db.Column(db.Text, nullable=False)     # JSON string
+    # When a pipeline run stored the payload's articles; a scheduled poll
+    # (news_fetcher/fetch_and_store_articles/providers.py) leaves it empty.
+    ingested_at = db.Column(db.DateTime, nullable=True)
     fetched_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class EditorialHistory(db.Model):
@@ -572,6 +604,17 @@ class RssFeed(db.Model):
     last_error      = db.Column(db.String(300), nullable=True)
     last_item_count = db.Column(db.Integer, nullable=True)
     failures_in_row = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+
+    # The outlet its articles last came in under (normalize_source_name), so
+    # an unlabelled feed still has a reporting grade for the scan order
+    # (aggregator/feed_order.py).
+    source_name = db.Column(db.String, nullable=True)
+
+    @property
+    def reporting(self):
+        """The outlet's reporting level (aggregator/outlet_reporting.py), or None."""
+        from aggregator.outlet_reporting import reporting_for
+        return reporting_for(self.label) or reporting_for(self.source_name)
 
 
 class FeedSection(db.Model):
@@ -991,16 +1034,38 @@ class StorySkip(db.Model):
     user = db.relationship("User", backref=db.backref("story_skips", lazy="dynamic", cascade="all, delete-orphan"))
 
 
-class NytApiCall(db.Model):
-    """One request to a New York Times API (news_fetcher/nyt_api.py). The key
-    allows 500 a day, so the budget counts these rows over the last 24 hours,
-    which stays under the limit however NYT counts its day and whichever
-    container (scheduler or web) made the call. `kind` is what the call was
-    for (wire / search / lookup), `items` how many articles it returned."""
-    __tablename__ = "nyt_api_calls"
-    __table_args__ = (db.Index("ix_nyt_api_calls_called_at", "called_at"),)
+class LlmUsage(db.Model):
+    """One call to a paid LLM provider (news_fetcher/llm_spend.py): the
+    tokens it used and what it cost, for the daily and monthly spending caps
+    on Settings › LLM providers. `priced` is false when there was no price
+    for the model, so the call counts as free."""
+    __tablename__ = "llm_usage"
+    __table_args__ = (db.Index("ix_llm_usage_provider_called_at", "provider", "called_at"),)
+
+    id            = db.Column(db.Integer, primary_key=True)
+    provider      = db.Column(db.String(16), nullable=False)
+    model         = db.Column(db.String(200), nullable=False, default="")
+    kind          = db.Column(db.String(16), nullable=False)  # chat / embedding
+    called_at     = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    input_tokens  = db.Column(db.Integer, nullable=True)
+    output_tokens = db.Column(db.Integer, nullable=True)
+    cost_usd      = db.Column(db.Numeric(12, 6), nullable=True)
+    priced        = db.Column(db.Boolean, nullable=False, default=True)
+
+
+class SourceApiCall(db.Model):
+    """One request to a news source API (news_fetcher/api_budget.py): the
+    New York Times, NewsAPI or GNews. Each key allows so many a day, so the
+    budget counts a provider's rows over the last 24 hours, which stays under
+    the limit however the provider counts its day and whichever container
+    (scheduler or web) made the call. `kind` is what the call was for (NYT:
+    wire / search / lookup; NewsAPI and GNews: poll / manual), `items` how
+    many articles it returned."""
+    __tablename__ = "source_api_calls"
+    __table_args__ = (db.Index("ix_source_api_calls_provider_called_at", "provider", "called_at"),)
 
     id          = db.Column(db.Integer, primary_key=True)
+    provider    = db.Column(db.String(16), nullable=False, default="nyt")
     called_at   = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     kind        = db.Column(db.String(16), nullable=False)
     http_status = db.Column(db.Integer, nullable=True)

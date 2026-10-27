@@ -7,9 +7,10 @@ flagged on the Sources page; nothing is switched off on its own. CBC News and
 Breitbart had answered with no items for days before anyone saw it
 (2026-10-27).
 """
+import logging
 from datetime import datetime
 
-from aggregator.models import RssFeed, db
+from aggregator.models import db
 
 STATUS_OK = "ok"
 STATUS_FALLBACK = "fallback"
@@ -18,28 +19,29 @@ STATUS_ERROR = "error"
 
 NEEDS_ATTENTION_AFTER = 3
 
+logger = logging.getLogger(__name__)
+
 
 def record_feed_read(feed_url, status, items=None, error=None, now=None):
     """Store one read of `feed_url` on every RssFeed row with that URL.
     `items` is the number of entries read (None when the feed answered
     304 Not Modified, which counts as a good read and keeps the last count).
-    Commits; never raises, so a health write can't stop a fetch."""
+    Its own connection, like rss_fetcher._remember_feed_outlet, so it never
+    commits or rolls back a run's work; never raises, so a health write
+    can't stop a fetch."""
     now = now or datetime.utcnow()
+    bad = status in (STATUS_EMPTY, STATUS_ERROR)
     try:
-        rows = RssFeed.query.filter_by(url=feed_url).all()
-        for row in rows:
-            row.last_read_at = now
-            row.last_status = status
-            row.last_error = (error or "")[:300] or None
-            if items is not None:
-                row.last_item_count = items
-            if status in (STATUS_EMPTY, STATUS_ERROR):
-                row.failures_in_row = (row.failures_in_row or 0) + 1
-            else:
-                row.failures_in_row = 0
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
+        with db.engine.begin() as conn:
+            conn.execute(db.text(
+                "UPDATE rss_feeds SET last_read_at = :now, last_status = :status, last_error = :error, "
+                "last_item_count = COALESCE(:items, last_item_count), "
+                "failures_in_row = CASE WHEN :bad THEN COALESCE(failures_in_row, 0) + 1 ELSE 0 END "
+                "WHERE url = :url"
+            ), {"now": now, "status": status, "error": (error or "")[:300] or None,
+                "items": items, "bad": bad, "url": feed_url})
+    except Exception as e:
+        logger.warning(f"[Feed health] Couldn't record a read of {feed_url[:60]}: {e}")
 
 
 def health_of(feed):
