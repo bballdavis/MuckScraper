@@ -7,6 +7,17 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **Optional OIDC sign-in, set in Settings › Sign-in.** From upstream
+  grregis/MuckScraper#28 (rinseaid): "Sign in with …" through an OpenID
+  Connect provider, with identities bound to accounts by issuer and subject
+  (never by email), optional group allow-list and role mapping, opt-in
+  account creation, provider-only and auto-login modes, and a server-side
+  session limit. Unlike upstream it is configured on the settings page, not
+  `OIDC_*` environment variables: the client secret is encrypted like the
+  other admin keys, accounts can be linked and unlinked there, provider-only
+  needs an admin who signed in with the provider, and
+  `flask --app aggregator.app disable-oidc` is the recovery switch. Migration
+  `a958c3be014a` adds `oidc_identities`. See [docs/OIDC.md](docs/OIDC.md).
 - **Feeds for the thin sections.** 26 default feeds so Sports, Sci/Tech,
   Buss/Fin, International News and Other have stories of their own: BBC
   Sport, The Guardian Sport, CBS Sports, Yahoo Sports, NPR Sports; Ars

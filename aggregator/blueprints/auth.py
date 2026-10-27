@@ -1,7 +1,7 @@
 from datetime import datetime
 from urllib.parse import urlparse
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from aggregator import appearance_prefs, db, feed_prefs, reading_prefs
@@ -16,6 +16,15 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for("public.headlines_feed"))
 
+    from aggregator.oidc import current_config
+    oidc = current_config()
+    if (request.method == "GET" and oidc and oidc["AUTO_LOGIN"]
+            and request.args.get("manual") != "1"
+            and not session.get("oidc_auto_login_paused")):
+        return redirect(url_for("auth.oidc_login", next=request.args.get("next", "")))
+    allow_password = not oidc or oidc["ALLOW_PASSWORD_LOGIN"]
+    if request.method == "POST" and not allow_password:
+        abort(403)
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
@@ -28,20 +37,35 @@ def login():
             login_user(user, remember=remember)
             user.last_login_at = datetime.utcnow()
             db.session.commit()
-            next_page = request.args.get("next")
-            if not next_page or urlparse(next_page).netloc != "":
-                # The index sends the reader to their chosen start page.
-                next_page = url_for("public.index")
-            return redirect(next_page)
+            from aggregator.oidc import safe_next
+            return redirect(safe_next(request.args.get("next")))
         else:
             flash("Invalid username or password")
 
-    return render_template("login.html")
+    return render_template("login.html", oidc_enabled=bool(oidc),
+                           oidc_provider_name=oidc["PROVIDER_NAME"] if oidc else "",
+                           allow_password_login=allow_password)
+
+
+@auth.route("/oidc/login", methods=["GET"])
+def oidc_login():
+    from aggregator.oidc import start
+    return start()
+
+
+@auth.route("/oidc/callback", methods=["GET"])
+def oidc_callback():
+    from aggregator.oidc import callback
+    return callback()
 
 
 @auth.route("/logout", methods=["GET", "POST"])
 def logout():
+    if session.get("auth_method") == "oidc" and request.method != "POST":
+        abort(405)
+    session.clear()
     logout_user()
+    session["oidc_auto_login_paused"] = True
     return redirect(url_for("public.index"))
 
 
@@ -53,6 +77,12 @@ def profile():
     Both changes ask for the current password, so a session left open on a
     shared machine can't be used to take the account over.
     """
+    oidc_managed = session.get("auth_method") == "oidc"
+    # Email and password belong to the identity provider during an OIDC
+    # session; feed, appearance and reading preferences stay local.
+    if (request.method == "POST" and oidc_managed
+            and request.form.get("action") not in ("feed_defaults", "appearance", "reading")):
+        abort(403)
     if request.method == "POST":
         action = request.form.get("action")
         if action == "feed_defaults":
@@ -93,6 +123,7 @@ def profile():
 
     return render_template(
         "profile.html",
+        oidc_managed=oidc_managed,
         feed_defaults=feed_prefs.load(current_user),
         start_pages=feed_prefs.START_PAGES,
         ranges=feed_prefs.RANGES,

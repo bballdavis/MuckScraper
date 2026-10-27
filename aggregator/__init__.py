@@ -55,6 +55,10 @@ def create_app():
     login.init_app(app)
     csrf.init_app(app)
 
+    # Optional OIDC sign-in, configured in Settings › Sign-in.
+    from aggregator.oidc import init_app as init_oidc
+    init_oidc(app)
+
     @login.user_loader
     def load_user(id):
         from aggregator.models import User
