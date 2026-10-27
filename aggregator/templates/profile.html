@@ -46,13 +46,21 @@
         <div class="profile-side">
             <section class="panel">
                 <div class="who">
-                    <span class="avatar" aria-hidden="true">{{ current_user.username[:2] }}</span>
+                    <span class="avatar" aria-hidden="true">{{ account_display_name[:2] }}</span>
                     <div>
-                        <div class="who-name">{{ current_user.username }}</div>
+                        <div class="who-name">{{ account_display_name }}</div>
                         <div class="who-role">{{ current_user.role_label }}{% if current_user.created_at %} · member since {{ current_user.created_at | local_datetime('%B %Y') }}{% endif %}</div>
                     </div>
                 </div>
 
+                {%- if oidc_managed %}
+                <div class="account-row">
+                    <span class="label">Email</span><br><span class="value">{{ current_user.email }}</span>
+                </div>
+                <div class="account-row">
+                    <span class="label">Signed in with your identity provider</span><br><span class="value">Email and password changes are managed there.</span>
+                </div>
+                {%- else %}
                 <details class="account-row">
                     <summary>
                         <span><span class="label">Email</span><br><span class="value">{{ current_user.email }}</span></span>
@@ -81,6 +89,8 @@
                         <button type="submit" class="btn">Change password</button>
                     </form>
                 </details>
+
+                {%- endif %}
 
                 {%- if current_user.last_login_at %}
                 <div class="account-row">

@@ -27,3 +27,5 @@ feedparser
 tzdata
 cryptography>=42
 segno>=1.6
+Authlib==1.9.1  # optional OpenID Connect sign-in (aggregator/oidc.py)
+joserfc==1.7.7
