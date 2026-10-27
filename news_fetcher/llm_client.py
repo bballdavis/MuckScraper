@@ -13,10 +13,34 @@
 import os
 import time
 import logging
+import threading
+from contextlib import contextmanager
 import requests
 from news_fetcher import saved_settings
 
 logger = logging.getLogger(__name__)
+
+
+# How many calls may wait on one provider at once. Ingestion classifies and
+# scrapes on a thread pool (news_fetcher/workpool.py); without a cap a home
+# GPU would get a dozen requests at once and each would sit in its queue
+# until its own timeout ran out. The timeout starts once a call has its slot.
+LOCAL_PROVIDERS = ("ollama", "lmstudio")
+LOCAL_CONCURRENCY = max(1, int(os.environ.get("LLM_LOCAL_CONCURRENCY", "2")))
+CLOUD_CONCURRENCY = max(1, int(os.environ.get("LLM_CLOUD_CONCURRENCY", "4")))
+_slots = {}
+_slots_lock = threading.Lock()
+
+
+@contextmanager
+def _provider_slot(provider):
+    with _slots_lock:
+        slot = _slots.get(provider)
+        if slot is None:
+            limit = LOCAL_CONCURRENCY if provider in LOCAL_PROVIDERS or not provider else CLOUD_CONCURRENCY
+            slot = _slots[provider] = threading.BoundedSemaphore(limit)
+    with slot:
+        yield
 
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").strip().lower()
 # Optional separate provider for the fast tier, so the ~1,140 mechanical calls
@@ -393,13 +417,28 @@ def generate_text(prompt, timeout=30, tier=TIER_QUALITY):
     _sync_config()
     provider = provider_for_tier(tier)
     model = model_for_tier(tier)
-    if provider == "gemini":
-        return _generate_text_gemini(prompt, timeout, model)
-    if provider == "anthropic":
-        return _generate_text_anthropic(prompt, timeout, model)
-    if provider in OPENAI_COMPATIBLE_PROVIDERS:
-        return _generate_text_openai_compatible(prompt, timeout, model, provider)
-    return _generate_text_ollama(prompt, timeout, model)
+    try:
+        with _provider_slot(provider):
+            if provider == "gemini":
+                return _generate_text_gemini(prompt, timeout, model)
+            if provider == "anthropic":
+                return _generate_text_anthropic(prompt, timeout, model)
+            if provider in OPENAI_COMPATIBLE_PROVIDERS:
+                return _generate_text_openai_compatible(prompt, timeout, model, provider)
+            return _generate_text_ollama(prompt, timeout, model)
+    finally:
+        _job_progress()
+
+
+def _job_progress():
+    """An LLM call that returned is progress: keep the running job's
+    heartbeat going (aggregator/jobs.py), so the watchdog only requeues a
+    job that has really stopped. A no-op outside a job."""
+    try:
+        from aggregator import jobs
+        jobs.beat()
+    except Exception:
+        pass
 
 
 def _probe_ollama_host(host):
@@ -772,10 +811,19 @@ def get_embedding(text):
     from Story.embedding's Vector(768)) or story grouping silently degrades.
     """
     _sync_config()
-    if EMBEDDING_PROVIDER == "gemini":
-        return _get_embedding_gemini(text)
-    if EMBEDDING_PROVIDER == "lmstudio":
-        return _get_embedding_lmstudio(text)
+    with _provider_slot(_embedding_backend()):
+        if EMBEDDING_PROVIDER == "gemini":
+            return _get_embedding_gemini(text)
+        if EMBEDDING_PROVIDER == "lmstudio":
+            return _get_embedding_lmstudio(text)
+        return _get_embedding_ollama(text)
+
+
+def _embedding_backend():
+    """The provider get_embedding() really uses: Ollama for anything that
+    can't embed, with a warning once per provider."""
+    if EMBEDDING_PROVIDER in ("gemini", "lmstudio"):
+        return EMBEDDING_PROVIDER
     if EMBEDDING_PROVIDER not in ("ollama", "") and EMBEDDING_PROVIDER not in _warned_embedding_providers:
         _warned_embedding_providers.add(EMBEDDING_PROVIDER)
         reason = _NO_EMBEDDING_PROVIDERS.get(
@@ -786,7 +834,106 @@ def get_embedding(text):
             "Set EMBEDDING_PROVIDER=ollama, lmstudio or gemini to silence this.",
             EMBEDDING_PROVIDER, reason,
         )
-    return _get_embedding_ollama(text)
+    return "ollama"
+
+
+# Texts per batched embedding request.
+EMBEDDING_BATCH_SIZE = 32
+
+
+def get_embeddings(texts):
+    """Embed several texts, in batched requests where the provider takes a
+    list (Ollama's /api/embed, LM Studio, Gemini). Returns a list the length
+    of `texts`, None where a text couldn't be embedded. A batch that fails
+    falls back to one get_embedding() call per text, so an older Ollama
+    without /api/embed still works.
+
+    Ollama's /api/embed returns unit-length vectors where /api/embeddings
+    doesn't; grouping and the Op/Ed linker compare by cosine distance, which
+    ignores length, so the two mix safely."""
+    texts = list(texts)
+    out = []
+    for start in range(0, len(texts), EMBEDDING_BATCH_SIZE):
+        chunk = texts[start:start + EMBEDDING_BATCH_SIZE]
+        _sync_config()
+        backend = _embedding_backend()
+        with _provider_slot(backend):
+            if backend == "gemini":
+                vectors = _get_embeddings_gemini(chunk)
+            elif backend == "lmstudio":
+                vectors = _get_embeddings_lmstudio(chunk)
+            else:
+                vectors = _get_embeddings_ollama(chunk)
+        if not vectors or len(vectors) != len(chunk):
+            vectors = [get_embedding(text) for text in chunk]
+        out.extend(vectors)
+    return out
+
+
+def _get_embeddings_ollama(texts):
+    if not OLLAMA_HOST and not OLLAMA_FALLBACK_HOST:
+        return None
+
+    def _call(host):
+        response = requests.post(
+            f"{host}/api/embed",
+            json={"model": EMBEDDING_MODEL, "input": texts},
+            timeout=15 + len(texts),
+        )
+        if response.status_code == 404:
+            # An Ollama older than /api/embed (0.3.4): not a host failure.
+            return None
+        response.raise_for_status()
+        return response.json().get("embeddings") or None
+
+    return _ollama_request("embed", _call)
+
+
+def _get_embeddings_lmstudio(texts):
+    if not (LMSTUDIO_HOST and LMSTUDIO_EMBEDDING_MODEL):
+        return None
+    headers = {"Authorization": f"Bearer {LMSTUDIO_API_KEY}"} if LMSTUDIO_API_KEY else {}
+    try:
+        response = requests.post(
+            f"{LMSTUDIO_HOST.rstrip('/')}/embeddings",
+            headers=headers,
+            json={"model": LMSTUDIO_EMBEDDING_MODEL, "input": texts},
+            timeout=15 + len(texts),
+        )
+        response.raise_for_status()
+        data = sorted(response.json().get("data") or [], key=lambda d: d.get("index", 0))
+    except Exception as e:
+        logger.info(f"  [llm_client] LM Studio batch embedding error: {e}")
+        return None
+    vectors = [d.get("embedding") or None for d in data]
+    if any(v and len(v) != EMBEDDING_DIMENSIONS for v in vectors):
+        return None  # get_embedding() per text logs the dimension mismatch once
+    return vectors
+
+
+def _get_embeddings_gemini(texts):
+    if not GEMINI_API_KEY:
+        return None
+    try:
+        import numpy as np
+        from google.genai import types
+
+        client = _get_gemini_client()
+        response = client.models.embed_content(
+            model=GEMINI_EMBEDDING_MODEL,
+            contents=texts,
+            config=types.EmbedContentConfig(output_dimensionality=768),
+        )
+        vectors = []
+        for embedding in response.embeddings:
+            # Renormalized as in _get_embedding_gemini().
+            vec = np.array(embedding.values, dtype=float)
+            norm = np.linalg.norm(vec)
+            vectors.append((vec / norm if norm > 0 else vec).tolist())
+        return vectors
+    except Exception as e:
+        logger.info(f"  [llm_client] Gemini batch embedding error: {e}")
+        return None
 
 
 def _get_embedding_ollama(text):

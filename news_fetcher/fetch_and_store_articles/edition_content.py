@@ -213,6 +213,88 @@ def _fill_story_content(story, metrics):
     return changed
 
 
+STORY_COUNTERS = (
+    "story_summaries_generated", "deep_reports_generated", "child_article_summaries_generated",
+    "child_article_analyses_generated", "stale_stories_reset", "stable_stories_skipped",
+)
+
+
+def _empty_edition_metrics(status, **extra):
+    return {"status": status, "stories_seen": 0, **{key: 0 for key in STORY_COUNTERS},
+            "backfilled_edition_ids": [], **extra}
+
+
+def edition_content_targets(backfill_recent=False):
+    """What process_current_edition() would fill, without filling it:
+    (metrics to start from, [(story_id, edition_id)]). edition_id is set for
+    stories of a superseded edition (the backfill) and None for the latest
+    edition's. The scheduler runs one job per story (news_fetcher/
+    pipeline_run.py) and adds them up with edition_content_metrics()."""
+    from aggregator.models import Edition, EditionStory
+
+    latest_edition = Edition.query.order_by(Edition.created_at.desc()).first()
+    if not latest_edition:
+        logger.info("[Processor] No edition found to process.")
+        return _empty_edition_metrics("skipped_no_edition"), []
+
+    # Summaries are the work this gates, so it asks about the quality tier.
+    ollama_available = check_ollama_status(_llm.TIER_QUALITY)
+    if not ollama_available:
+        logger.warning(
+            "[Processor] Ollama unreachable at start of edition processing; "
+            "will still scan stories and skip generation calls until Ollama recovers."
+        )
+
+    story_ids = [es.story_id for es in latest_edition.edition_stories.order_by(EditionStory.rank).all()]
+    metrics = _empty_edition_metrics(
+        "processed", edition_id=latest_edition.id, ollama_available_at_start=ollama_available,
+    )
+    metrics["stories_seen"] = len(story_ids)
+    logger.info(f"[Processor] Processing {len(story_ids)} stories from {latest_edition.edition_type} edition...")
+
+    seen = set(story_ids)
+    targets = [(story_id, None) for story_id in story_ids]
+    if backfill_recent:
+        cutoff = datetime.utcnow().date() - timedelta(days=BACKFILL_LOOKBACK_DAYS)
+        stale_editions = Edition.query.filter(
+            Edition.published == True,
+            Edition.id != latest_edition.id,
+            Edition.date >= cutoff,
+        ).order_by(Edition.date.desc(), Edition.created_at.desc()).all()
+        for edition in stale_editions:
+            for es in edition.edition_stories.order_by(EditionStory.rank).all():
+                if es.story_id is None or es.story_id in seen:
+                    continue
+                seen.add(es.story_id)
+                targets.append((es.story_id, edition.id))
+    return metrics, targets
+
+
+def fill_story(story_id, edition_id=None):
+    """Fill one story's missing summary, deep report and child summaries.
+    Returns its counters, whether anything changed, and `edition_id` (the
+    superseded edition it was backfilled for, if any)."""
+    counters = {key: 0 for key in STORY_COUNTERS}
+    story = db.session.get(Story, story_id)
+    changed = bool(story) and _fill_story_content(story, counters)
+    return {**counters, "changed": bool(changed), "edition_id": edition_id}
+
+
+def edition_content_metrics(metrics, story_results):
+    """process_current_edition()'s metrics from edition_content_targets()'s
+    and each fill_story() result."""
+    metrics = dict(metrics, backfilled_edition_ids=list(metrics.get("backfilled_edition_ids") or []))
+    for result in story_results:
+        for key in STORY_COUNTERS:
+            metrics[key] = metrics.get(key, 0) + (result.get(key) or 0)
+        edition_id = result.get("edition_id")
+        if result.get("changed") and edition_id and edition_id not in metrics["backfilled_edition_ids"]:
+            logger.info(f"  [Processor] Backfilled stories in superseded edition {edition_id}")
+            metrics["backfilled_edition_ids"].append(edition_id)
+    logger.info("[Processor] Current edition processing complete.")
+    return metrics
+
+
 def process_current_edition(backfill_recent=False):
     """
     Exhaustively summarize and analyze the stories selected for the latest
@@ -229,77 +311,7 @@ def process_current_edition(backfill_recent=False):
        opt in explicitly.
     This ensures the static headlines site is fully populated.
     """
-    from news_fetcher.summarizer import check_ollama_status
-    from aggregator.models import Edition, EditionStory
-
-    latest_edition = Edition.query.order_by(Edition.created_at.desc()).first()
-    if not latest_edition:
-        logger.info("[Processor] No edition found to process.")
-        return {
-            "status": "skipped_no_edition",
-            "stories_seen": 0,
-            "story_summaries_generated": 0,
-            "deep_reports_generated": 0,
-            "child_article_summaries_generated": 0,
-            "child_article_analyses_generated": 0,
-            "stale_stories_reset": 0,
-            "stable_stories_skipped": 0,
-            "backfilled_edition_ids": [],
-        }
-
-    # Summaries are the work this gates, so it asks about the quality tier.
-    ollama_available = check_ollama_status(_llm.TIER_QUALITY)
-    if not ollama_available:
-        logger.warning(
-            "[Processor] Ollama unreachable at start of edition processing; "
-            "will still scan stories and skip generation calls until Ollama recovers."
-        )
-
-    stories = [es.story for es in latest_edition.edition_stories.order_by(EditionStory.rank).all()]
-    metrics = {
-        "status": "processed",
-        "edition_id": latest_edition.id,
-        "ollama_available_at_start": ollama_available,
-        "stories_seen": len(stories),
-        "story_summaries_generated": 0,
-        "deep_reports_generated": 0,
-        "child_article_summaries_generated": 0,
-        "child_article_analyses_generated": 0,
-        "stale_stories_reset": 0,
-        "stable_stories_skipped": 0,
-        "backfilled_edition_ids": [],
-    }
-
-    logger.info(f"[Processor] Processing {len(stories)} stories from {latest_edition.edition_type} edition...")
-
-    processed_story_ids = set()
-    for story in stories:
-        processed_story_ids.add(story.id)
-        _fill_story_content(story, metrics)
-
-    if backfill_recent:
-        cutoff = datetime.utcnow().date() - timedelta(days=BACKFILL_LOOKBACK_DAYS)
-        stale_editions = Edition.query.filter(
-            Edition.published == True,
-            Edition.id != latest_edition.id,
-            Edition.date >= cutoff,
-        ).order_by(Edition.date.desc(), Edition.created_at.desc()).all()
-
-        for edition in stale_editions:
-            edition_changed = False
-            for es in edition.edition_stories.order_by(EditionStory.rank).all():
-                story = es.story
-                if not story or story.id in processed_story_ids:
-                    continue
-                processed_story_ids.add(story.id)
-                if _fill_story_content(story, metrics):
-                    edition_changed = True
-            if edition_changed:
-                logger.info(
-                    f"  [Processor] Backfilled stories in superseded edition "
-                    f"{edition.date} {edition.edition_type}"
-                )
-                metrics["backfilled_edition_ids"].append(edition.id)
-
-    logger.info("[Processor] Current edition processing complete.")
-    return metrics
+    metrics, targets = edition_content_targets(backfill_recent=backfill_recent)
+    if metrics["status"] != "processed":
+        return metrics
+    return edition_content_metrics(metrics, [fill_story(story_id, edition_id) for story_id, edition_id in targets])
