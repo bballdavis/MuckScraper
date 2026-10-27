@@ -36,6 +36,8 @@ def sign_in_page():
         callback_url=_site_url() + url_for("auth.oidc_callback"),
         admin_groups=oidc_settings.role_groups(values["role_mapping"], ROLE_ADMIN),
         scraper_groups=oidc_settings.role_groups(values["role_mapping"], ROLE_SCRAPER),
+        match_choice=("" if not values["match_claim"] else values["match_claim"]
+                      if values["match_claim"] in oidc_settings.COMMON_MATCH_CLAIMS else "custom"),
         default_roles=[(r, ROLE_LABELS[r]) for r in oidc_settings.DEFAULT_ROLES],
         lifetime_minutes=values["session_lifetime_seconds"] // 60,
         oidc_session=session.get("auth_method") == "oidc",
@@ -66,6 +68,8 @@ def save_sign_in():
                                                    oidc_settings.parse_groups(form.get("scraper_groups"))),
         "default_role": form.get("default_role") or oidc_settings.DEFAULTS["default_role"],
         "create_users": form.get("create_users") == "on",
+        "match_claim": (form.get("match_claim_custom", "").strip() if form.get("match_claim") == "custom"
+                        else form.get("match_claim", "").strip()),
         # The form asks the opposite question ("OIDC only"), so it is off by default.
         "allow_password_login": form.get("oidc_only") != "on",
         "auto_login": form.get("auto_login") == "on",

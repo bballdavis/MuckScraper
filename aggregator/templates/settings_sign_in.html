@@ -99,9 +99,22 @@
         <input type="text" id="scraper_groups" name="scraper_groups" value="{{ scraper_groups | join(', ') }}" class="wide-input" spellcheck="false">
     </div>
     <label class="row">
-        <span><span class="row-label">Create accounts on first sign-in</span><span class="row-sub">Off: only accounts linked below can sign in with the provider. On: a new identity gets an account with the default role (or its mapped role) and no password. Matching emails never link accounts.</span></span>
+        <span><span class="row-label">Create accounts on first sign-in</span><span class="row-sub">Off: only accounts linked below can sign in with the provider. On: a new identity that isn't linked or matched gets an account with the default role (or its mapped role) and no password.</span></span>
         <span class="switch"><input type="checkbox" name="create_users"{% if values.create_users %} checked{% endif %}><span aria-hidden="true"></span></span>
     </label>
+    <div class="row">
+        <span><label class="row-label" for="match_claim">Link existing accounts by</label><span class="row-sub">On an identity's first sign-in, link it to the one active account whose email or username equals this claim (ignoring case), instead of refusing it or making a new account. The link is stored, so later changes to the claim don't move it. Only use a claim people can't change for themselves at the provider.</span></span>
+        <span class="match-fields">
+            <select id="match_claim" name="match_claim" class="role-select">
+                <option value=""{% if not match_choice %} selected{% endif %}>Off (link by hand)</option>
+                <option value="email"{% if match_choice == 'email' %} selected{% endif %}>Email (email)</option>
+                <option value="preferred_username"{% if match_choice == 'preferred_username' %} selected{% endif %}>Username (preferred_username)</option>
+                <option value="custom"{% if match_choice == 'custom' %} selected{% endif %}>Custom claim&hellip;</option>
+            </select>
+            <input type="text" id="match_claim_custom" name="match_claim_custom" aria-label="Custom claim name" placeholder="Claim name" spellcheck="false" class="role-select"
+                   value="{{ values.match_claim if match_choice == 'custom' else '' }}"{% if match_choice != 'custom' %} hidden{% endif %}>
+        </span>
+    </div>
     <div class="row">
         <span><label class="row-label" for="default_role">Default role for new accounts</label><span class="row-sub">Readers can read everything; Scrapers can also fetch articles and run summaries and analysis. Applies to accounts made on first sign-in and to anyone outside the admin and scraper groups, and is preselected in Users › Add a user. Admin is never a default.</span></span>
         <select id="default_role" name="default_role" class="role-select">
@@ -180,6 +193,16 @@
     </form>
     {%- endif %}
 </section>
+<script>
+    // Custom claim: show its name field only when picked.
+    (function () {
+        var pick = document.getElementById('match_claim'), custom = document.getElementById('match_claim_custom');
+        pick.addEventListener('change', function () {
+            custom.hidden = pick.value !== 'custom';
+            if (!custom.hidden) custom.focus();
+        });
+    })();
+</script>
 {% endblock %}
 
 {% block styles %}
@@ -194,7 +217,8 @@
     .settings-content .panel-head h2 { font-size: 17px; font-weight: 800; letter-spacing: -0.2px; }
     .settings-content .panel-head p { margin-top: 4px; font-size: 13px; line-height: 1.45; }
     .form-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
-    .role-select { width: 160px; }
+    .role-select { width: 220px; max-width: 100%; }
+    .match-fields { display: flex; flex-direction: column; gap: 6px; }
     .secret-row { display: block; }
     .secret-row > .row-sub { margin-top: 6px; }
     .config-field-form .secret-row .field { grid-template-columns: minmax(0, 1fr) 360px; }

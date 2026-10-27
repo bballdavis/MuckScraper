@@ -764,3 +764,57 @@ def test_settings_page_saves_default_role_and_users_page_preselects_it(app):
     assert '<option value="scraper" selected>' in page and '<option value="admin"' not in page
     users = browser.get("/admin/users", base_url="https://reader.example").get_data(as_text=True)
     assert '<option value="scraper" selected>Scraper' in users
+
+
+def test_matching_claim_links_an_existing_account_once(app, flow):
+    with app.app_context():
+        admin = User(username="boss", email="reader@example.com", role="admin", is_admin=True, is_active=True)
+        db.session.add(admin)
+        db.session.commit()
+        admin_id = admin.id
+    _, start, finish = flow
+    # Off by default: the matching email is refused, never linked.
+    assert finish(start())[0].status_code == 403
+    configure(app, match_claim="email")
+    assert finish(start())[0].status_code == 302
+    with app.app_context():
+        assert User.query.count() == 1
+        assert OIDCIdentity.query.one().user_id == admin_id and User.query.one().is_admin
+    # A second identity with the same email can't take the linked account.
+    assert finish(start(), sub="other-subject")[0].status_code == 403
+
+
+def test_matching_claim_by_custom_claim_and_username(app, flow):
+    with app.app_context():
+        db.session.add(User(username="Philip", email="p@example.com", role="scraper", is_active=True))
+        db.session.commit()
+    configure(app, match_claim="nickname")
+    _, start, finish = flow
+    assert finish(start(), nickname="PHILIP", email="p@example.com")[0].status_code == 302
+    with app.app_context():
+        assert OIDCIdentity.query.one().user.username == "Philip"
+
+
+def test_matching_claim_refuses_ambiguous_or_disabled_accounts(app, flow):
+    with app.app_context():
+        db.session.add_all([User(username="reader@example.com", email="x@example.com", is_active=True),
+                            User(username="someone", email="reader@example.com", is_active=True)])
+        db.session.commit()
+    configure(app, match_claim="email")
+    _, start, finish = flow
+    assert finish(start())[0].status_code == 403
+    with app.app_context():
+        assert OIDCIdentity.query.count() == 0
+
+
+def test_settings_page_saves_custom_matching_claim(app):
+    browser = _admin_browser(app)
+    browser.post("/admin/settings/sign-in", data=_form(match_claim="custom", match_claim_custom="upn"),
+                 base_url="https://reader.example")
+    with app.app_context():
+        assert oidc_settings.load()["match_claim"] == "upn"
+    page = browser.get("/admin/settings/sign-in", base_url="https://reader.example").get_data(as_text=True)
+    assert '<option value="custom" selected>' in page and 'value="upn"' in page
+    browser.post("/admin/settings/sign-in", data=_form(match_claim="email"), base_url="https://reader.example")
+    with app.app_context():
+        assert oidc_settings.load()["match_claim"] == "email"

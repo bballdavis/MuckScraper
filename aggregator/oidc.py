@@ -2,8 +2,10 @@
 
 Only trusted server configuration selects the issuer and role policy: an
 admin sets it on Settings › Sign-in (aggregator/oidc_settings.py), not the
-environment. Identity is an exact issuer/subject binding, never a matching
-email or forwarded header.
+environment. Identity is an exact issuer/subject binding, never a forwarded
+header. A matching email or username links an identity to an existing
+account only when the admin picks a matching claim, and only once: the
+first sign-in stores the issuer/subject binding, which is used from then on.
 """
 import hashlib
 import secrets
@@ -14,6 +16,7 @@ from urllib.parse import urlsplit
 import click
 from flask import abort, current_app, redirect, request, session, url_for
 from flask_login import current_user, login_user, logout_user
+from sqlalchemy import func
 
 from aggregator import db, oidc_settings
 from aggregator.accounts import email_error, other_active_admins
@@ -80,6 +83,26 @@ def display_name(claims):
     return "Account"
 
 
+def match_existing(claims, config):
+    """The one active account whose email or username equals the configured
+    matching claim (ignoring case), or None. Refuses when the value fits
+    more than one account, a disabled one, or one already bound to another
+    identity at this issuer."""
+    claim = config.get("MATCH_CLAIM")
+    value = claims.get(claim) if claim else None
+    if not isinstance(value, str) or not value.strip():
+        return None
+    value = value.strip().lower()
+    found = User.query.filter(db.or_(func.lower(User.email) == value, func.lower(User.username) == value)).all()
+    if not found:
+        return None
+    if len(found) > 1 or not found[0].is_active:
+        raise OIDCRefused()
+    if OIDCIdentity.query.filter_by(user_id=found[0].id, issuer=config["ISSUER_URL"]).first():
+        raise OIDCRefused()
+    return found[0]
+
+
 def resolve_user(claims, config):
     if claims.get("iss") != config["ISSUER_URL"] or claims.get("email_verified") is not True:
         raise OIDCRefused()
@@ -98,6 +121,8 @@ def resolve_user(claims, config):
             raise OIDCRefused()
         user = binding.user
     else:
+        user = match_existing(claims, config)
+    if user is None:
         if not config["CREATE_USERS"]:
             raise OIDCRefused()
         username = "oidc_" + key[:59]

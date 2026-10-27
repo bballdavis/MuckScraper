@@ -46,12 +46,18 @@ DEFAULTS = {
     # are mapped). Never Admin: admins come from Admin groups or Users.
     "default_role": ROLE_READER,
     "create_users": False,
+    # A claim whose value links a new identity to the one existing account
+    # with that email or username, on its first sign-in. Empty: an identity
+    # only reaches an account an admin linked (or one it creates).
+    "match_claim": "",
     "allow_password_login": True,
     "auto_login": False,
     "session_lifetime_seconds": 3600,
 }
 MIN_LIFETIME, MAX_LIFETIME = 60, 86400
 DEFAULT_ROLES = (ROLE_READER, ROLE_SCRAPER)
+# The page's shortcuts for match_claim; anything else is a custom claim.
+COMMON_MATCH_CLAIMS = ("email", "preferred_username")
 
 _GROUP_RE = re.compile(r"^[^\x00-\x1f\x7f]{1,200}$")
 _CLAIM_RE = re.compile(r"^[A-Za-z0-9_.:/-]{1,100}$")
@@ -79,6 +85,8 @@ def clean(raw):
     for name in ("enabled", "create_users", "allow_password_login", "auto_login"):
         if isinstance(raw.get(name), bool):
             out[name] = raw[name]
+    if isinstance(raw.get("match_claim"), str) and _CLAIM_RE.match(raw["match_claim"].strip()):
+        out["match_claim"] = raw["match_claim"].strip()
     for name in ("issuer_url", "client_id", "redirect_uri", "provider_name", "scopes", "groups_claim"):
         if isinstance(raw.get(name), str) and raw[name].strip():
             out[name] = raw[name].strip()[:500]
@@ -127,6 +135,8 @@ def errors(values, has_secret):
         problems.append("Scopes must include openid.")
     if not _CLAIM_RE.match(values.get("groups_claim", "")):
         problems.append("The groups claim is a claim name: letters, digits and . _ : / - only.")
+    if values.get("match_claim") and not _CLAIM_RE.match(values["match_claim"]):
+        problems.append("The account matching claim is a claim name: letters, digits and . _ : / - only.")
     if values.get("default_role", ROLE_READER) not in DEFAULT_ROLES:
         problems.append("New accounts start as a Reader or a Scraper.")
     if not 1 <= len(values.get("provider_name", "")) <= 100:
@@ -218,6 +228,7 @@ def _build():
         "ROLE_MAPPING": dict(values["role_mapping"]),
         "DEFAULT_ROLE": values["default_role"],
         "CREATE_USERS": values["create_users"],
+        "MATCH_CLAIM": values["match_claim"],
         "ALLOW_PASSWORD_LOGIN": values["allow_password_login"],
         "AUTO_LOGIN": values["auto_login"],
         "SESSION_LIFETIME_SECONDS": values["session_lifetime_seconds"],
