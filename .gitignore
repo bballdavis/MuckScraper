@@ -15,7 +15,11 @@ printouts
 .gitignore
 .claude
 .agents
-tests
+# Our own tests stay local. Tests that come with contributors' pull
+# requests are kept in the repo: un-ignore each one by name.
+tests/*
+!tests/test_settings_form_ownership.py
+!tests/test_ai_task_network_errors.py
 
 # Personal Headline feature files
 aggregator/public_app.py
@@ -39,7 +43,6 @@ docker-compose.private.yml
 fableaudit.md
 TODO.md
 TROUBLESHOOTINGHL.md
-tests
 scripts
 
 # Internal working docs — not for the public repo
