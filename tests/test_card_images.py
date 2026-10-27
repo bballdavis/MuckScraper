@@ -127,9 +127,11 @@ class CardImageTemplateTests(unittest.TestCase):
     def render(self, articles):
         env = Environment(loader=FileSystemLoader(TEMPLATES))
         env.globals.update(url_for=lambda *a, **k: "/", current_back=lambda: "", can=lambda r: False)
-        from aggregator.story_image import lead_image
+        from aggregator.story_image import image_focus, lead_image, object_position
+        env.filters["object_position"] = object_position
+        photo = lead_image(articles, "")
         story = SimpleNamespace(articles=articles, display_articles=articles,
-                                lead_image_url=lead_image(articles, ""))
+                                lead_image_url=photo, lead_image_focus=image_focus(articles, photo))
         tpl = env.from_string("{% from 'story_card_macros.html' import card_image with context %}{{ card_image(story) }}")
         return tpl.render(story=story)
 
