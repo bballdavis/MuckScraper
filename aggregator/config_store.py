@@ -66,6 +66,21 @@ PROVIDER_FIELDS = {
         ("OPENROUTER_FAST_MODEL", "Fast model", "model"),
     ],
 }
+# Spending caps and prices for the paid providers (news_fetcher/llm_spend.py),
+# saved with the provider's form. Blank caps are unlimited; blank prices use
+# llm_spend.PRICES for the model when it has one.
+SPEND_FIELDS = {
+    key: [
+        (f"{prefix}_SPEND_DAILY_USD", "Daily cap", "money"),
+        (f"{prefix}_SPEND_MONTHLY_USD", "Monthly cap", "money"),
+        (f"{prefix}_PRICE_INPUT", "Input $ / 1M tokens", "money"),
+        (f"{prefix}_PRICE_OUTPUT", "Output $ / 1M tokens", "money"),
+    ]
+    for key, prefix in (("anthropic", "ANTHROPIC"), ("gemini", "GEMINI"), ("groq", "GROQ"), ("openrouter", "OPENROUTER"))
+}
+for _key, _fields in SPEND_FIELDS.items():
+    PROVIDER_FIELDS[_key] = PROVIDER_FIELDS[_key] + _fields
+
 ROUTING_FIELDS = ("LLM_PROVIDER", "LLM_FAST_PROVIDER")
 # Saved with the routing form but checked against the embedding providers.
 EMBEDDING_FIELDS = ("EMBEDDING_PROVIDER",)
@@ -130,6 +145,12 @@ def validate(name, value, kind=None):
         return None if _MODEL_RE.match(value) else "Model names have no spaces and are at most 200 characters."
     if kind == "int":
         return None if value.isdigit() and 0 < int(value) <= 100000 else "Enter a whole number."
+    if kind == "money":
+        try:
+            amount = float(value)
+        except ValueError:
+            return "Enter an amount in dollars, like 5 or 2.50."
+        return None if 0 <= amount <= 1_000_000 else "Enter an amount from 0 to 1,000,000."
     if kind == "percent":
         return None if value.isdigit() and 0 < int(value) <= 100 else "Enter a percent from 1 to 100."
     if kind == "schedule":

@@ -14,7 +14,7 @@ import os
 import time
 import logging
 import requests
-from news_fetcher import saved_settings
+from news_fetcher import llm_spend, saved_settings
 
 logger = logging.getLogger(__name__)
 
@@ -393,6 +393,10 @@ def generate_text(prompt, timeout=30, tier=TIER_QUALITY):
     _sync_config()
     provider = provider_for_tier(tier)
     model = model_for_tier(tier)
+    # A paid provider past its daily or monthly spending cap gets no call;
+    # callers see the same None as when it's down (news_fetcher/llm_spend.py).
+    if not llm_spend.allowed(provider):
+        return None
     if provider == "gemini":
         return _generate_text_gemini(prompt, timeout, model)
     if provider == "anthropic":
@@ -617,6 +621,13 @@ def _generate_text_gemini(prompt, timeout, model=None):
             model=model or GEMINI_MODEL,
             contents=prompt,
         )
+        meta = getattr(response, "usage_metadata", None)
+        llm_spend.record(
+            "gemini", model or GEMINI_MODEL, "chat",
+            getattr(meta, "prompt_token_count", None),
+            # Thinking tokens are billed as output.
+            (getattr(meta, "candidates_token_count", None) or 0) + (getattr(meta, "thoughts_token_count", None) or 0),
+        )
         text = (response.text or "").strip()
         return text or None
     except Exception as e:
@@ -656,6 +667,8 @@ def _generate_text_openai_compatible(prompt, timeout, model, provider, _attempt=
             json={
                 "model": model,
                 "messages": [{"role": "user", "content": prompt}],
+                # OpenRouter adds the call's cost to `usage` when asked.
+                **({"usage": {"include": True}} if provider == "openrouter" else {}),
             },
             timeout=timeout,
         )
@@ -675,7 +688,11 @@ def _generate_text_openai_compatible(prompt, timeout, model, provider, _attempt=
                 prompt, timeout, model, provider, _attempt=_attempt + 1
             )
         response.raise_for_status()
-        text = response.json()["choices"][0]["message"]["content"]
+        data = response.json()
+        usage = data.get("usage") or {}
+        llm_spend.record(provider, model, "chat", usage.get("prompt_tokens"), usage.get("completion_tokens"),
+                         usage.get("cost") if provider == "openrouter" else None)
+        text = data["choices"][0]["message"]["content"]
         return (text or "").strip() or None
     except Exception as e:
         logger.info(f"  [llm_client] {label} generate error: {e}")
@@ -721,6 +738,11 @@ def _generate_text_anthropic(prompt, timeout, model=None, _attempt=0):
             return _generate_text_anthropic(prompt, timeout, model, _attempt=_attempt + 1)
         response.raise_for_status()
         data = response.json()
+        usage = data.get("usage") or {}
+        llm_spend.record("anthropic", model, "chat",
+                         (usage.get("input_tokens") or 0) + (usage.get("cache_creation_input_tokens") or 0)
+                         + (usage.get("cache_read_input_tokens") or 0),
+                         usage.get("output_tokens"))
         if data.get("stop_reason") == "max_tokens":
             logger.warning(
                 f"  [llm_client] Anthropic response hit ANTHROPIC_MAX_TOKENS="
@@ -852,7 +874,7 @@ def embedding_model_name():
 
 
 def _get_embedding_gemini(text):
-    if not GEMINI_API_KEY:
+    if not GEMINI_API_KEY or not llm_spend.allowed("gemini"):
         return None
     try:
         import numpy as np
@@ -864,6 +886,9 @@ def _get_embedding_gemini(text):
             contents=text,
             config=types.EmbedContentConfig(output_dimensionality=768),
         )
+        # The embedding response carries no token count; about four
+        # characters a token is close enough for a budget.
+        llm_spend.record("gemini", GEMINI_EMBEDDING_MODEL, "embedding", max(1, len(text or "") // 4), 0)
         embedding = response.embeddings[0].values
         # gemini-embedding-001 does not auto-normalize truncated output the
         # way the model's native 3072-dim vectors are normalized, so an
