@@ -964,6 +964,25 @@ class StorySkip(db.Model):
     user = db.relationship("User", backref=db.backref("story_skips", lazy="dynamic", cascade="all, delete-orphan"))
 
 
+class LlmUsage(db.Model):
+    """One call to a paid LLM provider (news_fetcher/llm_spend.py): the
+    tokens it used and what it cost, for the daily and monthly spending caps
+    on Settings › LLM providers. `priced` is false when there was no price
+    for the model, so the call counts as free."""
+    __tablename__ = "llm_usage"
+    __table_args__ = (db.Index("ix_llm_usage_provider_called_at", "provider", "called_at"),)
+
+    id            = db.Column(db.Integer, primary_key=True)
+    provider      = db.Column(db.String(16), nullable=False)
+    model         = db.Column(db.String(200), nullable=False, default="")
+    kind          = db.Column(db.String(16), nullable=False)  # chat / embedding
+    called_at     = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    input_tokens  = db.Column(db.Integer, nullable=True)
+    output_tokens = db.Column(db.Integer, nullable=True)
+    cost_usd      = db.Column(db.Numeric(12, 6), nullable=True)
+    priced        = db.Column(db.Boolean, nullable=False, default=True)
+
+
 class SourceApiCall(db.Model):
     """One request to a news source API (news_fetcher/api_budget.py): the
     New York Times, NewsAPI or GNews. Each key allows so many a day, so the
