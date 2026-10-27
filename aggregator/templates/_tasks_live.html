@@ -1,0 +1,141 @@
+{#- Settings › Tasks, the parts that change: rendered with the page and again
+    every few seconds (?partial=1) by tasks.html's script. -#}
+{% from 'icons.html' import icon %}
+{%- macro post(endpoint, label, cls='btn-quiet', args={}, hidden={}, disabled=false, title=none) -%}
+<form method="POST" action="{{ url_for(endpoint, **args) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {%- for k, v in hidden.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <button type="submit" class="btn {{ cls }}"{% if disabled %} disabled{% endif %}{% if title %} title="{{ title }}"{% endif %}>{{ label }}</button>
+</form>
+{%- endmacro %}
+{%- set status_chip = {'ok': 'chip-safe', 'run': 'chip-new', 'warn': 'chip-broad', 'bad': 'chip-danger', 'off': ''} %}
+
+{%- if not scheduler.alive %}
+<div class="notice is-error" role="alert">
+    <span><strong>The scheduler isn't running.</strong> {% if scheduler.heartbeat %}Its last heartbeat was {{ scheduler.heartbeat }} ago.{% else %}It hasn't checked in since this page was added; redeploy to start it.{% endif %} Nothing below runs until it's back.</span>
+    <form method="POST" action="{{ url_for('admin.restart_container', name='scheduler') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-broad">{{ icon('rotate-cw') }} Restart scheduler</button>
+    </form>
+</div>
+{%- elif scheduler.worker_alive == false %}
+<div class="notice" role="alert"><span><strong>The job queue worker stopped.</strong> The scheduler starts a new one within a few seconds.</span></div>
+{%- endif %}
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Running now</h2>
+        {%- if scheduler.alive %}<span class="tasks-beat"><span class="dot ok"></span>Scheduler up since {{ scheduler.since }} · checked in {{ scheduler.heartbeat }} ago</span>{% endif %}
+    </div>
+    {%- if running %}
+    <div class="tasks-now">
+        <div class="tasks-now-main">
+            <div class="row-label">{{ running.kind }} <span class="tasks-muted">· started {{ running.started }}, {{ running.elapsed }}</span></div>
+            <div class="tasks-stagebar" role="img" aria-label="Pipeline stages">
+                {%- for s in running.stages %}<span class="is-{{ s.state }}"></span>{% endfor %}
+            </div>
+            <div class="tasks-stagelabels">
+                {%- for s in running.stages %}<span class="is-{{ s.state }}">{{ s.label }}{% if s.time %} · {{ s.time }}{% endif %}{% if s.state == 'done' %} ✓{% elif s.state == 'skip' %} · skipped{% endif %}</span>{% endfor %}
+            </div>
+            {%- if running.step %}
+            <span class="row-sub{% if running.slow %} tasks-slow{% endif %}">{{ running.step }}, {{ running.step_elapsed }}{% if running.slow %} with no new step. A feed or the LLM may be slow; it times out on its own.{% endif %}</span>
+            {%- endif %}
+        </div>
+    </div>
+    {%- elif not other_running %}
+    <div class="panel-body tasks-muted">No pipeline run right now.</div>
+    {%- endif %}
+    {%- if other_running %}
+    <ul class="tasks-other">
+        {%- for op in other_running %}<li><span class="dot warn"></span>{{ op.label }}</li>{% endfor %}
+    </ul>
+    {%- endif %}
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Recurring</h2>
+        <p>Times are New York time. Run now and Pause take effect within 15 seconds.</p>
+    </div>
+    <table class="data-table tasks-table tasks-recurring">
+        <colgroup><col class="c-task"><col class="c-when"><col class="c-last"><col class="c-status"><col class="c-actions"></colgroup>
+        <thead><tr><th scope="col">Task</th><th scope="col">Schedule</th><th scope="col">Last run</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+        <tbody>
+        {%- for t in recurring %}
+            <tr>
+                <td data-label="Task"><div class="cell"><div class="row-label">{{ t.name }}</div><span class="row-sub">{{ t.desc }}</span></div></td>
+                <td data-label="Schedule"><div class="cell">{{ t.every }}<span class="row-sub">Next: {{ t.next }}</span></div></td>
+                <td data-label="Last run"><div class="cell">{% if t.last %}{{ t.last }}{% if t.took or t.summary %}<span class="row-sub{% if t.state == 'bad' %} tasks-error{% endif %}">{{ t.took or '' }}{% if t.took and t.summary %} · {% endif %}{{ t.summary or '' }}</span>{% endif %}{% else %}<span class="tasks-muted">Not yet</span>{% endif %}</div></td>
+                <td data-label="Status"><div class="cell"><span class="chip {{ status_chip[t.state] }}">{{ t.label }}</span></div></td>
+                <td class="tasks-actions">
+                    {{ post('admin.run_task_now', 'Starting…' if t.requested else 'Run now', args={'task_id': t.id}, disabled=t.requested or t.running or not scheduler.alive) }}
+                    {%- if t.paused %}
+                    {{ post('admin.pause_task', 'Resume', args={'task_id': t.id}, hidden={'paused': '0'}) }}
+                    {%- else %}
+                    {{ post('admin.pause_task', 'Pause', args={'task_id': t.id}) }}
+                    {%- endif %}
+                </td>
+            </tr>
+        {%- endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Recent pipeline runs</h2>
+        <p>Where each run's time went.</p>
+    </div>
+    {%- if history %}
+    <table class="data-table tasks-table tasks-history">
+        <colgroup><col class="c-started"><col class="c-took"><col class="c-stages"><col class="c-stored"><col class="c-status"></colgroup>
+        <thead><tr><th scope="col">Run</th><th scope="col">Took</th><th scope="col">Stages</th><th scope="col" class="num">Stored</th><th scope="col">Status</th></tr></thead>
+        <tbody>
+        {%- for r in history %}
+            <tr>
+                <td data-label="Run"><div class="cell">{{ r.started }}{% if r.kind != '—' %}<span class="row-sub">{{ r.kind }}</span>{% endif %}</div></td>
+                <td data-label="Took"><div class="cell">{{ r.took or '—' }}</div></td>
+                <td data-label="Stages"><div class="cell">
+                    {%- if r.segments %}
+                    <div class="tasks-timeline" role="img" aria-label="{% for s in r.segments %}{{ s.label }} {{ s.time }}{% if not loop.last %}, {% endif %}{% endfor %}">
+                        {%- for s in r.segments %}<i class="st-{{ s.key }}" style="width: {{ s.pct }}%" title="{{ s.label }}: {{ s.time }}"></i>{% endfor %}
+                    </div>
+                    {%- if r.slowest %}<span class="row-sub">{{ r.slowest }}</span>{% endif %}
+                    {%- else %}<span class="tasks-muted">Not recorded for this run</span>{% endif %}
+                </div></td>
+                <td data-label="Stored" class="num"><div class="cell">{{ r.stored if r.stored is not none else '—' }}</div></td>
+                <td data-label="Status"><div class="cell"><span class="chip {{ 'chip-safe' if r.status == 'ok' else 'chip-broad' }}">{{ 'OK' if r.status == 'ok' else ('Some errors' if r.status == 'partial_error' else r.status|capitalize) }}</span></div></td>
+            </tr>
+        {%- endfor %}
+        </tbody>
+    </table>
+    <div class="tasks-legend">{% for key, label, _ in stages %}<span><b class="st-{{ key }}"></b>{{ label }}</span>{% endfor %}</div>
+    {%- else %}
+    <div class="panel-body tasks-muted">No finished runs yet.</div>
+    {%- endif %}
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Queue</h2>
+        <p>{{ queue_counts.running }} running · {{ queue_counts.queued }} waiting · failures from the last day</p>
+    </div>
+    {%- if queue %}
+    <table class="data-table tasks-table tasks-queue">
+        <colgroup><col class="c-job"><col class="c-when"><col class="c-status"><col class="c-actions"></colgroup>
+        <thead><tr><th scope="col">Job</th><th scope="col">When</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+        <tbody>
+        {%- for j in queue %}
+            <tr>
+                <td data-label="Job"><div class="cell"><div class="row-label">{{ j.label }}</div><span class="row-sub">#{{ j.id }}{% if j.error %} · <span class="tasks-error">{{ j.error }}</span>{% endif %}</span></div></td>
+                <td data-label="When"><div class="cell">{{ j.when }}</div></td>
+                <td data-label="Status"><div class="cell"><span class="chip {{ {'running': 'chip-new', 'queued': '', 'error': 'chip-danger'}[j.status] }}">{{ {'running': 'Running', 'queued': 'Waiting', 'error': 'Failed'}[j.status] }}</span></div></td>
+                <td class="tasks-actions">{% if j.status == 'queued' %}{{ post('admin.cancel_job', 'Cancel', args={'job_id': j.id}) }}{% endif %}</td>
+            </tr>
+        {%- endfor %}
+        </tbody>
+    </table>
+    {%- else %}
+    <div class="panel-body tasks-muted">The queue is empty.</div>
+    {%- endif %}
+</section>

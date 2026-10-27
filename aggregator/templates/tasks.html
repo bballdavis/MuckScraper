@@ -1,0 +1,157 @@
+{#- Settings › Pipeline › Tasks (admin.tasks_page): the scheduler's live run,
+    recurring tasks, recent runs, the job queue and the one-off jobs.
+    _tasks_live.html is the part the page refreshes. Styles: static/css/tasks.css. -#}
+{% extends 'settings_base.html' %}
+{% from 'icons.html' import icon %}
+{% block title %}Tasks{% endblock %}
+{% block settings_key %}tasks{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/tasks.css') }}">{% endblock %}
+{% block settings_body %}
+{%- set risk_labels = {'safe': 'Safe', 'maintenance': 'Maintenance', 'broad': 'Broad change', 'danger': 'Danger'} %}
+<div class="page-head">
+    <h1>Tasks</h1>
+    <p>What the scheduler is doing, what runs next, and where the time goes. <a href="{{ url_for('admin.pipeline_schedule_page') }}">Run schedule</a> sets the pipeline hours.</p>
+</div>
+
+<div class="tasks-page">
+<div id="tasks-live" class="stack" aria-live="polite">
+{% include '_tasks_live.html' %}
+</div>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>One-off jobs</h2>
+        <div class="seg" role="group" aria-label="Show jobs">
+            <button type="button" data-risk="all" aria-pressed="true">All</button>
+            <button type="button" data-risk="safe" aria-pressed="false">Safe</button>
+            <button type="button" data-risk="broad" aria-pressed="false">Broad</button>
+            <button type="button" data-risk="danger" aria-pressed="false">Danger</button>
+        </div>
+    </div>
+    <div>
+        <table class="data-table jobs-table tasks-table tasks-oneoff">
+            <colgroup><col class="c-job"><col class="c-impact"><col class="c-last"><col class="c-actions"></colgroup>
+            <thead>
+                <tr>
+                    <th scope="col">Job</th>
+                    <th scope="col">Impact</th>
+                    <th scope="col">Last run</th>
+                    <th scope="col" class="num"><span class="visually-hidden">Action</span></th>
+                </tr>
+            </thead>
+            <tbody>
+            {%- for job in jobs %}
+                {%- set chip = {'safe': 'chip-safe', 'broad': 'chip-broad', 'danger': 'chip-danger'}.get(job.risk, '') %}
+                {%- set btn = {'broad': 'btn-broad', 'danger': 'btn-danger'}.get(job.risk, 'btn-quiet') %}
+                <tr data-risk="{{ job.risk }}">
+                    <td data-label="Job">
+                        <div class="row-label">{{ job.name }}</div>
+                        <span class="row-sub">{{ job.desc }}</span>
+                        <span class="chip {{ chip }} job-risk-inline">{{ risk_labels[job.risk] }}</span>
+                    </td>
+                    <td><span class="chip {{ chip }}">{{ risk_labels[job.risk] }}</span></td>
+                    <td class="muted" style="white-space: nowrap;"{% if job.bulk %} id="job-last-{{ job.bulk }}"{% endif %}>—</td>
+                    <td class="num">
+                        {%- if job.post %}
+                        <form method="POST" action="{{ url_for(job.post) }}"{% if job.confirm %} onsubmit="return confirm({{ job.confirm|tojson|forceescape }});"{% endif %}>
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="next" value="{{ url_for('admin.tasks_page') }}">
+                            <button type="submit" class="btn {{ btn }} btn-square" aria-label="{{ job.button }}: {{ job.name }}" title="{{ job.button }}{% if job.confirm %}…{% endif %}"{% if job.bulk %} id="job-btn-{{ job.bulk }}"{% endif %}>{{ icon('play') }}</button>
+                        </form>
+                        {%- else %}
+                        <button type="button" class="btn {{ btn }} btn-square" aria-label="{{ job.button }}: {{ job.name }}" title="{{ job.button }}…" data-script="{{ job.script }}" data-confirm="{{ job.confirm }}">{{ icon('play') }}</button>
+                        {%- endif %}
+                    </td>
+                </tr>
+            {%- endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Jobs: filter by impact. Broad also shows Maintenance, as in the mock's tabs.
+    document.querySelectorAll('.seg [data-risk]').forEach((tab) => {
+        tab.addEventListener('click', () => {
+            const risk = tab.dataset.risk;
+            document.querySelectorAll('.seg [data-risk]').forEach((t) => t.setAttribute('aria-pressed', String(t === tab)));
+            document.querySelectorAll('.jobs-table tbody tr').forEach((row) => {
+                const r = row.dataset.risk;
+                row.hidden = !(risk === 'all' || r === risk || (risk === 'broad' && r === 'maintenance'));
+            });
+        });
+    });
+
+    document.querySelectorAll('[data-script="merge-outlets"]').forEach((button) => {
+        button.addEventListener('click', () => {
+            if (!confirm(button.dataset.confirm)) return;
+            button.disabled = true;
+            fetch('{{ url_for("admin.merge_outlets") }}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content },
+            })
+                .then(r => r.json())
+                .then(data => {
+                    const cell = button.closest('tr').querySelector('td.muted');
+                    cell.textContent = data.status === 'ok'
+                        ? `Renamed ${data.renamed}, merged ${data.outlets_deleted}, moved ${data.articles_reassigned} articles`
+                        : 'Failed: ' + data.message;
+                })
+                .catch(e => { button.closest('tr').querySelector('td.muted').textContent = 'Request failed: ' + e; })
+                .finally(() => { button.disabled = false; });
+        });
+    });
+
+    // Last run for the queued jobs, from their task status.
+    const BULK_TASK_STATUS_URL_TEMPLATE = '{{ url_for("admin.bulk_task_status", action="__ACTION__") }}';
+    const BULK_ACTIONS = {{ jobs | selectattr('bulk') | map(attribute='bulk') | list | tojson }};
+
+    function shortTime(value) {
+        if (!value) return '';
+        const date = new Date(value + 'Z');
+        const today = new Date();
+        return date.toDateString() === today.toDateString()
+            ? 'Today, ' + date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+            : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+
+    function applyBulkStatus(action, status) {
+        const cell = document.getElementById('job-last-' + action);
+        const button = document.getElementById('job-btn-' + action);
+        if (!cell) return;
+        const state = status.status || 'idle';
+        if (state === 'running') cell.textContent = 'Running';
+        else if (state === 'error') cell.textContent = 'Failed ' + shortTime(status.finished_at);
+        else if (status.finished_at) cell.textContent = shortTime(status.finished_at);
+        else cell.textContent = '—';
+        cell.title = status.message || '';
+        if (button) button.disabled = state === 'running';
+    }
+
+    function pollBulkStatuses() {
+        BULK_ACTIONS.forEach((action) => {
+            fetch(BULK_TASK_STATUS_URL_TEMPLATE.replace('__ACTION__', action))
+                .then(r => r.json())
+                .then(status => applyBulkStatus(action, status))
+                .catch(() => {});
+        });
+    }
+
+    pollBulkStatuses();
+    setInterval(pollBulkStatuses, 5000);
+
+    // The live sections, every few seconds, unless a button there has focus.
+    const live = document.getElementById('tasks-live');
+    function refreshLive() {
+        if (document.hidden || live.contains(document.activeElement)) return;
+        fetch('{{ url_for("admin.tasks_page", partial=1) }}', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.text() : Promise.reject(r.status))
+            .then(html => { live.innerHTML = html; })
+            .catch(() => {});
+    }
+    setInterval(refreshLive, 8000);
+</script>
+{% endblock %}

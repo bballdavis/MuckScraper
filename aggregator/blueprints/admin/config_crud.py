@@ -159,9 +159,8 @@ def reset_prompt(key):
 
 
 def _mark_pipeline_schedule_changed():
-    """Record that PipelineSchedule was edited -- compared against
-    scheduler_started_at (set by scheduler.py on boot) to tell whether the
-    scheduler still needs a restart to pick up the change."""
+    """Record that PipelineSchedule was edited, to tell whether the running
+    scheduler has applied it yet (pipeline_schedule_restart_needed)."""
     now = datetime.utcnow().isoformat()
     setting = AppSetting.query.filter_by(key="pipeline_schedule_changed_at").first()
     if setting:
@@ -172,15 +171,15 @@ def _mark_pipeline_schedule_changed():
 
 
 def pipeline_schedule_restart_needed():
+    """Whether a schedule edit is still waiting on the scheduler. A running
+    scheduler applies edits on its next control tick (aggregator/
+    scheduler_tasks.py), so this is only true while it's down or stuck, or
+    on a build from before it re-read the schedule."""
+    from aggregator.scheduler_tasks import schedule_applied_since
     changed = AppSetting.query.filter_by(key="pipeline_schedule_changed_at").first()
     if not changed or not changed.value:
         return False
-    started = AppSetting.query.filter_by(key="scheduler_started_at").first()
-    if not started or not started.value:
-        # Schedule has been edited but the scheduler has never recorded a
-        # start (e.g. this migration/feature is newer than its last boot).
-        return True
-    return changed.value > started.value
+    return not schedule_applied_since(changed.value)
 
 
 @admin.route("/pipeline-schedule")
