@@ -171,6 +171,17 @@ DOMAIN_SOURCE_OVERRIDES = {
     "abc.net.au": "ABC News (Australia)",
     "cbc.ca": "CBC News",
     "dailymaverick.co.za": "Daily Maverick",
+    # Section feeds added 2026-10-27, whose titles don't name the outlet
+    # ("Ars Technica - All content", "Latest from Space.com", an empty one
+    # for Yahoo Sports, "CBS Sports Headlines").
+    "arstechnica.com": "Ars Technica",
+    "theverge.com": "The Verge",
+    "techcrunch.com": "TechCrunch",
+    "sciencenews.org": "Science News",
+    "space.com": "Space.com",
+    "cbssports.com": "CBS Sports",
+    "sports.yahoo.com": "Yahoo Sports",
+    "variety.com": "Variety",
 }
 
 

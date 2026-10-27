@@ -376,6 +376,33 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertTrue(all("why" in s for s in multi))
         self.assertEqual(self._get("/api/v1/stories?topic=Nope", token).status_code, 404)
 
+    def test_section_needs_a_third_of_the_articles(self):
+        """A big story that picked up Sports from one article out of four is
+        not a Sports story; one whose articles carry no topics keeps the
+        story's own (aggregator/sections.py)."""
+        from aggregator import db
+        from aggregator.models import Article, Story, Topic
+        from aggregator.sections import in_section
+        try:
+            sports, news = Topic(name="Sports"), Topic(name="US News")
+            big = Story(title="Big", topics=[sports, news])
+            game = Story(title="Game", topics=[sports, news])
+            untagged = Story(title="Old", topics=[sports])
+            db.session.add_all([sports, news, big, game, untagged])
+            db.session.flush()
+            for i in range(4):
+                db.session.add(Article(title=f"Big {i}", url=f"https://x.example/big{i}", story=big,
+                                       topics=[sports] if i == 0 else [news]))
+            db.session.add(Article(title="Game 1", url="https://x.example/g1", story=game, topics=[sports, news]))
+            db.session.add(Article(title="Game 2", url="https://x.example/g2", story=game, topics=[news]))
+            db.session.add(Article(title="Old 1", url="https://x.example/o1", story=untagged))
+            db.session.flush()
+            names = {s.title for s in Story.query.filter(in_section(sports))}
+            self.assertEqual(names, {"Game", "Old"})
+            self.assertEqual({s.title for s in Story.query.filter(in_section(news.id))}, {"Big", "Game"})
+        finally:
+            db.session.rollback()
+
     def test_bad_parameters_are_rejected(self):
         token = self._pair()
         for path in ("/api/v1/stories?limit=500", "/api/v1/stories?range=1y", "/api/v1/stories?sort=new",
@@ -505,6 +532,19 @@ class ApiEndToEndTests(unittest.TestCase):
         # A one-article story has no analysis to write: the summary stands in.
         lone = Story.query.get(self.ids["lone"])
         self.assertEqual(newsbox._needs(lone, "analysis"), {"summary"})
+        self._clear_newsbox()
+
+    def test_one_article_story_cannot_be_analyzed(self):
+        """can_analyze tells the app to hide its analysis buttons, and an
+        analysis asked for anyway queues the summary, not an error."""
+        self._clear_newsbox()
+        token = self._pair(scopes=("read", "summarize"))
+        self.assertTrue(self._get(f"/api/v1/stories/{self.ids['story']}", token).get_json()["can_analyze"])
+        lone = self._get(f"/api/v1/stories/{self.ids['lone']}", token).get_json()
+        self.assertFalse(lone["can_analyze"])
+        r = self._send("POST", f"/api/v1/stories/{self.ids['lone']}/summarize", token, json={"depth": "analysis"})
+        self.assertEqual(r.status_code, 202, r.get_json())
+        self.assertEqual((r.get_json()["state"], r.get_json()["step"]), ("pending", "summary"))
         self._clear_newsbox()
 
     def test_unsummarized_story_queues_one_job_and_turns_ready(self):

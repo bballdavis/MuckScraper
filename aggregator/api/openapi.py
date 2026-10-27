@@ -67,6 +67,8 @@ SCHEMAS = {
          "is_summarized", "has_analysis", "has_ai_headline", "has_updates", "breaking"],
         id=_I, section=_S, headline=_S, dek=_NS, image_url=_URL, image_focus=_FOCUS, logo_url=_LOGO, coverage=_ref("Coverage"),
         source_count=_I, updated_at=_DT, is_summarized=_B, has_analysis=_B, has_ai_headline=_B, has_updates=_B,
+        can_analyze={"type": "boolean", "description": "Two or more articles, so a multi-source analysis can be "
+                     "written. When false, hide analysis buttons; depth analysis writes the summary instead."},
         breaking={"oneOf": [_ref("BreakingChip"), {"type": "null"}],
                   "description": "Set while the story is breaking: show the Breaking chip, with these details "
                   "in its tooltip"},

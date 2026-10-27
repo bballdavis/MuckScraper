@@ -1,7 +1,7 @@
 """Store where each article photo's subject is (articles.image_focus_*).
 
 Revision ID: b6e2f9c4a8d1
-Revises: a4b42504ce6b
+Revises: f3c8a1e6d2b9
 Create Date: 2026-10-27
 
 `image_focus_x` / `image_focus_y` are the photo's focal point, 0..1 from the
@@ -13,7 +13,7 @@ from alembic import op
 
 
 revision = 'b6e2f9c4a8d1'
-down_revision = 'a4b42504ce6b'
+down_revision = 'f3c8a1e6d2b9'
 branch_labels = None
 depends_on = None
 
