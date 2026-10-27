@@ -146,12 +146,59 @@
     // The live sections, every few seconds, unless a button there has focus.
     const live = document.getElementById('tasks-live');
     function refreshLive() {
-        if (document.hidden || live.contains(document.activeElement)) return;
+        if (document.hidden || live.contains(document.activeElement) || live.querySelector(':popover-open')) return;
         fetch('{{ url_for("admin.tasks_page", partial=1) }}', { credentials: 'same-origin' })
             .then(r => r.ok ? r.text() : Promise.reject(r.status))
             .then(html => { live.innerHTML = html; })
             .catch(() => {});
     }
     setInterval(refreshLive, 8000);
+
+    // A failed task's full error: a popover under its short line, opened by a
+    // tap or click, or by hovering where there's a mouse.
+    function placeError(trigger, pop) {
+        const r = trigger.getBoundingClientRect();
+        const width = pop.offsetWidth, height = pop.offsetHeight;
+        const left = Math.max(16, Math.min(r.left, window.innerWidth - width - 16));
+        const below = r.bottom + 6;
+        pop.style.left = left + 'px';
+        pop.style.top = (below + height > window.innerHeight - 8 ? Math.max(8, r.top - height - 6) : below) + 'px';
+    }
+    live.addEventListener('toggle', (event) => {
+        const pop = event.target;
+        if (event.newState !== 'open' || !pop.classList || !pop.classList.contains('tasks-err-pop')) return;
+        const trigger = live.querySelector(`[popovertarget="${pop.id}"]`);
+        if (trigger) placeError(trigger, pop);
+    }, true);
+    if (window.matchMedia('(hover: hover)').matches) {
+        let hideTimer = null;
+        const popFor = (el) => {
+            const trigger = el.closest('.tasks-err');
+            if (trigger) return document.getElementById(trigger.getAttribute('popovertarget'));
+            return el.closest('.tasks-err-pop');
+        };
+        live.addEventListener('mouseover', (event) => {
+            const pop = popFor(event.target);
+            if (!pop) return;
+            clearTimeout(hideTimer);
+            live.querySelectorAll('.tasks-err-pop:popover-open').forEach((p) => { if (p !== pop) p.hidePopover(); });
+            if (!pop.matches(':popover-open')) { pop.dataset.hover = '1'; pop.showPopover(); }
+        });
+        live.addEventListener('mouseout', (event) => {
+            const pop = popFor(event.target);
+            if (!pop || pop.dataset.hover !== '1' || (event.relatedTarget && popFor(event.relatedTarget) === pop)) return;
+            hideTimer = setTimeout(() => { if (pop.dataset.hover === '1') pop.hidePopover(); }, 250);
+        });
+        // A click pins a hover-opened popover instead of closing it.
+        live.addEventListener('click', (event) => {
+            const trigger = event.target.closest('.tasks-err');
+            if (!trigger) return;
+            const pop = document.getElementById(trigger.getAttribute('popovertarget'));
+            if (pop && pop.dataset.hover === '1') { event.preventDefault(); delete pop.dataset.hover; clearTimeout(hideTimer); }
+        });
+        live.addEventListener('toggle', (event) => {
+            if (event.newState === 'closed' && event.target.dataset) delete event.target.dataset.hover;
+        }, true);
+    }
 </script>
 {% endblock %}
