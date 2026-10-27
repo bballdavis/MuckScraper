@@ -243,6 +243,12 @@
     text-transform: uppercase; white-space: nowrap;
 }
 .story.compact .card-meta .chip { margin-left: 8px; }
+/* The lean chip inside the grade pill keeps the pill's height and square
+   inner corner (theme.css .grade-pill). */
+.story.compact .grade-pill .bias-tag { height: 20px; border-radius: 0 4px 4px 0; }
+.story.compact .grade-pill.is-single .bias-tag { border-radius: 4px; }
+/* Its open tip sits over the cards below, as an open ⋯ menu does. */
+.story.compact:has(.grade-pill:hover, .grade-pill:focus) { z-index: 3; }
 .chip-flag { background: rgba(76, 76, 143, 0.12); color: var(--accent-text); }
 .chip-new { background: var(--bias-1-bg); color: var(--bias-1-fg); }
 .chip.scrape-success { background: rgba(29,111,66,0.12); color: #1d6f42; }
@@ -331,6 +337,8 @@
     .story-content { padding: 16px 14px; }
     .story.compact .story-content { padding: 10px 10px 10px 12px; }
     .story.compact .card-meta .meta-date { flex-basis: 100%; }
+    /* A single-article card leads with the outlet; the date below it gets no dot. */
+    .story.compact .card-meta .meta-item.meta-date::before { content: none; margin: 0; }
     .story.compact .card-meta .meta-date + .meta-item::before { content: none; margin: 0; }
     .story.compact .card-meta .meta-item { white-space: nowrap; }
     .story.compact .card-meta .meta-item + .meta-item::before { margin: 0 5px; }

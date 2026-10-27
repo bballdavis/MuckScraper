@@ -52,19 +52,26 @@ class ChipTests(unittest.TestCase):
                 continue
             html = self._render(Outlet(name=name))
             self.assertEqual(html.count('class="on"'), filled, level)
-            self.assertIn("data-tip=", html)
 
     def test_grade_and_lean_share_one_pill(self):
         env = Environment(loader=FileSystemLoader(TEMPLATES))
         env.globals.update(url_for=lambda *a, **k: "/", current_back=lambda: "", can=lambda r: False)
         tpl = env.from_string(
             "{% from 'story_card_macros.html' import grade_pill, bias_tag with context %}"
-            "{% call grade_pill(o) %}{{ bias_tag(3, unrated=false) }}{% endcall %}")
+            "{% call grade_pill(o, score=s) %}{{ bias_tag(3, unrated=false) }}{% endcall %}")
         graded = next(k for k in rep.GRADES)
-        html = tpl.render(o=Outlet(name=graded))
-        self.assertTrue(html.startswith('<span class="grade-pill">'))
+        html = tpl.render(o=Outlet(name=graded), s=3)
+        self.assertTrue(html.startswith('<span class="grade-pill" tabindex="0"'))
         self.assertLess(html.index("reporting-tag"), html.index("bias-tag"))
-        plain = tpl.render(o=Outlet(name="Some Blog Nobody Graded"))
+        # One tip for the pill, worded like the iOS app's popover.
+        self.assertIn("<strong>Reporting: ", html)
+        self.assertIn("Leans center.", html)
+        self.assertIn("Our grade, from Media Bias/Fact Check and Ad Fontes Media.", html)
+        lean_only = tpl.render(o=Outlet(name="Some Blog Nobody Graded"), s=3)
+        self.assertIn('class="grade-pill is-single"', lean_only)
+        self.assertNotIn("reporting-tag", lean_only)
+        self.assertIn("Leans center.", lean_only)
+        plain = tpl.render(o=Outlet(name="Some Blog Nobody Graded"), s=None)
         self.assertNotIn("grade-pill", plain)
         self.assertIn("bias-tag bias-3", plain)
 

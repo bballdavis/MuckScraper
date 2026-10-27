@@ -10,6 +10,7 @@
         {% block styles %}<style>...</style>{% endblock %}
         {% block body %}...{% endblock %}
         {% block scripts %}<script>...</script>{% endblock %}
+        {% block topbar %}{% call feed_topbar(...) %}...{% endcall %}{% endblock %}
 
     The sidebar lists the active topics itself (sidebar_topics()), so a page
     may pass its own `topics` (the Topics settings page passes inactive ones
@@ -44,7 +45,8 @@
 <body class="app-page {% block body_class %}{% endblock %}">
 {%- set sidebar_toggle_in_topbar = true -%}
 {%- set active_nav = (self.nav()|trim) or active_nav|default(none) -%}
-{{ feed_topbar(self.section()|trim, url_for('admin.list_articles')) }}
+{#- A page with its own search or Filters (Op/Ed) replaces the bar. -#}
+{% block topbar %}{{ feed_topbar(self.section()|trim, url_for('admin.list_articles')) }}{% endblock %}
 <div class="layout feed-layout">
     {% with topics = sidebar_topics() %}{% include 'sidebar_nav.html' %}{% endwith %}
     <div class="page-body">

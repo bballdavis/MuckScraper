@@ -45,10 +45,9 @@
 {%- endmacro %}
 
 {# The outlet's reporting grade from aggregator/outlet_reporting.py: the
-   word, then five bars filled up to the grade and coloured by it.
-   "Reporting" and what the grade means are in the tooltip (Philip,
-   2026-10-25). Nothing for an outlet with no grade. Styles: theme.css
-   .reporting-tag. Pages show it through grade_pill below. #}
+   word, then five bars filled up to the grade and coloured by it. Nothing
+   for an outlet with no grade. Styles: theme.css .reporting-tag. Pages show
+   it through grade_pill below, which carries the tooltip. #}
 {% set reporting_grades = {
     'very_high': (5, 'Very high', 'Consistently factual, well sourced, corrects quickly'),
     'high': (4, 'High', 'Factual and sourced, with rare failed fact checks'),
@@ -58,8 +57,8 @@
 {% macro reporting_tag(outlet) -%}
 {%- set grade = outlet.reporting if outlet else none -%}
 {%- if grade in reporting_grades -%}
-{%- set n, label, tip = reporting_grades[grade] -%}
-<span class="reporting-tag reporting-{{ grade|replace('_', '-') }}" tabindex="0" aria-label="Reporting: {{ label }}" data-tip="Reporting: {{ label }} ({{ n }} of 5). {{ tip }}. Our grade, from Media Bias/Fact Check and Ad Fontes Media.">
+{%- set n, label, _meaning = reporting_grades[grade] -%}
+<span class="reporting-tag reporting-{{ grade|replace('_', '-') }}">
     <span class="reporting-word" aria-hidden="true">{{ label }}</span><span class="reporting-dots" aria-hidden="true">{% for i in range(5) %}<i{% if i < n %} class="on"{% endif %}></i>{% endfor %}</span></span>
 {%- endif -%}
 {%- endmacro %}
@@ -67,13 +66,33 @@
 {# The reporting grade and the lean chip as one split pill: the grade on the
    left, the lean chip (the caller) filling the right end (Philip,
    2026-10-25). An outlet with no grade gets the lean chip alone.
+   Hover, focus or a tap opens one tip for the whole pill, worded like the
+   iOS app's GradePill popover (Philip, 2026-10-27): the grade and what it
+   means, which way the outlet leans (or that it is based abroad and not
+   rated on the US scale), its country, and where the grade comes from.
+   `score` is the lean the chip shows when it isn't the outlet's own (an
+   article's rating on the article page).
      {% call grade_pill(outlet) %}{{ outlet_bias_tag(outlet) }}{% endcall %} #}
-{% macro grade_pill(outlet) -%}
-{%- set chip = caller() -%}
-{%- if (outlet.reporting if outlet else none) in reporting_grades and chip|trim -%}
-<span class="grade-pill">{{ reporting_tag(outlet) }}{{ chip }}</span>
+{% macro grade_pill(outlet, score=none) -%}
+{%- set chip = caller()|trim -%}
+{%- set grade = outlet.reporting if outlet else none -%}
+{%- set graded = grade in reporting_grades -%}
+{%- set s = score if score is not none else (outlet.bias_score if outlet else none) -%}
+{%- set side = 'left' if s is not none and s <= 2.5 else 'center' if s is not none and s <= 3.5 else 'right' if s is not none else none -%}
+{%- set intl = s is none and outlet and outlet.is_international -%}
+{%- if not (graded or intl or side) -%}
+{{ chip }}
 {%- else -%}
-{{ reporting_tag(outlet) }}{{ chip }}
+<span class="grade-pill{{ ' is-single' if not (graded and chip) else '' }}" tabindex="0" aria-label="
+{%- if graded %}Reporting: {{ reporting_grades[grade][1] }}{% if side or intl %}, {% endif %}{% endif -%}
+{%- if intl %}International{% elif side %}{{ side|capitalize }} leaning{% endif %}">{{ reporting_tag(outlet) }}{{ chip }}
+<span class="tip" role="tooltip">
+    {%- if graded %}{% set n, label, meaning = reporting_grades[grade] %}<strong>Reporting: {{ label }} ({{ n }} of 5)</strong><span class="gp-line">{{ meaning }}.</span>{% endif -%}
+    {%- if intl %}<span class="gp-line gp-muted">Based outside the US{% if outlet.origin_label %} ({{ outlet.origin_label }}){% endif %}, so not rated on the US left / right scale.</span>
+    {%- elif side %}<span class="gp-line gp-muted">Leans {{ side }}.</span>{% endif -%}
+    {%- if not intl and outlet and outlet.flag and outlet.origin_label %}<span class="gp-line gp-muted">{{ outlet.flag }} {{ outlet.origin_label }}</span>{% endif -%}
+    {%- if graded %}<span class="gp-line gp-small">Our grade, from Media Bias/Fact Check and Ad Fontes Media.</span>{% endif -%}
+</span></span>
 {%- endif -%}
 {%- endmacro %}
 
@@ -228,7 +247,7 @@
 {%- endif -%}
 {%- endmacro %}
 
-{% macro story_card(story, compact=false, why=none, why_hot=false, why_icon=none) -%}
+{% macro story_card(story, compact=false, why=none, why_hot=false, why_icon=none, href=none) -%}
 {%- if compact %}
 {#- Compact (All / Grouped Stories): the image, the headline, one meta row
     (date, counts, flags), then the bottom row: the Left/Center/Right bar for
@@ -236,26 +255,31 @@
     down the right side holds the summary and analysis actions and the ⋯
     menu (Philip, 2026-10-22). The headline link stretches over the whole
     card; the ⋯ button sits above it. The page's call block fills the menu's
-    actions; the scrape results head the menu for signed-in readers. #}
+    actions; the scrape results head the menu for signed-in readers.
+    The Op/Ed page draws its columns with it too (opinion.OpinionCard, with
+    `href` to the column's page): no Breaking tag or AI actions for those.
+    `why` adds one meta item, as on the full card. #}
 {%- set article_count = story.articles|length %}
 {%- set single = story.display_articles|first if article_count == 1 else none %}
 {%- set actions = caller()|trim %}
 {%- set has_menu = actions or current_user.is_authenticated %}
-<div class="story compact" id="story-{{ story.id }}">
+{%- set opinion = story.is_opinion is defined and story.is_opinion %}
+<div class="story compact" id="{{ story.card_id if story.card_id is defined else 'story-' ~ story.id }}">
     <div class="story-layout">
         {{ card_image(story) }}
-        {{ breaking_chip(story) }}
+        {% if not opinion %}{{ breaking_chip(story) }}{% endif %}
         <div class="story-content">
-            <h2><a class="story-link" href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ headline_text(story) }}</a></h2>
+            <h2><a class="story-link" href="{{ href or url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ headline_text(story) }}</a></h2>
             <div class="card-meta">
                 {% if single and single.outlet %}<span class="meta-item">{{ single.outlet.name }}{{ outlet_flag(single.outlet) }}</span>{% endif %}
                 {% if story.last_updated %}<span class="meta-item meta-date">{{ story.last_updated|short_datetime }}</span>{% endif %}
                 {% if not single %}<span class="meta-item">{{ article_count }} article{{ 's' if article_count != 1 else '' }}{% if story.source_count is defined %} · {{ story.source_count }} outlet{{ 's' if story.source_count != 1 else '' }}{% endif %}</span>{% endif %}
+                {% if why %}<span class="meta-item">{{ why }}</span>{% endif %}
                 {% if story.edition_has_updates %}<span class="chip chip-new">New updates</span>{% endif %}
             </div>
             <div class="card-bottom">
                 {% if single %}
-                    {{ outlet_bias_tag(single.outlet) }}
+                    {% call grade_pill(single.outlet, score=single.outlet.bias_score if single.outlet else single.bias_score) %}{{ outlet_bias_tag(single.outlet) }}{% endcall %}
                     {% if single.bias_score and single.outlet and single.bias_score != single.outlet.bias_score %}
                     {{ bias_tag(single.bias_score, prefix='Article: ', unrated=false) }}
                     {% endif %}
@@ -267,8 +291,10 @@
         {#- The action rail down the right side, mirroring the image: summary,
             analysis, then the ⋯ menu (Philip, 2026-10-22). -#}
         <div class="card-rail">
+            {% if not opinion %}
             {{ story_summary_action(story, can('scraper')) }}
             {{ story_analysis_action(story, can('scraper')) }}
+            {% endif %}
             {% if has_menu %}
             <div class="card-menu">
                 <button type="button" class="card-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" title="More actions">{{ icon('more-horizontal') }}</button>

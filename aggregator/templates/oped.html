@@ -1,223 +1,126 @@
 {% extends '_app_page.html' %}
-{% from 'story_card_macros.html' import bias_tag with context %}
+{% from 'story_card_macros.html' import story_card with context %}
 {% from 'pagination.html' import pager %}
 {% from 'icons.html' import icon %}
-{% from 'oped_columns.html' import oped_columns, oped_roundup with context %}
-{#- Op/Ed list (admin.oped_list, blueprints/admin/oped.py). Laid out like
-    All Stories (articles.html); cards reuse story_card.css. -#}
-{% block title %}Op/Ed{% endblock %}
-{% block section %}Op/Ed{% endblock %}
+{#- Opinion & Editorials (admin.oped_list, blueprints/admin/oped.py), built
+    like the section pages in articles.html (Philip, 2026-10-27): the top
+    bar's search (live results are columns) and Filters popover, the filter
+    chips, then compact story cards. Latest draws each column as a
+    one-article story (opinion.OpinionCard), By story the stories the
+    columns are about, as a section lists them. -#}
+{% block title %}{{ section_title }}{% endblock %}
+{% block section %}{{ section_title }}{% endblock %}
 {% block head %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/story_card.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/oped_columns.css') }}">
 {% endblock %}
 {% block styles %}
     <style>
-
-
         .main {
             flex: 1;
             min-width: 0;
-            padding: 24px 40px 0;
+            padding: 20px 40px 0;
             max-width: var(--width-list);
             margin: 0 auto;
             position: relative;
         }
-
-        .main-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            position: sticky;
-            top: 0;
-            background: var(--topbar-bg);
-            padding: 16px 40px;
-            margin-bottom: 20px;
-            z-index: 100;
-        }
-
-        h1 { font-size: 18px; font-weight: 800; color: var(--topbar-text); letter-spacing: -0.5px; }
-
-        .page-title { font-size: var(--fs-page-title); font-weight: 800; margin-bottom: 6px; }
-        .page-intro { font-size: var(--fs-meta); color: var(--text-muted); margin-bottom: 20px; max-width: 70ch; line-height: 1.5; }
-
-        .search-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-        .search-bar input {
-            padding: 12px 16px;
-            flex: 1;
-            max-width: 400px;
-            font-size: 15px;
-            border: 1px solid var(--input-border);
-            border-radius: 12px;
-            background: var(--surface);
-            color: var(--text);
-            box-shadow: var(--shadow);
-        }
-        .search-bar input:focus { outline: none; border-color: var(--accent); }
-        .search-bar button {
-            padding: 12px 24px;
-            font-size: 15px;
-            font-weight: 600;
-            background: var(--accent);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-        }
-        .search-bar button:hover { background: var(--accent-dark); }
-        .search-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .clear-search { font-size: 13px; font-weight: 700; color: var(--accent-text); text-decoration: none; }
-
-        .filter-row { margin-bottom: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .filter-label {
-            font-size: 12px;
-            font-weight: 800;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--text-faint);
-        }
-        .filter-link {
-            display: inline-flex;
-            align-items: center;
-            padding: 6px 10px;
-            border-radius: 999px;
-            border: 1px solid var(--border);
-            background: var(--surface);
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 12px;
-            font-weight: 700;
-        }
-        .filter-link.active { color: var(--text); border-color: var(--accent); }
-
-        .result-count { font-size: var(--fs-meta); color: var(--text-muted); margin: 8px 0 18px; }
-
-        .oped-excerpt { font-size: var(--fs-body); color: var(--text-muted); line-height: 1.5; margin-top: 4px; }
-        .oped-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: var(--fs-meta); color: var(--text-muted); }
-        /* Same chip shape as articles.html (colours come from theme.css). */
-        .bias-tag {
-            display: inline-block;
-            font-size: var(--fs-label);
-            font-weight: 800;
-            padding: 2px 8px;
-            border-radius: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
         .bias-none { background-color: #ddd; color: #666; }
-        .outlet-name { color: var(--text-muted); font-size: 13px; font-weight: 600; }
-        .external-mark { display: inline-block; font-size: var(--fs-label); color: var(--text-faint); margin-left: 6px; text-decoration: none; }
-        .external-mark:hover { color: var(--accent-text); }
-
-        .by-story { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 20px 24px; margin-bottom: 20px; }
-        .by-story h2 { font-size: var(--fs-card-title); font-weight: 800; line-height: 1.3; margin-bottom: 4px; }
-        .by-story h2 a { color: var(--text); text-decoration: none; }
-        .by-story h2 a:hover { color: var(--accent-text); }
-        .by-story .by-story-meta { font-size: var(--fs-meta); color: var(--text-muted); margin-bottom: 16px; }
-
         .empty { text-align: center; padding: 80px 0; color: var(--text-faint); font-style: italic; }
-
         @media (max-width: 900px) {
-            .main { padding: 16px 20px 0; }
+            .main { padding: 16px 16px 0; }
         }
     </style>
 {% endblock %}
+
+{%- set base = {'view': 'story' if active_view == 'story' else none, 'range': active_range, 'leaning': active_leaning, 'q': active_search_query} -%}
+{%- set range_short = {'24h': '24h', '7d': '7 days', '30d': '30 days', 'all': 'All'} -%}
+
+{% block topbar %}
+{% call feed_topbar(section_title, url_for('admin.oped_list'), active_search_query,
+                    {'view': base.view, 'range': active_range, 'leaning': active_leaning},
+                    suggest_scope='oped', placeholder='Search columns and outlets') %}
+    <div>
+        <span class="fp-label">Show</span>
+        <div class="fp-segment">
+            <a href="{{ url_for('admin.oped_list', **dict(base, view=none)) }}" class="{{ 'active' if active_view != 'story' }}"{% if active_view != 'story' %} aria-current="true"{% endif %}>Columns</a>
+            <a href="{{ url_for('admin.oped_list', **dict(base, view='story')) }}" class="{{ 'active' if active_view == 'story' }}"{% if active_view == 'story' %} aria-current="true"{% endif %}>By story</a>
+        </div>
+    </div>
+    <div>
+        <span class="fp-label">Time range</span>
+        <div class="fp-segment">
+            {%- for value, label in time_ranges %}
+            <a href="{{ url_for('admin.oped_list', **dict(base, range=value)) }}" class="{{ 'active' if active_range == value }}"{% if active_range == value %} aria-current="true"{% endif %}>{{ range_short.get(value, label) }}</a>
+            {%- endfor %}
+        </div>
+    </div>
+    <div>
+        <span class="fp-label">Outlet leaning</span>
+        <div class="fp-chips">
+            <a href="{{ url_for('admin.oped_list', **dict(base, leaning=none)) }}" class="{{ 'active' if not active_leaning }}">All</a>
+            {%- for value, label in leanings %}
+            <a href="{{ url_for('admin.oped_list', **dict(base, leaning=value)) }}" class="{{ 'active' if active_leaning == value }}">{{ label }}</a>
+            {%- endfor %}
+        </div>
+    </div>
+    <div class="fp-foot">
+        <a href="{{ url_for('admin.oped_list', q=active_search_query) }}">Reset filters</a>
+    </div>
+{% endcall %}
+{% endblock %}
+
 {% block body %}
 <div class="main">
-        <h2 class="page-title">Op/Ed</h2>
-        <p class="page-intro">Opinion columns, op-eds and editorials from the outlets MuckScraper reads. They're kept out of the news stories and editions and collected here instead. Open one for what it argues, the news story it's about and its text, or use ↗ to go straight to the publisher.</p>
-
-        <div class="filter-row">
-            <span class="filter-label">View</span>
-            <a href="{{ url_for('admin.oped_list', range=active_range, leaning=active_leaning, q=active_search_query or '') }}"
-               class="filter-link {% if active_view == 'latest' %}active{% endif %}">Latest</a>
-            <a href="{{ url_for('admin.oped_list', view='story') }}"
-               class="filter-link {% if active_view == 'story' %}active{% endif %}">By story</a>
+    {% include '_flashes.html' %}
+    <div class="active-filters">
+        {%- set n = story_total if active_view == 'story' else total %}
+        <p>{{ '{:,}'.format(n) }} {% if active_view == 'story' %}stor{{ 'y' if n == 1 else 'ies' }} with columns{% else %}column{{ '' if n == 1 else 's' }}{% endif %}{% if active_search_query %} matching “{{ active_search_query }}”{% endif %}</p>
+        <div class="filter-chips">
+            {% if active_search_query %}
+            <a class="filter-chip" href="{{ url_for('admin.oped_list', **dict(base, q=none)) }}" aria-label="Clear search {{ active_search_query }}">“{{ active_search_query }}” {{ icon('x') }}</a>
+            {% endif %}
+            {% if active_view == 'story' %}
+            <a class="filter-chip" href="{{ url_for('admin.oped_list', **dict(base, view=none)) }}" aria-label="Show latest columns instead">By story {{ icon('x') }}</a>
+            {% endif %}
+            {% if active_range != 'all' %}
+            <a class="filter-chip" href="{{ url_for('admin.oped_list', **dict(base, range='all')) }}" aria-label="Remove filter: last {{ dict(time_ranges)[active_range]|lower }}">Last {{ dict(time_ranges)[active_range]|lower }} {{ icon('x') }}</a>
+            {% endif %}
+            {% if active_leaning %}
+            <a class="filter-chip" href="{{ url_for('admin.oped_list', **dict(base, leaning=none)) }}" aria-label="Remove filter: {{ active_leaning }}-leaning outlets">{{ dict(leanings)[active_leaning] }} outlets {{ icon('x') }}</a>
+            {% endif %}
         </div>
-
-        {% if active_view == 'story' %}
-        <p class="result-count">The news stories with the most columns about them, newest first among equals. Each column is filed under its outlet's leaning; the line under it says what it argues.</p>
-        {% for story, columns in by_story %}
-        <div class="by-story">
-            <h2><a href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">{{ story.display_headline }}</a></h2>
-            <p class="by-story-meta">{{ story.articles|length }} news article{{ 's' if story.articles|length != 1 else '' }} · {{ columns.values()|map('length')|sum }} column{{ 's' if columns.values()|map('length')|sum != 1 else '' }}</p>
-            {{ oped_roundup(story) }}
-            {{ oped_columns(columns) }}
-        </div>
-        {% else %}
-        <div class="empty"><p>No columns are linked to a news story yet.</p></div>
-        {% endfor %}
-        {% else %}
-        <form method="GET" action="{{ url_for('admin.oped_list') }}" class="search-bar">
-            <input type="hidden" name="range" value="{{ active_range }}">
-            <input type="hidden" name="leaning" value="{{ active_leaning or '' }}">
-            <input type="text" name="q" value="{{ active_search_query or '' }}" placeholder="Search titles and outlets...">
-            <div class="search-actions">
-                <button type="submit">Search</button>
-                {% if active_search_query %}
-                <a href="{{ url_for('admin.oped_list', range=active_range, leaning=active_leaning) }}" class="clear-search">Clear</a>
-                {% endif %}
-            </div>
-        </form>
-
-        <div class="filter-row">
-            <span class="filter-label">Time Range</span>
-            {% for value, label in time_ranges %}
-                <a href="{{ url_for('admin.oped_list', range=value, leaning=active_leaning, q=active_search_query or '') }}"
-                   class="filter-link {% if active_range == value %}active{% endif %}">{{ label }}</a>
-            {% endfor %}
-        </div>
-
-        <div class="filter-row">
-            <span class="filter-label">Outlet Leaning</span>
-            <a href="{{ url_for('admin.oped_list', range=active_range, q=active_search_query or '') }}"
-               class="filter-link {% if not active_leaning %}active{% endif %}">All</a>
-            {% for value, label in leanings %}
-                <a href="{{ url_for('admin.oped_list', range=active_range, leaning=value, q=active_search_query or '') }}"
-                   class="filter-link {% if active_leaning == value %}active{% endif %}">{{ label }}</a>
-            {% endfor %}
-        </div>
-
-        <p class="result-count">{{ '{:,}'.format(total) }} piece{{ 's' if total != 1 else '' }}</p>
-
-        {% if pieces %}
-            {% for piece in pieces %}
-            <div class="story" id="oped-{{ piece.id }}">
-                <div class="story-layout">
-                    <div class="story-image">
-                        {% if piece.image_url %}
-                            <img src="{{ piece.image_url }}" alt="" loading="lazy">
-                        {% else %}
-                            <div class="story-image-placeholder">{{ icon('newspaper') }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="story-content">
-                        <h2><a href="{{ url_for('admin.oped_piece', piece_id=piece.id, back=current_back()) }}">{{ piece.title }}</a><a href="{{ piece.url }}" target="_blank" rel="noopener noreferrer" class="external-mark" aria-label="Open on the publisher's site" title="Open on the publisher's site">↗</a></h2>
-                        {% if excerpts.get(piece.id) %}
-                            <p class="oped-excerpt">{{ excerpts[piece.id] }}</p>
-                        {% endif %}
-                        <div class="oped-meta">
-                            <span class="outlet-name">{{ piece.outlet.name if piece.outlet else piece.source }}</span>
-                            {{ bias_tag(piece.bias_score) }}
-                            {% if piece.date %}
-                                <span class="meta-item"><span class="local-date" data-utc="{{ piece.date.isoformat() }}Z">{{ piece.date.strftime('%Y-%m-%d %H:%M') }} UTC</span></span>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        {% else %}
-            <div class="empty">
-                <p>No opinion pieces in this window. Try a longer time range.</p>
-            </div>
-        {% endif %}
-
-        {{ pager(page, total_pages) }}
-        {% endif %}
     </div>
+
+    {% if active_view == 'story' %}
+        {% for story, columns in by_story %}
+        {%- set n = columns.values()|map('length')|sum %}
+        {% call story_card(story, compact=true, why=n ~ ' column' ~ ('' if n == 1 else 's')) %}
+            <a class="card-menu-item" role="menuitem" href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">Open full coverage and columns</a>
+        {% endcall %}
+        {% else %}
+        <div class="empty"><p>No columns about a news story {% if active_range != 'all' %}in the last {{ dict(time_ranges)[active_range]|lower }}{% else %}yet{% endif %}.</p>
+            {% if active_range != 'all' %}<p><a href="{{ url_for('admin.oped_list', **dict(base, range='all')) }}">Show all time</a></p>{% endif %}</div>
+        {% endfor %}
+    {% else %}
+        {% for card in cards %}
+        {% call story_card(card, compact=true, href=url_for('admin.oped_piece', piece_id=card.id, back=current_back())) %}
+            <a class="card-menu-item" role="menuitem" href="{{ url_for('admin.oped_piece', piece_id=card.id, back=current_back()) }}">{{ 'Read what it argues and its text' if current_user.is_authenticated else 'Read what it argues' }}</a>
+            <a class="card-menu-item" role="menuitem" href="{{ card.piece.url }}" target="_blank" rel="noopener noreferrer">Open on the publisher's site</a>
+            {% if card.story %}
+            <a class="card-menu-item" role="menuitem" href="{{ url_for('public.view_story', story_id=card.story.id, back=current_back()) }}">Open the news story</a>
+            {% endif %}
+        {% endcall %}
+        {% else %}
+        <div class="empty"><p>No columns {% if active_search_query %}match “{{ active_search_query }}”{% elif active_range != 'all' %}in the last {{ dict(time_ranges)[active_range]|lower }}{% else %}yet{% endif %}.</p>
+            {% if active_range != 'all' %}<p><a href="{{ url_for('admin.oped_list', **dict(base, range='all')) }}">Show all time</a></p>{% endif %}</div>
+        {% endfor %}
+        {{ pager(page, total_pages) }}
+    {% endif %}
+</div>
 {% endblock %}
 {% block scripts %}
+<script>
+    {% include '_ai_task_script.html' %}
+</script>
 <script src="{{ url_for('static', filename='js/local_time.js') }}" data-timezone="{{ config['DISPLAY_TIMEZONE'] }}"></script>
+<script src="{{ url_for('static', filename='js/ai_toast.js') }}"></script>
 {% endblock %}

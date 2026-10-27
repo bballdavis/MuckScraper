@@ -77,7 +77,7 @@
     </style>
 </head>
 <body>
-{%- set section_title = active_label or ('Grouped Stories' if is_multi_view else 'All Stories') -%}
+{%- set section_title = (active_label|section_name if active_label else none) or ('Grouped Stories' if is_multi_view else 'All Stories') -%}
 {#- Every filter link keeps the others; scrape_param (not active_scrape_status)
     so an explicit "All" survives a saved scrape default. -#}
 {%- set base = {'topic': active_label, 'scrape_status': scrape_param, 'show_single': show_single|string|lower, 'q': active_search_query, 'range': active_range} -%}
@@ -181,7 +181,7 @@
                 {%- set range_label = (time_ranges|selectattr(0, 'equalto', active_range)|map(attribute=1)|first) or '' %}
                 {% if active_label and not active_search_query %}
                 {#- A section with nothing of its own says so; it never stands in other stories (Philip, 2026-10-27). #}
-                <p>No {{ active_label }} stories {% if active_range != 'all' %}in the last {{ range_label }}{% else %}yet{% endif %}.</p>
+                <p>No {{ active_label|section_name }} stories {% if active_range != 'all' %}in the last {{ range_label }}{% else %}yet{% endif %}.</p>
                 {% if active_range != 'all' %}<p><a href="{{ url_for(list_endpoint, topic=active_label, scrape_status=scrape_param, show_single=show_single|string|lower, range='all') }}">Show all time</a></p>{% endif %}
                 {% else %}
                 <p>No articles found. Try fetching a new topic or check back later.</p>
@@ -215,83 +215,7 @@
 
     {% include 'sidebar_script.html' %}
 
-    const aiTaskStartUrl = "{{ url_for('admin.start_ai_task') }}";
-    const aiTaskStatusTemplate = "{{ url_for('admin.ai_task_status', task_type='TASK_TYPE', resource_id=999999) }}";
-    let activeAiTaskPoll = null;
-
-    function aiTaskStatusUrl(taskType, resourceId) {
-        return aiTaskStatusTemplate
-            .replace('TASK_TYPE', taskType)
-            .replace('999999', String(resourceId));
-    }
-
-
-    async function pollAiTask(taskType, resourceId, button) {
-        if (activeAiTaskPoll) {
-            clearInterval(activeAiTaskPoll);
-            activeAiTaskPoll = null;
-        }
-
-        const statusUrl = aiTaskStatusUrl(taskType, resourceId);
-        activeAiTaskPoll = setInterval(async () => {
-            const response = await fetch(statusUrl);
-            const status = await response.json();
-            aiTaskToast(taskType, status, status.status === 'error');
-
-            if (status.status === 'success') {
-                clearInterval(activeAiTaskPoll);
-                activeAiTaskPoll = null;
-                window.location.reload();
-                return;
-            }
-
-            if (status.status === 'error') {
-                clearInterval(activeAiTaskPoll);
-                activeAiTaskPoll = null;
-                if (button) {
-                    button.disabled = false;
-                    button.classList.remove('busy');
-                    if (button.dataset.originalText) button.textContent = button.dataset.originalText;
-                }
-            }
-        }, 2000);
-    }
-
-    async function startAiTask(taskType, resourceId, button) {
-        if (button) {
-            button.disabled = true;
-            // Icon buttons (ai_actions.html) pulse; text buttons say so.
-            if (button.classList.contains('act')) button.classList.add('busy');
-            else { button.dataset.originalText = button.textContent; button.textContent = 'Working...'; }
-        }
-
-        const response = await fetch(aiTaskStartUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content,
-            },
-            body: JSON.stringify({
-                task_type: taskType,
-                resource_id: resourceId,
-            }),
-        });
-
-        const payload = await response.json();
-        aiTaskToast(taskType, payload.status || payload, response.status >= 400);
-
-        if (!response.ok && response.status !== 409) {
-            if (button) {
-                button.disabled = false;
-                button.classList.remove('busy');
-                if (button.dataset.originalText) button.textContent = button.dataset.originalText;
-            }
-            return;
-        }
-
-        await pollAiTask(taskType, resourceId, button);
-    }
-
+    {% include '_ai_task_script.html' %}
 
     document.querySelectorAll('a[role="switch"]').forEach(function (el) {
         el.addEventListener('keydown', function (e) { if (e.key === ' ') { e.preventDefault(); el.click(); } });

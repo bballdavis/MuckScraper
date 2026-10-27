@@ -1,4 +1,4 @@
-{% from 'story_card_macros.html' import bias_tag with context %}
+{% from 'story_card_macros.html' import bias_tag, grade_pill with context %}
 {% from 'account_menu.html' import account_menu with context %}
 {% from 'icons.html' import icon %}
 {% from 'breadcrumb.html' import back_link %}
@@ -217,7 +217,7 @@
         {% call title_meta() %}
             {{ meta_item('Source', outlet_name) }}
             {% if piece.date %}{{ meta_item('Published', when=piece.date) }}{% endif %}
-            {{ bias_tag(piece.bias_score) }}
+            {% call grade_pill(piece.outlet, score=piece.bias_score) %}{{ bias_tag(piece.bias_score) }}{% endcall %}
         {% endcall %}
 
         {% if piece.image_url %}

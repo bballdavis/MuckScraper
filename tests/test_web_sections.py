@@ -74,10 +74,19 @@ class SectionPageTests(unittest.TestCase):
 
     def test_empty_section_says_so(self):
         page = self._get("/admin/articles?topic=Sci/Tech&range=24h&show_single=true")
-        self.assertIn("No Sci/Tech stories in the last 24 hours.", page)
+        self.assertIn("No Science &amp; Technology stories in the last 24 hours.", page)
         self.assertIn("Show all time", page)
         self.assertNotIn("Senate budget fight", page)
-        self.assertIn("No Sci/Tech stories yet.", self._get("/admin/articles?topic=Sci/Tech&range=all&show_single=true"))
+        self.assertIn("No Science &amp; Technology stories yet.", self._get("/admin/articles?topic=Sci/Tech&range=all&show_single=true"))
+
+    def test_sections_use_full_names(self):
+        page = self._get("/admin/articles?topic=Sci/Tech&range=all&show_single=true")
+        # The section header and the sidebar spell the key out; the link keeps it.
+        self.assertIn('<span class="ft-section">Science &amp; Technology</span>', page)
+        self.assertIn('<span class="full-text">Science &amp; Technology</span>', page)
+        self.assertIn("topic=Sci/Tech", page)
+        self.assertNotIn(">Sci/Tech<", page)
+        self.assertIn('<span class="full-text">Opinion &amp; Editorials</span>', page)
 
 
 if __name__ == "__main__":

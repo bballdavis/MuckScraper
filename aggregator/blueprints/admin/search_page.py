@@ -22,7 +22,8 @@ from sqlalchemy.orm import aliased
 from aggregator import db
 from aggregator.article_signals import bias_bucket_for_score
 from aggregator.display_time import local_day_end_utc, local_day_start_utc, short_datetime
-from aggregator.models import Article, Outlet, Story, Topic, story_topics
+from aggregator.models import Article, OpinionPiece, Outlet, Story, Topic, story_topics
+from aggregator.opinion import opinion_filters
 from aggregator.search import SearchUnavailableError, search_article_ids, search_story_ids
 
 from . import admin
@@ -416,6 +417,7 @@ def search_page():
 # Live results under the feed's header search box (static/js/feed_header.js).
 SUGGEST_STORIES = 5
 SUGGEST_ARTICLES = 4
+SUGGEST_OPEDS = 6
 SUGGEST_MIN_CHARS = 2
 
 
@@ -453,6 +455,37 @@ def _story_logos(story_ids):
     return logos
 
 
+def _oped_suggestions(text_query, window):
+    """The newest few Opinion & Editorials columns matching `text_query`, for
+    the Op/Ed page's top bar (opinion_filters(): title, outlet, stance)."""
+    query = OpinionPiece.query.filter(*opinion_filters(text_query, window["since"]))
+    total = query.count()
+    pieces = (query.order_by(OpinionPiece.date.desc().nullslast(), OpinionPiece.id.desc())
+              .limit(SUGGEST_OPEDS).all())
+    opeds = []
+    for piece in pieces:
+        bucket = bias_bucket_for_score(piece.bias_score)
+        opeds.append({
+            "title": piece.title,
+            "url": url_for("admin.oped_piece", piece_id=piece.id),
+            "image": piece.image_url,
+            "logo": piece.outlet.logo_url if piece.outlet else None,
+            "outlet": piece.outlet.name if piece.outlet else piece.source,
+            "lean": BIAS_CHIPS[bucket][1],
+            "lean_class": BIAS_CHIPS[bucket][2],
+            "date": short_datetime(piece.date),
+        })
+    return {
+        "q": text_query,
+        "stories": [],
+        "articles": [],
+        "opeds": opeds,
+        "story_total": 0,
+        "oped_total": total,
+        "all_url": url_for("admin.oped_list", q=text_query, range=window["range"]),
+    }
+
+
 @admin.route("/search/suggest")
 @public_or_login
 def search_suggest():
@@ -463,6 +496,8 @@ def search_suggest():
     if len(text_query) < SUGGEST_MIN_CHARS:
         return jsonify({"q": text_query, "stories": [], "articles": [], "story_total": 0})
     window = _resolve_window(request.args)
+    if request.args.get("scope") == "oped":
+        return jsonify(_oped_suggestions(text_query, window))
 
     story_ids = article_ids = None
     try:
