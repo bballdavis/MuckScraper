@@ -627,6 +627,28 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertEqual(self._send("POST", path, token, json={"refresh": "yes"}).status_code, 400)
         self._clear_newsbox()
 
+    def test_headline_only_story_and_article_text(self):
+        """can_summarize is false when no article has text to summarize; each
+        article says how much was read, with the feed teaser as excerpt."""
+        from aggregator import article_text
+        from aggregator.models import Article, Story
+        token = self._pair()
+        lone = self._get(f"/api/v1/stories/{self.ids['lone']}", token).get_json()
+        self.assertFalse(lone["can_summarize"])
+        article = lone["articles"]["left"][0]
+        self.assertEqual(article["text"], "none")
+        detail = self._get(f"/api/v1/articles/{article['id']}", token).get_json()
+        self.assertIsNone(detail["excerpt"])
+        a1 = self._get(f"/api/v1/articles/{self.ids['a1']}", token).get_json()
+        self.assertEqual((a1["text"], a1["excerpt"]), ("excerpt", "Full scraped text"))
+
+        story = Story(title="Read story")
+        story.articles = [Article(title="Read", url="https://read.example/1", source="Read",
+                                  content="<p>" + "word " * 120 + "</p>", scrape_status="success")]
+        self.assertTrue(article_text.can_summarize(story))
+        self.assertEqual(article_text.text_kind(story.articles[0]), "full")
+        self.assertIsNone(article_text.excerpt(story.articles[0]))
+
     def test_two_articles_from_one_outlet_are_one_source(self):
         from aggregator.models import Article, Story
         story = Story(title="Wire story")

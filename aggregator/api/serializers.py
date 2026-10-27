@@ -8,7 +8,7 @@ Swift's .iso8601 decoder reads.
 from datetime import datetime as dt
 from urllib.parse import urlparse
 
-from aggregator import newsbox
+from aggregator import article_text, newsbox
 from aggregator.article_copies import copy_label, is_copy_in_story
 from aggregator.filters import summary_paragraph
 from aggregator.html_safety import sanitize_html
@@ -158,6 +158,8 @@ def story_summary(story, edition_story=None):
         "is_summarized": bool((story.summary or "").strip()),
         "has_analysis": bool((story.deep_report or "").strip()),
         "can_analyze": newsbox.can_analyze(story),
+        # False when no article has enough text to summarize (headline only).
+        "can_summarize": article_text.can_summarize(story),
         "has_ai_headline": bool(story.has_ai_headline),
         "has_updates": bool(getattr(edition_story, "has_updates", False)),
         "breaking": breaking_chip(story),
@@ -208,6 +210,8 @@ def article_card(article):
         "image_focus": _article_focus(article),
         "summary": summary_paragraph(article.summary) or None,
         "copy_of": copy_label(article),
+        # "full" | "excerpt" | "none" (headline only): aggregator/article_text.py.
+        "text": article_text.text_kind(article),
         # A Reuters story read from a site licensed to republish it
         # (news_fetcher/wire_carriers.py): {"name", "url"}, else null.
         "text_via": ({"name": article.text_via, "url": _http_url(article.text_via_url)}
@@ -222,6 +226,8 @@ def article_detail(article, full_text=False):
         "analysis": _paragraphs(article.deep_analysis),
         # Scraped text only when Settings › API allows it.
         "content_html": sanitize_html(article.content) if full_text and article.content else None,
+        # The publisher's teaser when that is all MuckScraper has.
+        "excerpt": article_text.excerpt(article),
     })
     return out
 
