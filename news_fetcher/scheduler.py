@@ -888,6 +888,16 @@ def stage_fetch(run):
         except Exception as e:
             db.session.rollback()
             logging.error(f"Error polling NewsAPI/GNews: {e}")
+    # Stories still running after a day: NewsAPI's day-late search can now
+    # see their first day's coverage (news_fetcher/story_followup.py).
+    _mark_step(run_metrics, "Searching NewsAPI for long-running stories")
+    try:
+        from news_fetcher.story_followup import search_followups
+        run_metrics["steps"]["story_followups"] = search_followups()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error searching story follow-ups: {e}")
+        run_metrics["steps"]["story_followups"] = {"status": "error", "reason": str(e)}
     _mark_step(run_metrics, "Storing NewsAPI and GNews articles")
     try:
         polled_topics = ingest_payloads()

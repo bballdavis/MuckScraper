@@ -617,8 +617,9 @@ class ScheduledFetch(db.Model):
     PipelineSchedule, which is *when* runs happen.
 
     One row per category the pipeline queries. `mode` picks the NewsAPI
-    endpoint: "query" hits /everything using `query`, "top" hits
-    /top-headlines using `country` + `category`. The gnews_* columns are the
+    endpoint: "query" hits /everything using `query` (a day behind on the
+    free plan), "top" hits /top-headlines using `country` + `category`, or
+    `sources`. The gnews_* columns are the
     same idea for the GNews provider, kept separate because the two providers
     have different category vocabularies and phrase-matching behaviour.
     """
@@ -638,6 +639,9 @@ class ScheduledFetch(db.Model):
     # Flask-SQLAlchemy's Model.query, and the prefix pairs with gnews_* below.
     newsapi_country  = db.Column(db.String(8), nullable=True)   # ISO-2, "top" mode only
     newsapi_category = db.Column(db.String(32), nullable=True)  # NewsAPI category, "top" mode only
+    # NewsAPI source ids ("bbc-news,reuters"), "top" mode only; NewsAPI
+    # won't take them with a country or category, so they replace both.
+    newsapi_sources  = db.Column(db.String, nullable=True)
     newsapi_query    = db.Column(db.String, nullable=True)      # search terms, "query" mode only
     gnews_query      = db.Column(db.String, nullable=True)
     gnews_category   = db.Column(db.String(32), nullable=True)
