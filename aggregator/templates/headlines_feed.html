@@ -164,7 +164,7 @@
         <div class="hl-side">
             <button type="button" class="hl-read" data-mark-read aria-label="Mark as read"><span class="hl-read-icon">{{ icon('glasses') }}<span class="tip" role="tooltip"><strong>Mark as read</strong> Hides it from Headlines. Find it again under Recently Read.</span></span></button>
             {% if can_analyze and not story.summary %}
-            <button type="button" class="hl-read hl-analyze" onclick="analyzeStory({{ story.id }}, {{ 'true' if story.articles|length >= 2 and not story.deep_report else 'false' }}, this)" aria-label="Generate analysis"><span class="hl-read-icon">{{ icon('scale') }}<span class="tip" role="tooltip"><strong>Generate analysis</strong> Writes The Big Picture{% if story.articles|length >= 2 and not story.deep_report %} and the multi-source analysis{% endif %}. Runs in the background.</span></span></button>
+            <button type="button" class="hl-read hl-analyze" onclick="analyzeStory({{ story.id }}, {{ 'true' if story.can_analyze and not story.deep_report else 'false' }}, this)" aria-label="Generate analysis"><span class="hl-read-icon">{{ icon('scale') }}<span class="tip" role="tooltip"><strong>Generate analysis</strong> Writes The Big Picture{% if story.can_analyze and not story.deep_report %} and the multi-source analysis{% endif %}. Runs in the background.</span></span></button>
             {% endif %}
         </div>
         </div>

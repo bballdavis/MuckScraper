@@ -154,6 +154,17 @@ class Story(db.Model):
         from aggregator.article_copies import original_articles
         return original_articles(self.articles)
 
+    @property
+    def source_count(self):
+        """Distinct outlets among site_articles: what a card counts as sources."""
+        return len({a.outlet.name if a.outlet else a.source for a in self.site_articles})
+
+    @property
+    def can_analyze(self):
+        """Two or more sources to compare. A wire story's copies count once,
+        so a one-source story never offers the analysis (Philip, 2026-10-27)."""
+        return self.source_count >= 2
+
     def new_sources_since(self, generated_at):
         """Articles fetched into the story after `generated_at`: the story
         page offers Regenerate only when this is above zero (Philip,

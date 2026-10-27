@@ -285,7 +285,7 @@
 {%- set summary_new = story.new_sources_for_summary if can('scraper') else 0 -%}
 {%- set analysis_new = story.new_sources_for_analysis if can('scraper') else 0 -%}
 {%- set summary_pending = not (story.summary and story.summary != story.title) or summary_new -%}
-{%- set analysis_pending = (not story.deep_report or analysis_new) and story.articles|length >= 2 -%}
+{%- set analysis_pending = (not story.deep_report or analysis_new) and story.can_analyze -%}
 {%- set rail_actions = can('scraper') and (summary_pending or analysis_pending) -%}
 {%- set rail -%}
 {%- if current_user.is_authenticated -%}
@@ -365,7 +365,7 @@
 
         {#- A one-source story has nothing to compare, so no analysis section
             or button (Philip, 2026-10-27). -#}
-        {% if story.deep_report or story.articles|length >= 2 %}
+        {% if story.deep_report or story.can_analyze %}
         <div class="section-head">
             <h2 class="section-label">Multi-Source Analysis</h2>
             {{ story_analysis_action(story, can('scraper') and ollama_online, new_sources=analysis_new) }}
