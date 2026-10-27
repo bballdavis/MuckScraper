@@ -391,7 +391,7 @@
 
     const aiTaskStartUrl = "{{ url_for('admin.start_ai_task') }}";
     const aiTaskStatusTemplate = "{{ url_for('admin.ai_task_status', task_type='TASK_TYPE', resource_id=999999) }}";
-    let activeAiTaskPoll = null;
+    const activeAiTaskPolls = new Map();
 
     function aiTaskStatusUrl(taskType, resourceId) {
         return aiTaskStatusTemplate
@@ -410,31 +410,41 @@
     }
 
     async function pollAiTask(taskType, resourceId, button) {
-        if (activeAiTaskPoll) {
-            clearInterval(activeAiTaskPoll);
-            activeAiTaskPoll = null;
-        }
+        const key = `${taskType}:${resourceId}`;
+        const previous = activeAiTaskPolls.get(key);
+        if (previous) previous.stop();
 
-        const statusUrl = aiTaskStatusUrl(taskType, resourceId);
-        activeAiTaskPoll = setInterval(async () => {
-            const response = await fetch(statusUrl);
-            const status = await response.json();
-            renderAiTaskStatus(status, status.status === 'error');
-
-            if (status.status === 'success') {
-                clearInterval(activeAiTaskPoll);
-                activeAiTaskPoll = null;
-                window.location.reload();
-                return;
-            }
-
-            if (status.status === 'error') {
-                clearInterval(activeAiTaskPoll);
-                activeAiTaskPoll = null;
+        const poll = {
+            stop() {
+                clearInterval(poll.timer);
+                if (activeAiTaskPolls.get(key) === poll) activeAiTaskPolls.delete(key);
                 if (button) {
                     button.disabled = false;
                     button.textContent = button.dataset.originalText;
                 }
+            },
+        };
+        activeAiTaskPolls.set(key, poll);
+        const statusUrl = aiTaskStatusUrl(taskType, resourceId);
+        poll.timer = setInterval(async () => {
+            if (activeAiTaskPolls.get(key) !== poll) return;
+            try {
+                const response = await fetch(statusUrl);
+                if (!response.ok) throw new Error('Status unavailable');
+                const status = await response.json();
+                // A request already in flight may finish after its poll was replaced.
+                if (activeAiTaskPolls.get(key) !== poll) return;
+                renderAiTaskStatus(status, status.status === 'error');
+                if (status.status === 'success') {
+                    poll.stop();
+                    window.location.reload();
+                } else if (status.status === 'error') {
+                    poll.stop();
+                }
+            } catch (error) {
+                if (activeAiTaskPolls.get(key) !== poll) return;
+                poll.stop();
+                renderAiTaskStatus({message: 'Could not check progress. Reload this page to see whether the task completed.'}, true);
             }
         }, 2000);
     }
@@ -446,30 +456,35 @@
             button.textContent = 'Working...';
         }
 
-        const response = await fetch(aiTaskStartUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content,
-            },
-            body: JSON.stringify({
-                task_type: taskType,
-                resource_id: resourceId,
-            }),
-        });
+        try {
+            const response = await fetch(aiTaskStartUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content,
+                },
+                body: JSON.stringify({
+                    task_type: taskType,
+                    resource_id: resourceId,
+                }),
+            });
 
-        const payload = await response.json();
-        renderAiTaskStatus(payload.status || payload, response.status >= 400);
+            const payload = await response.json();
+            renderAiTaskStatus(payload.status || payload, response.status >= 400);
 
-        if (!response.ok && response.status !== 409) {
-            if (button) {
-                button.disabled = false;
-                button.textContent = button.dataset.originalText;
+            if (!response.ok && response.status !== 409) {
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = button.dataset.originalText;
+                }
+                return;
             }
-            return;
-        }
 
-        await pollAiTask(taskType, resourceId, button);
+            await pollAiTask(taskType, resourceId, button);
+        } catch (error) {
+            renderAiTaskStatus({message: 'The request could not be confirmed. Reload this page before trying again.'}, true);
+            if (button) { button.disabled = false; button.textContent = button.dataset.originalText; }
+        }
     }
 
 </script>
