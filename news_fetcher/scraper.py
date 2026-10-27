@@ -9,6 +9,7 @@ import logging
 from difflib import SequenceMatcher
 import re
 import json
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from urllib.parse import urljoin, urlparse, urlunparse, parse_qsl, urlencode
@@ -249,8 +250,18 @@ def _should_cache_retry_result(result):
     return True
 
 
+# Ingestion scrapes on a thread pool (news_fetcher/workpool.py); the cache is
+# one app_settings row, read, changed and written back, so writers take turns.
+_retry_cache_lock = threading.Lock()
+
+
 def update_retry_cache(url, result, now=None):
     """Persist retry cooldowns based on scrape telemetry."""
+    with _retry_cache_lock:
+        _update_retry_cache(url, result, now)
+
+
+def _update_retry_cache(url, result, now=None):
     now = now or _utcnow()
     cache = _prune_retry_cache(_load_retry_cache(), now=now)
     domain = get_domain(url)
