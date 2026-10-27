@@ -291,7 +291,7 @@ A JSON API runs as its own container with only `/api/v1` routes, so it can sit b
 ### Scraping and reliability
 - Full article scraping during ingestion
 - Multi-step scrape fallback pipeline
-- Paywalled sites are not bypassed: they stay headline-and-description only. With an optional free `NYT_API_KEY` (set on Settings > Source API keys or in `.env`), a New York Times article gets its abstract and opening paragraph from NYT's Article Search API instead
+- Paywalled sites are not bypassed: they stay headline-and-description only. With an optional free `NYT_API_KEY` (set on Settings > Source API keys or in `.env`), MuckScraper reads NYT's Times Wire through the day (several hundred items a request, polled every 3 to 20 minutes) and ingests its news sections with the abstract, plus the opening paragraph from Article Search ten articles a request, all within the key's 500 requests a day (see `news_fetcher/nyt_api.py`). A New York Times article gets that text instead
 - Scrape telemetry stored per article
 - Bad-scrape auditing and status-aware retries
 - Domain and URL cooldown behavior for repeated failures

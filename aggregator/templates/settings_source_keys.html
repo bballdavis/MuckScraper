@@ -28,6 +28,13 @@
                 {%- endif %}
             </div>
             <p class="source-about">{{ s.about }} <a href="{{ s.signup }}" target="_blank" rel="noopener noreferrer">Get a key</a></p>
+            {%- if s.key == 'nyt' and nyt_usage %}
+            {%- set k = nyt_usage.kinds %}
+            <p class="source-usage">Last 24 hours: {{ nyt_usage.used }} of {{ nyt_usage.limit }} requests
+                ({{ (k.wire or {}).requests or 0 }} wire, {{ (k.search or {}).requests or 0 }} lead paragraph, {{ (k.lookup or {}).requests or 0 }} single article).
+                {{ nyt_usage.wire_items }} new wire items{% if nyt_usage.items_per_wire_request %}, about {{ nyt_usage.items_per_wire_request }} per request{% endif %}; {{ nyt_usage.ingested }} ingested.
+                Polling every {{ nyt_usage.interval }} min now{% if nyt_usage.last_wire_poll %}, last at {{ nyt_usage.last_wire_poll.strftime('%H:%M') }} UTC{% endif %}.</p>
+            {%- endif %}
         </div>
         <div class="source-fields">
             {%- for f in s.fields %}{{ config_field(f) }}{% endfor %}
@@ -44,6 +51,7 @@
     .source + .source { border-top: 1px solid var(--border); }
     .source-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .source-about { margin-top: 3px; font-size: 12px; line-height: 1.45; color: var(--text-muted); }
+    .source-usage { margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--text-muted); font-variant-numeric: tabular-nums; }
     .source-fields { display: flex; flex-direction: column; gap: 8px; }
     .config-field-form.source .field { grid-template-columns: 120px minmax(0, 1fr); gap: 2px 12px; }
     .app-page .page-body .source .field input { height: 30px; }
