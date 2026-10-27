@@ -355,6 +355,7 @@ class Job(db.Model):
     __tablename__ = "jobs"
     __table_args__ = (
         db.Index("ix_jobs_queued", "status", "priority", "id"),
+        db.Index("ix_jobs_run_id", "run_id"),
     )
 
     id          = db.Column(db.Integer, primary_key=True)
@@ -366,6 +367,34 @@ class Job(db.Model):
     started_at  = db.Column(db.DateTime, nullable=True)
     finished_at = db.Column(db.DateTime, nullable=True)
     error       = db.Column(db.Text, nullable=True)
+    # Raised on each claim; a finish only counts for the attempt that claimed
+    # it, so a requeued job's abandoned thread can't overwrite the rerun.
+    attempts     = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    # Moved on while the job makes progress (jobs.beat()); the watchdog
+    # requeues a pipeline job whose heartbeat stops (aggregator/workers.py).
+    heartbeat_at = db.Column(db.DateTime, nullable=True)
+    # The pipeline run (PipelineRun) a stage, feed or story job belongs to.
+    run_id       = db.Column(db.Integer, nullable=True)
+    # What the handler returned (JSON), e.g. a feed job's ingest counts.
+    result       = db.Column(db.Text, nullable=True)
+
+
+class PipelineRun(db.Model):
+    """One pipeline run, carried out as a chain of jobs
+    (news_fetcher/pipeline_run.py). `stage` is where it is, so a restart
+    resumes there; `metrics` is the run's metrics JSON, built up stage by
+    stage."""
+    __tablename__ = "pipeline_runs"
+
+    id                = db.Column(db.Integer, primary_key=True)
+    task_id           = db.Column(db.String(32), nullable=False)
+    run_full_pipeline = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    status            = db.Column(db.String(16), nullable=False, default="running", server_default="running", index=True)
+    stage             = db.Column(db.String(32), nullable=False, default="fetch", server_default="fetch")
+    started_at        = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    finished_at       = db.Column(db.DateTime, nullable=True)
+    metrics           = db.Column(db.Text, nullable=True)
+    error             = db.Column(db.Text, nullable=True)
 
 
 class RawArticlePayload(db.Model):

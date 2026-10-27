@@ -21,11 +21,15 @@ PLACEHOLDER_SECRET_KEYS = {
 }
 
 
-def create_app():
+def create_app(engine_options=None):
+    """`engine_options` sizes the connection pool, for the scheduler's
+    worker threads."""
     app = Flask(__name__)
 
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    if engine_options:
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options
 
     secret_key = os.environ.get("SECRET_KEY")
     if not secret_key:

@@ -19,13 +19,13 @@
     </form>
 </div>
 {%- elif scheduler.worker_alive == false %}
-<div class="notice" role="alert"><span><strong>The job queue worker stopped.</strong> The scheduler starts a new one within a few seconds.</span></div>
+<div class="notice" role="alert"><span><strong>A job queue worker thread stopped.</strong> The scheduler starts a new one within a few seconds, and puts its job back in the queue.</span></div>
 {%- endif %}
 
 <section class="panel">
     <div class="panel-head">
         <h2>Running now</h2>
-        {%- if scheduler.alive %}<span class="tasks-beat"><span class="dot ok"></span>Scheduler up since {{ scheduler.since }} · checked in {{ scheduler.heartbeat }} ago</span>{% endif %}
+        {%- if scheduler.alive %}<span class="tasks-beat"><span class="dot ok"></span>Scheduler up since {{ scheduler.since }} · checked in {{ scheduler.heartbeat }} ago{% if scheduler.threads %} · {{ scheduler.threads }} worker threads{% endif %}{% if scheduler.restarted or scheduler.requeued %} · watchdog restarted {{ scheduler.restarted }}, requeued {{ scheduler.requeued }}{% endif %}</span>{% endif %}
     </div>
     {%- if running %}
     <div class="tasks-now">
@@ -118,7 +118,7 @@
 <section class="panel">
     <div class="panel-head">
         <h2>Queue</h2>
-        <p>{{ queue_counts.running }} running · {{ queue_counts.queued }} waiting · failures from the last day</p>
+        <p>{{ queue_counts.running }} running · {{ queue_counts.queued }} waiting{% if queue_counts.batched %} ({{ queue_counts.batched }} pipeline feed and story jobs, not listed){% endif %} · failures from the last day</p>
     </div>
     {%- if queue %}
     <table class="data-table tasks-table tasks-queue">
