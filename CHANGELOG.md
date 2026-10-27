@@ -375,6 +375,13 @@ All notable changes to MuckScraper are documented here.
   `LLM_FAST_PROVIDER` into the containers.** They were documented in
   `.env.sample` but never reached the app or scheduler, so setting them in
   `.env` had no effect.
+- **Breaking News stopped after a restart.** The scheduler ran its startup
+  fetch before starting the job scheduler, so the Breaking News poller (and
+  NewsBox schedules and photo focal points) waited out the whole run, an hour
+  or more, after every deploy. The startup run is now a job of its own;
+  pipeline runs still never overlap (a scheduled hour during one is skipped).
+  RSS feeds are now fetched with a timeout: feedparser had none, and one
+  stalled feed held the startup run (and the poller behind it) for hours.
 
 ## [1.0.2] - 2026-10-26
 
