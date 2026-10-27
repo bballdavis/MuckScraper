@@ -7,6 +7,15 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **LLM spending caps.** Settings › LLM providers has a Spending caps
+  section for Anthropic, Gemini, Groq and OpenRouter: a daily and a monthly
+  dollar cap (blank, so unlimited, by default), with today's and this
+  month's spend against them. Every call is kept in `llm_usage` with its
+  tokens and cost; OpenRouter reports its own cost, Anthropic models have
+  built-in prices, and any provider's price per million tokens can be
+  entered. Once a cap is reached (Eastern time days and calendar months)
+  that provider gets no more calls until the period turns. Ollama and LM
+  Studio are never capped.
 - **Source API budgets for NYT, NewsAPI and GNews.** The NYT request ledger
   is now `source_api_calls`, shared by every news source API
   (`news_fetcher/api_budget.py`): a rolling 24-hour count under each
