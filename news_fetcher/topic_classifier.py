@@ -26,36 +26,68 @@ _FALLBACK_TOPIC_NAMES = [
     "Sci/Tech", "Sports", "Buss/Fin", "Other",
 ]
 _TOPIC_NAME_CACHE_TTL_SECONDS = 60
-_topic_name_cache = {"names": None, "expires_at": 0.0}
+_topic_name_cache = {"names": None, "descriptions": {}, "expires_at": 0.0}
 
 
-def _active_topic_names():
+def _load_active_topics():
     """
-    Active topic names from the DB, in admin-configured order. Cached for
-    _TOPIC_NAME_CACHE_TTL_SECONDS so a batch classification run (one call
-    per article) doesn't re-query on every article. The rule bullets in
-    the classification prompt below are written for the default
-    7-category taxonomy — adding/removing topics via the admin UI changes
-    which names the model can choose from, but the semantic guidance
-    still reflects the default set until prompts are made configurable
-    too (tracked as a follow-up).
+    Active sections from the DB, in admin-configured order, with the
+    description each one gives the classifier (Settings › Sections). Cached
+    for _TOPIC_NAME_CACHE_TTL_SECONDS so a batch classification run (one
+    call per article) doesn't re-query on every article.
     """
     now = time.monotonic()
     if _topic_name_cache["names"] is not None and now < _topic_name_cache["expires_at"]:
-        return _topic_name_cache["names"]
+        return _topic_name_cache["names"], _topic_name_cache["descriptions"]
 
     from aggregator import db
     from aggregator.models import Topic
     try:
-        names = [t.name for t in Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all()]
+        rows = Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all()
     except Exception as e:
         db.session.rollback()
         logger.error(f"  [Classifier] Failed to load active topics from DB, using default taxonomy: {e}")
-        return _FALLBACK_TOPIC_NAMES
-
-    _topic_name_cache["names"] = names
+        return _FALLBACK_TOPIC_NAMES, {}
+    _topic_name_cache["names"] = [t.name for t in rows]
+    _topic_name_cache["descriptions"] = {t.name: (t.description or "").strip() for t in rows}
     _topic_name_cache["expires_at"] = now + _TOPIC_NAME_CACHE_TTL_SECONDS
-    return names
+    return _topic_name_cache["names"], _topic_name_cache["descriptions"]
+
+
+def _active_topic_names():
+    return _load_active_topics()[0]
+
+
+def categories_list(names, descriptions):
+    """The prompt's category lines: "- Sports: Games, leagues, ..." (just the
+    name when a section has no description). Other is left out; it is the
+    prompt's own fallback."""
+    lines = []
+    for name in names:
+        if name == "Other":
+            continue
+        description = descriptions.get(name)
+        lines.append(f"- {name}: {description}" if description else f"- {name}")
+    return "\n".join(lines)
+
+
+def match_topics(result, valid_topics):
+    """The section names in the model's answer, in order. A line counts by
+    its name, the part before any colon, so a model that echoes a
+    description ("US Politics: ... toward another country") doesn't also
+    pick up names inside it ("other")."""
+    by_lower = {t.lower(): t for t in valid_topics}
+    matched = []
+    for line in result.splitlines():
+        name = line.split(":", 1)[0].strip(" \t-*\"'.").lower()
+        if not name:
+            continue
+        found = by_lower.get(name)
+        if found is None:
+            found = next((t for t in valid_topics if t.lower() in name), None)
+        if found and found not in matched:
+            matched.append(found)
+    return matched
 
 
 @observe()
@@ -68,7 +100,7 @@ def classify_article(title, content_snippet=""):
     if not llm_client.is_configured(llm_client.TIER_FAST):
         return ["Other"]
 
-    valid_topics = _active_topic_names()
+    valid_topics, descriptions = _load_active_topics()
     if not valid_topics:
         return ["Other"]
 
@@ -79,9 +111,8 @@ def classify_article(title, content_snippet=""):
         if clean:
             text += f"\n{clean}"
 
-    categories_list = "\n".join(f"- {t}" for t in valid_topics if t != "Other")
-
-    prompt = render_prompt("topic_classifier", text=text, categories_list=categories_list)
+    prompt = render_prompt("topic_classifier", text=text,
+                           categories_list=categories_list(valid_topics, descriptions))
     if prompt is None:
         return ["Other"]
 
@@ -99,14 +130,7 @@ def classify_article(title, content_snippet=""):
 
     langfuse_context.update_current_observation(output=result)
 
-    lines  = [line.strip() for line in result.splitlines() if line.strip()]
-
-    matched = []
-    for line in lines:
-        for valid in valid_topics:
-            if valid.lower() in line.lower():
-                if valid not in matched:
-                    matched.append(valid)
+    matched = match_topics(result, valid_topics)
 
     if matched:
         # Remove "Other" if any real categories were found

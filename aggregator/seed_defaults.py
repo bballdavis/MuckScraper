@@ -48,6 +48,7 @@ from datetime import datetime
 
 from aggregator import db
 from aggregator.models import (
+    FeedSection,
     IngestionBlock,
     PipelineSchedule,
     PromptTemplate,
@@ -65,13 +66,79 @@ logger = logging.getLogger(__name__)
 # Generated from the seven seeding migrations (see module docstring). Do not
 # reformat by hand; regenerate if a migration's defaults change.
 
-SEED_TOPICS = [('US Politics', 'UP', 0),
- ('US News', 'UN', 1),
- ('International News', 'IN', 2),
- ('Sci/Tech', 'ST', 3),
- ('Sports', 'SP', 4),
- ('Buss/Fin', 'BF', 5),
- ('Other', 'OT', 6)]
+# Sections: (key, display name, description), in sidebar order. From
+# d9f2b6a4c1e8, which also added Health and Culture.
+SEED_TOPICS = [
+    ("US Politics", "US Politics",
+     "US federal government, Congress, the White House, elections, federal courts and policy, "
+     "and any US government action toward a foreign country"),
+    ("US News", "US News",
+     "Domestic US news that is not government or politics: crime, accidents, disasters, "
+     "lawsuits, state and local news, transportation, weather"),
+    ("International News", "International News",
+     "Events, governments, conflicts and disasters in countries outside the US"),
+    ("Sci/Tech", "Science & Technology",
+     "Technology, science, research, AI, space and the environment; not stock or earnings "
+     "stories about tech companies"),
+    ("Sports", "Sports",
+     "Games, leagues, athletes, contracts and signings; not labor or political fights that "
+     "only happen at a team or venue"),
+    ("Buss/Fin", "Business & Finance",
+     "Financial markets, the economy, corporate earnings, mergers and companies"),
+    ("Health", "Health",
+     "Medicine, public health, disease, health care and health research"),
+    ("Culture", "Culture & Entertainment",
+     "Film, TV, music, books, the arts, celebrities and lifestyle"),
+    ("Other", "Other", "Anything that fits no other section"),
+]
+NEW_SECTIONS = ("Health", "Culture")
+
+# Feed URL -> the section keys it serves (d9f2b6a4c1e8).
+SEED_FEED_SECTIONS = {
+    "https://feeds.bbci.co.uk/sport/rss.xml": ["Sports"],
+    "https://www.theguardian.com/sport/rss": ["Sports"],
+    "https://www.cbssports.com/rss/headlines/": ["Sports"],
+    "https://sports.yahoo.com/rss/": ["Sports"],
+    "https://feeds.npr.org/1055/rss.xml": ["Sports"],
+    "https://feeds.arstechnica.com/arstechnica/index": ["Sci/Tech"],
+    "https://www.theverge.com/rss/index.xml": ["Sci/Tech"],
+    "https://techcrunch.com/feed/": ["Sci/Tech"],
+    "https://feeds.bbci.co.uk/news/technology/rss.xml": ["Sci/Tech"],
+    "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml": ["Sci/Tech"],
+    "https://feeds.npr.org/1007/rss.xml": ["Sci/Tech"],
+    "https://feeds.npr.org/1019/rss.xml": ["Sci/Tech"],
+    "https://www.theguardian.com/science/rss": ["Sci/Tech"],
+    "https://www.sciencenews.org/feed": ["Sci/Tech"],
+    "https://www.space.com/feeds/all": ["Sci/Tech"],
+    "https://insideclimatenews.org/feed/": ["Sci/Tech"],
+    "https://www.cnbc.com/id/100003114/device/rss/rss.html": ["Buss/Fin"],
+    "https://feeds.bbci.co.uk/news/business/rss.xml": ["Buss/Fin"],
+    "https://feeds.npr.org/1006/rss.xml": ["Buss/Fin"],
+    "https://www.theguardian.com/business/rss": ["Buss/Fin"],
+    "https://moxie.foxbusiness.com/google-publisher/latest.xml": ["Buss/Fin"],
+    "https://feeds.bbci.co.uk/news/world/rss.xml": ["International News"],
+    "https://feeds.npr.org/1004/rss.xml": ["International News"],
+    "https://www.theguardian.com/world/rss": ["International News"],
+    "https://feeds.washingtonpost.com/rss/world": ["International News"],
+    "https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/world/rss.xml": ["International News"],
+    "https://feeds.npr.org/1128/rss.xml": ["Health"],
+    "https://kffhealthnews.org/feed/": ["Health"],
+    "https://feeds.npr.org/1008/rss.xml": ["Culture"],
+    "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml": ["Culture"],
+    "https://www.theguardian.com/culture/rss": ["Culture"],
+    "https://variety.com/feed/": ["Culture"],
+}
+
+# Seeded search label -> (section key, keep to outlets already stored).
+SEED_SEARCH_SECTIONS = {
+    "US Politics": ("US Politics", False),
+    "Business & Economy": ("Buss/Fin", False),
+    "Sports": ("Sports", True),
+    "World News": ("International News", True),
+}
+
+# Title blocks seeded switched off: Sports and Culture are real sections now.
+SEED_INACTIVE_BLOCK_NOTE = "Recap or transaction item, not an event"
 
 SEED_SCHEDULED_FETCHES = [{'label': 'US Politics',
   'description': 'Congress, White House, courts, elections',
@@ -713,17 +780,12 @@ PROMPT_TOPIC_CLASSIFIER = """You are a news editor categorizing articles. You mu
 
 Article: "{text}"
 
-Categories (choose only from these exact names):
+Categories (choose only from these exact names; after each name is what belongs there):
 {categories_list}
 
 Rules:
-- Use EXACT category names only — do not create new categories
-- US Politics means US federal government, Congress, White House, elections, federal courts/policy, or any US government action or statement toward another country (diplomacy, sanctions, tariffs, military orders)
-- International News means events, governments, conflicts, or disasters in other countries. If a story is about a US government action toward another country, use BOTH US Politics and International News
-- US News means domestic US news that is NOT about government or politics — crime, accidents, disasters, lawsuits, local/state news, transportation, weather
-- Entertainment, celebrity, lifestyle, and human-interest stories belong to Other, not US News
-- Sci/Tech means technology, science, research, AI, space — NOT general business news about tech companies (use Buss/Fin for stock/earnings stories)
-- Buss/Fin means financial markets, economics, corporate earnings, mergers — NOT general commerce
+- Use EXACT category names only — do not create new categories and do not repeat the descriptions
+- If a story is about a US government action toward another country, use BOTH US Politics and International News
 - Sports contracts and player signings belong to Sports only, not Buss/Fin
 - Labor disputes, strikes, unionization votes, protests, or other political/regulatory action are US Politics, not Sports, even when they take place at or involve a sports venue, team, or event — the venue is incidental to a fundamentally political story
 - Pick the most specific category — if it's clearly Sports, do not also add other categories
@@ -932,25 +994,43 @@ SEED_PROMPTS = [
 # --- END GENERATED DATA -----------------------------------------------------
 
 def _seed_topics(counts):
-    """Topics, ordered. The only seeder that fills a column on an existing row.
+    """Sections, ordered. The only seeder that fills columns on an existing row.
 
     A pre-existing Topic created by classification (topics are auto-created when
-    the classifier returns an unseen name) can be missing icon/sort_order, which
-    the admin UI sorts by -- so fill those two if and only if they are NULL.
-    That is not a customization anyone set, so it is not an overwrite; anything
-    the user did set is left alone.
+    the classifier returns an unseen name) can be missing its display name,
+    description or sort_order, which the admin UI and the classifier use -- so
+    fill those if and only if they are NULL. That is not a customization anyone
+    set, so it is not an overwrite; anything the user did set is left alone.
     """
-    for name, icon, sort_order in SEED_TOPICS:
+    for sort_order, (name, display_name, description) in enumerate(SEED_TOPICS):
         topic = Topic.query.filter_by(name=name).first()
         if topic is None:
-            db.session.add(Topic(name=name, icon=icon, sort_order=sort_order, is_active=True))
+            db.session.add(Topic(name=name, display_name=display_name, description=description,
+                                 sort_order=sort_order, is_active=True))
             counts["topics"] += 1
         else:
-            if topic.icon is None:
-                topic.icon = icon
+            if topic.display_name is None and topic.description is None:
                 counts["topics_backfilled"] += 1
+            if topic.display_name is None:
+                topic.display_name = display_name
+            if topic.description is None:
+                topic.description = description
             if topic.sort_order is None:
                 topic.sort_order = sort_order
+
+
+def _seed_feed_sections(counts):
+    """The sections each default feed serves. Keyed by feed URL: a URL that
+    already has any sections is left as it is."""
+    db.session.flush()
+    topic_ids = {t.name: t.id for t in Topic.query.all()}
+    for url, keys in SEED_FEED_SECTIONS.items():
+        if FeedSection.query.filter_by(feed_url=url).first() is not None:
+            continue
+        for key in keys:
+            if key in topic_ids:
+                db.session.add(FeedSection(feed_url=url, topic_id=topic_ids[key]))
+                counts["feed_sections"] += 1
 
 
 def _seed_scheduled_fetches(counts):
@@ -958,7 +1038,10 @@ def _seed_scheduled_fetches(counts):
     for index, entry in enumerate(SEED_SCHEDULED_FETCHES):
         if ScheduledFetch.query.filter_by(label=entry["label"]).first() is not None:
             continue
-        db.session.add(ScheduledFetch(sort_order=index, is_active=True, **entry))
+        section, known_only = SEED_SEARCH_SECTIONS.get(entry["label"], (None, False))
+        topic = Topic.query.filter_by(name=section).first() if section else None
+        db.session.add(ScheduledFetch(sort_order=index, is_active=True, known_outlets_only=known_only,
+                                      topic_id=topic.id if topic else None, **entry))
         counts["scheduled_fetches"] += 1
 
 
@@ -1006,7 +1089,8 @@ def _seed_ingestion_blocks(counts):
             if IngestionBlock.query.filter_by(kind=kind, pattern=pattern).first() is not None:
                 continue
             db.session.add(IngestionBlock(
-                kind=kind, pattern=pattern, note=note, is_active=True, added_at=now,
+                kind=kind, pattern=pattern, note=note, added_at=now,
+                is_active=note != SEED_INACTIVE_BLOCK_NOTE,
             ))
             counts["ingestion_blocks"] += 1
 
@@ -1050,6 +1134,7 @@ def seed_defaults():
     counts = {
         "topics": 0,
         "topics_backfilled": 0,
+        "feed_sections": 0,
         "scheduled_fetches": 0,
         "pipeline_schedule": 0,
         "rss_feeds": 0,
@@ -1059,6 +1144,7 @@ def seed_defaults():
     }
 
     _seed_topics(counts)
+    _seed_feed_sections(counts)
     _seed_scheduled_fetches(counts)
     _seed_pipeline_schedule(counts)
     _seed_rss_feeds(counts)

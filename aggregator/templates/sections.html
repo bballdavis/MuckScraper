@@ -1,0 +1,218 @@
+{% extends 'settings_base.html' %}
+{% from 'icons.html' import icon %}
+{% block title %}Sections{% endblock %}
+{% block settings_key %}topics{% endblock %}
+
+{% block styles %}
+<style>
+    /* One section per row in sidebar order; drag by the handle like
+       Scheduled fetches (Philip, 2026-10-27). */
+    .sec-list { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+    .sec-card { display: flex; flex-direction: column; gap: 6px; padding: 9px 12px 10px 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-frame); min-width: 0; }
+    .sec-card.is-off .sec-name, .sec-card.is-off .sec-meta, .sec-card.is-off .sec-desc { opacity: 0.5; }
+    .sec-card.is-dragging { opacity: 0.4; }
+    .sec-card.is-drop-target { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .sec-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .sec-grip { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 26px; padding: 0; border: 0; background: none; color: var(--text-faint); cursor: grab; border-radius: 3px; flex: 0 0 auto; }
+    .sec-grip:hover { color: var(--text-muted); background: var(--btn-muted-bg); }
+    .sec-grip:focus-visible { outline: 2px solid var(--accent-text); }
+    .sec-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sec-key { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+    .sec-spacer { flex: 1 1 auto; }
+    .sec-desc { padding-left: 26px; font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+    .sec-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding-left: 26px; font-size: 12px; color: var(--text-muted); }
+    .sec-meta b { color: var(--text); font-weight: 600; }
+    .sec-meta a { color: inherit; }
+    .lcr-mini { display: inline-flex; width: 64px; height: 6px; border-radius: 3px; overflow: hidden; background: var(--border); vertical-align: middle; }
+    .lcr-mini span { display: block; height: 100%; }
+    .lcr-mini .l { background: var(--bias-1-bg); }
+    .lcr-mini .c { background: #8c8c8c; }
+    .lcr-mini .r { background: var(--bias-5-bg); }
+    .lcr-mini .u { background: var(--bias-unrated-bg); }
+    .sec-editor { display: none; padding-left: 26px; }
+    .sec-card.is-editing .sec-editor { display: block; }
+    .sec-card.is-editing .sec-desc, .sec-card.is-editing .btn-edit { display: none; }
+    .sec-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 10px 12px; }
+    .sec-fields input { width: 100%; }
+    .app-page .page-body .sec-fields input { height: 32px; }
+    .sec-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+    .sec-add[hidden] { display: none; }
+    .sec-add form { padding: 12px 16px 14px; }
+    .sec-add .sec-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr); }
+    .sec-hint { margin-top: 14px; font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+    @media (max-width: 600px) { .sec-fields, .sec-add .sec-fields { grid-template-columns: minmax(0, 1fr); } .sec-key { display: none; } }
+</style>
+{% endblock %}
+
+{% block settings_body %}
+<div class="page-head page-head-row">
+    <div>
+        <h1>Sections</h1>
+        <p>The sections readers see in the sidebar and the app, in this order. Drag a section to move it. Each description tells the classifier what belongs there, and <a href="{{ url_for('admin.rss_feeds_page') }}">Sources</a> says which feeds serve each section.</p>
+    </div>
+    <button type="button" class="btn" id="sec-add-open">{{ icon('plus') }} Add section</button>
+</div>
+
+<section class="panel sec-add" id="sec-add" hidden>
+    <div class="panel-head"><h2>Add a section</h2><p>It goes to the end of the list and starts on.</p></div>
+    <form method="POST" action="{{ url_for('admin.add_topic') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="sec-fields">
+            <label class="add-field"><span>Key</span><input type="text" name="name" maxlength="60" placeholder="e.g. Climate" required></label>
+            <label class="add-field"><span>Name readers see</span><input type="text" name="display_name" maxlength="80" placeholder="e.g. Climate & Environment"></label>
+            <label class="add-field"><span>What belongs here</span><input type="text" name="description" maxlength="300" placeholder="e.g. Climate change, energy, weather extremes"></label>
+        </div>
+        <div class="sec-actions">
+            <button type="button" class="btn btn-quiet" id="sec-add-cancel">Cancel</button>
+            <button type="submit" class="btn">{{ icon('plus') }} Add section</button>
+        </div>
+    </form>
+</section>
+
+<ul class="sec-list" id="sec-list">
+    {%- for topic in topics %}
+    {%- set cov = coverage[topic.id] %}
+    {%- set lean_total = cov.lean.left + cov.lean.center + cov.lean.right + cov.lean.unrated %}
+    <li class="sec-card{{ '' if topic.is_active else ' is-off' }}" id="topic-{{ topic.id }}" data-id="{{ topic.id }}">
+        <div class="sec-top">
+            <button type="button" class="sec-grip" draggable="true" aria-label="Move {{ topic.label }} (Alt + up or down arrow)" title="Drag to reorder">{{ icon('grip') }}</button>
+            <span class="sec-name">{{ topic.label }}</span>
+            {%- if topic.label != topic.name %}<span class="sec-key" title="Key used in links, the API and the classifier">{{ topic.name }}</span>{% endif %}
+            {%- if cov.thin %}<span class="chip chip-broad" title="Fewer than {{ thin_sources }} sources or {{ thin_articles }} articles in 24 hours">Thin</span>{% endif %}
+            <span class="sec-spacer"></span>
+            <label class="switch" title="{{ 'Shown' if topic.is_active else 'Hidden' }}">
+                <input type="checkbox" data-active-url="{{ url_for('admin.set_topic_active', topic_id=topic.id) }}" {{ 'checked' if topic.is_active else '' }} aria-label="Show {{ topic.label }}"><span></span>
+            </label>
+            <button type="button" class="btn btn-quiet btn-square btn-edit" aria-label="Edit {{ topic.label }}" title="Edit">{{ icon('pencil') }}</button>
+        </div>
+        <div class="sec-desc">{{ topic.description or 'No description: the classifier only sees the name.' }}</div>
+        <div class="sec-meta">
+            <span><a href="{{ url_for('admin.rss_feeds_page', section=topic.id) }}"><b>{{ cov.sources }}</b> source{{ '' if cov.sources == 1 else 's' }}</a></span>
+            <span><b>{{ cov.articles }}</b> article{{ '' if cov.articles == 1 else 's' }} · <b>{{ cov.stories }}</b> new stor{{ 'y' if cov.stories == 1 else 'ies' }} in 24 h</span>
+            {%- if lean_total %}
+            <span title="Articles in 24 hours by outlet lean: {{ cov.lean.left }} left, {{ cov.lean.center }} center, {{ cov.lean.right }} right, {{ cov.lean.unrated }} unrated">
+                <span class="lcr-mini" aria-hidden="true">
+                    {%- for key, cls in [('left', 'l'), ('center', 'c'), ('right', 'r'), ('unrated', 'u')] %}{% if cov.lean[key] %}<span class="{{ cls }}" style="width: {{ (100 * cov.lean[key] / lean_total)|round(1) }}%"></span>{% endif %}{% endfor -%}
+                </span>
+                L {{ cov.lean.left }} · C {{ cov.lean.center }} · R {{ cov.lean.right }}
+            </span>
+            {%- endif %}
+        </div>
+        <div class="sec-editor">
+            <form method="POST" action="{{ url_for('admin.update_topic', topic_id=topic.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="sec-fields">
+                    <label class="add-field"><span>Name readers see</span><input type="text" name="display_name" maxlength="80" value="{{ topic.display_name or '' }}" placeholder="{{ topic.label }}"></label>
+                    <label class="add-field"><span>What belongs here</span><input type="text" name="description" maxlength="300" value="{{ topic.description or '' }}"></label>
+                </div>
+                <div class="sec-actions">
+                    <button type="button" class="btn btn-quiet btn-square btn-cancel" aria-label="Close without saving" title="Close">{{ icon('x') }}</button>
+                    <button type="submit" class="btn btn-square" aria-label="Save {{ topic.label }}" title="Save">{{ icon('save') }}</button>
+                </div>
+            </form>
+        </div>
+    </li>
+    {%- endfor %}
+</ul>
+
+<p class="sec-hint">
+    A hidden section leaves the sidebar, the app and the classifier, but stories already tagged with it keep the tag.
+    The key never changes once a section exists: links and the app use it. Articles from a source that serves sections
+    take those sections directly; articles from a General source are sorted by the classifier using the descriptions above.
+</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+    const post = (url, body) => fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+        body: JSON.stringify(body),
+    }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+
+    const addPanel = document.getElementById('sec-add');
+    document.getElementById('sec-add-open').addEventListener('click', () => {
+        addPanel.hidden = false;
+        addPanel.querySelector('input[name="name"]').focus();
+    });
+    document.getElementById('sec-add-cancel').addEventListener('click', () => { addPanel.hidden = true; });
+
+    document.querySelectorAll('.sec-card').forEach((card) => {
+        card.querySelector('.btn-edit').addEventListener('click', () => {
+            card.classList.add('is-editing');
+            card.querySelector('.sec-editor input[name="display_name"]').focus();
+        });
+        card.querySelector('.btn-cancel').addEventListener('click', () => {
+            card.querySelector('.sec-editor form').reset();
+            card.classList.remove('is-editing');
+        });
+    });
+
+    document.querySelectorAll('[data-active-url]').forEach((input) => {
+        input.addEventListener('change', () => {
+            const card = input.closest('.sec-card');
+            post(input.dataset.activeUrl, { active: input.checked })
+                .then((data) => {
+                    card.classList.toggle('is-off', !data.active);
+                    input.closest('.switch').title = data.active ? 'Shown' : 'Hidden';
+                })
+                .catch(() => { input.checked = !input.checked; alert('Could not save. Reload and try again.'); });
+        });
+    });
+
+    // Order: drag a card by its handle, or Alt + arrow keys on the handle.
+    const list = document.getElementById('sec-list');
+    const saveOrder = () => post('{{ url_for("admin.reorder_topics") }}', {
+        ids: Array.from(list.children).map((li) => Number(li.dataset.id)),
+    }).catch(() => alert('Could not save the new order. Reload and try again.'));
+
+    let dragged = null;
+    list.querySelectorAll('.sec-grip').forEach((grip) => {
+        const card = grip.closest('.sec-card');
+        grip.addEventListener('dragstart', (e) => {
+            dragged = card;
+            card.classList.add('is-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', card.dataset.id);
+            e.dataTransfer.setDragImage(card, 20, 20);
+        });
+        grip.addEventListener('dragend', () => {
+            card.classList.remove('is-dragging');
+            list.querySelectorAll('.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'));
+            dragged = null;
+        });
+        grip.addEventListener('keydown', (e) => {
+            if (!e.altKey) return;
+            const back = e.key === 'ArrowUp' || e.key === 'ArrowLeft';
+            const fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight';
+            if (!back && !fwd) return;
+            e.preventDefault();
+            const sibling = back ? card.previousElementSibling : card.nextElementSibling;
+            if (!sibling) return;
+            list.insertBefore(card, back ? sibling : sibling.nextElementSibling);
+            grip.focus();
+            saveOrder();
+        });
+    });
+    list.addEventListener('dragover', (e) => {
+        if (!dragged) return;
+        const target = e.target.closest('.sec-card');
+        if (!target || target === dragged) return;
+        e.preventDefault();
+        list.querySelectorAll('.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'));
+        target.classList.add('is-drop-target');
+    });
+    list.addEventListener('drop', (e) => {
+        const target = e.target.closest('.sec-card');
+        if (!dragged || !target || target === dragged) return;
+        e.preventDefault();
+        const cards = Array.from(list.children);
+        const after = cards.indexOf(dragged) < cards.indexOf(target);
+        list.insertBefore(dragged, after ? target.nextElementSibling : target);
+        saveOrder();
+    });
+})();
+</script>
+{% endblock %}

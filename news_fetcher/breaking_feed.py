@@ -15,7 +15,7 @@ import os
 import re
 from datetime import datetime, timedelta
 
-from aggregator import breaking
+from aggregator import breaking, feed_health
 from aggregator.models import FeedEntry, RssFeed, Story, db
 
 logger = logging.getLogger(__name__)
@@ -127,12 +127,19 @@ def poll_feeds(now=None):
             db.session.rollback()
             metrics["failed"] += 1
             logger.warning("[Breaking] %s failed: %s", url[:60], e)
+            feed_health.record_feed_read(url, feed_health.STATUS_ERROR, error=str(e))
             continue
         if read_url == url:
             _validators[url] = (etag, modified)
         if articles is None:
             metrics["unchanged"] += 1
+            feed_health.record_feed_read(url, feed_health.STATUS_OK)
             continue
+        if read_url != url:
+            status = feed_health.STATUS_FALLBACK
+        else:
+            status = feed_health.STATUS_OK if articles else feed_health.STATUS_EMPTY
+        feed_health.record_feed_read(url, status, items=len(articles))
         metrics["new"] += breaking.store_headlines(articles, read_url, now)
     breaking.link_scraped(now)
     metrics["breaking"] = mark_breaking(now)

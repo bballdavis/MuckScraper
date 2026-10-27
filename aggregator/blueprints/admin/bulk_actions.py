@@ -78,7 +78,7 @@ def unblock_domain():
             db.session.delete(entry)
             db.session.commit()
             logger.info(f"[Blocklist] Removed {domain}")
-    return redirect(url_for("admin.scrape_blocklist"))
+    return redirect(url_for("admin.blocklist_page"))
 
 
 @admin.route("/sync-allsides", methods=["POST"])

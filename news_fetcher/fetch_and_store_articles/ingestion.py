@@ -57,6 +57,46 @@ def get_ingestion_blocks():
     return sources, title_keywords
 
 
+class IngestionBlocks:
+    """The active ingestion blocks for one batch, counting which rule
+    stopped each article so the Blocklist page can say what every rule
+    caught (aggregator/blocklist.py). Patterns are lowercased once here, as
+    in get_ingestion_blocks()."""
+
+    def __init__(self):
+        self.sources, self.title_keywords = [], []
+        for row in IngestionBlock.query.filter_by(is_active=True).all():
+            pattern = (row.pattern or "").strip().lower()
+            if not pattern:
+                continue
+            if row.kind == BLOCK_KIND_SOURCE:
+                self.sources.append((pattern, row.id))
+            elif row.kind == BLOCK_KIND_TITLE:
+                self.title_keywords.append((pattern, row.id))
+        self.hits = {}
+
+    def _match(self, rules, text, count):
+        text = (text or "").lower()
+        for pattern, block_id in rules:
+            if pattern in text:
+                if count:
+                    self.hits[block_id] = self.hits.get(block_id, 0) + 1
+                return True
+        return False
+
+    def blocks_url(self, url, count=True):
+        return self._match(self.sources, url, count)
+
+    def blocks_title(self, title, count=True):
+        return self._match(self.title_keywords, title, count)
+
+    def save_hits(self):
+        """Add this batch's hits to today's counts. Doesn't commit."""
+        from aggregator.blocklist import record_block_hits
+        record_block_hits(self.hits)
+        self.hits = {}
+
+
 GROUPING_LOOKBACK_DAYS = int(os.getenv("MUCKSCRAPER_GROUPING_LOOKBACK_DAYS", "7"))
 
 
@@ -84,6 +124,7 @@ def empty_store_metrics(topic_name, provider=None, input_articles=0):
             "promotional": 0,
             "duplicate_url": 0,
             "duplicate_title_outlet": 0,
+            "unknown_outlet": 0,
         },
         "scrape_statuses": {},
         "bias_buckets": {bucket: 0 for bucket in BIAS_BUCKETS},
@@ -269,7 +310,7 @@ def store_opinion_feed(articles_data):
     def skip(reason):
         metrics["skipped"][reason] = metrics["skipped"].get(reason, 0) + 1
 
-    blocked_sources, blocked_title_keywords = get_ingestion_blocks()
+    blocks = IngestionBlocks()
     seen_urls = set()
     for article in articles_data:
         title = strip_title_tags(article.get("title"))
@@ -281,10 +322,10 @@ def store_opinion_feed(articles_data):
             skip("missing_required")
             continue
         url = normalize_url(raw_url)
-        if any(blocked in url.lower() for blocked in blocked_sources):
+        if blocks.blocks_url(url):
             skip("blocked_source")
             continue
-        if any(kw in title.lower() for kw in blocked_title_keywords):
+        if blocks.blocks_title(title):
             skip("blocked_title")
             continue
         reason = low_value_article_reason(title, url)
@@ -303,6 +344,7 @@ def store_opinion_feed(articles_data):
             metrics["saved"] += 1
         else:
             skip("not_saved")  # already stored, or the save failed (logged)
+    blocks.save_hits()
     db.session.commit()
     return metrics
 
@@ -343,7 +385,10 @@ def store_articles(articles_data, topic_name, provider=None):
 
     # Same reasoning as the story pre-fetch above: every article in the batch
     # is tested against these, so load them once rather than per article.
-    blocked_sources, blocked_title_keywords = get_ingestion_blocks()
+    blocks = IngestionBlocks()
+    # The sections each article's source serves (aggregator/sources.py).
+    from aggregator.sources import IngestSections
+    source_sections = IngestSections(topic_name)
     opinion_urls_seen = set()
     # Bylines that are just an outlet's name ("Washington Post" on a Toronto
     # Sun reprint) are dropped; loaded once per batch.
@@ -370,7 +415,7 @@ def store_articles(articles_data, topic_name, provider=None):
             
         url = normalize_url(raw_url)
 
-        if any(blocked in url.lower() for blocked in blocked_sources):
+        if blocks.blocks_url(url):
             logger.debug(f"Skipping blocked source: {url}")
             metrics["skipped"]["blocked_source"] += 1
             continue
@@ -379,14 +424,14 @@ def store_articles(articles_data, topic_name, provider=None):
         if low_value_reason == "opinion":
             # Still refused as news (and counted as skipped), but kept in the
             # separate Op/Ed table unless a title block applies.
-            if not any(kw in title.lower() for kw in blocked_title_keywords):
+            if not blocks.blocks_title(title, count=False):
                 save_opinion_piece(title, url, source_name, published_at, content, image_url, opinion_urls_seen)
         if low_value_reason:
             logger.debug(f"Skipping low-value article ({low_value_reason}): {title} [{url}]")
             metrics["skipped"][low_value_reason if low_value_reason in metrics["skipped"] else "low_value_url"] += 1
             continue
 
-        if any(kw in title.lower() for kw in blocked_title_keywords):
+        if blocks.blocks_title(title):
             logger.debug(f"Skipping blocked title: {title}")
             metrics["skipped"]["blocked_title"] += 1
             continue
@@ -408,6 +453,11 @@ def store_articles(articles_data, topic_name, provider=None):
                 metrics["skipped"]["duplicate_title_outlet"] += 1
                 continue
         
+        if not outlet and source_sections.known_outlets_only:
+            logger.debug(f"Skipping new outlet {source_name} (search keeps known outlets only): {title}")
+            metrics["skipped"]["unknown_outlet"] += 1
+            continue
+
         logger.info(f"Processing: {title}")
 
         if is_roundup_article(title, raw_url):
@@ -471,9 +521,10 @@ def store_articles(articles_data, topic_name, provider=None):
         if story not in recent_stories:
             recent_stories.append(story)
 
-        # Classify article into topics via Ollama
+        # A source that serves sections tags its articles with them;
+        # anything from a General source is classified.
         from aggregator.models import Topic as TopicModel
-        classified_topic_names = classify_article(title, content)
+        classified_topic_names = source_sections.sections_for(article) or classify_article(title, content)
         for classified_name in classified_topic_names:
             classified_topic = TopicModel.query.filter_by(name=classified_name).first()
             if not classified_topic:
@@ -578,6 +629,7 @@ def store_articles(articles_data, topic_name, provider=None):
         bias_source = outlet.bias_source or "unrated"
         metrics["bias_sources"][bias_source] = metrics["bias_sources"].get(bias_source, 0) + 1
 
+    blocks.save_hits()
     db.session.commit()
     metrics["stories_touched"] = len(stories_touched)
     logger.info(

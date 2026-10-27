@@ -65,8 +65,24 @@ def _feed_fallback_url(feed_url):
 
 
 def _fetch_with_fallback(feed_url, **kwargs):
-    """fetch_feed() with the feed's fallback_url, if one is set."""
-    return fetch_feed(feed_url, fallback_url=_feed_fallback_url(feed_url), **kwargs)
+    """fetch_feed() with the feed's fallback_url, if one is set. Each article
+    carries the feed's own URL (not the fallback's) as `feed_url`, which is
+    what its sections are keyed on (aggregator/sources.py), and the read is
+    recorded for Settings › Sources (aggregator/feed_health.py) unless the
+    Breaking poller reads it, which also knows when the fallback was used."""
+    from aggregator import feed_health
+    from aggregator.models import RssFeed
+    source_name, articles = fetch_feed(feed_url, fallback_url=_feed_fallback_url(feed_url), **kwargs)
+    for article in articles:
+        article["feed_url"] = feed_url
+    if RssFeed.query.filter_by(url=feed_url, bucket="general", enabled=True).first() is not None:
+        return source_name, articles
+    if source_name is None and not articles:
+        feed_health.record_feed_read(feed_url, feed_health.STATUS_ERROR, items=0, error="Could not be read")
+    else:
+        status = feed_health.STATUS_OK if articles else feed_health.STATUS_EMPTY
+        feed_health.record_feed_read(feed_url, status, items=len(articles))
+    return source_name, articles
 
 
 def _feed_failed(feed):

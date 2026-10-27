@@ -1,0 +1,281 @@
+{% extends 'settings_base.html' %}
+{% from 'icons.html' import icon %}
+{% block title %}Sources{% endblock %}
+{% block settings_key %}rss{% endblock %}
+
+{#- Role and section checkboxes, for a new feed (g is none) or an existing one. -#}
+{% macro feed_choices(g, roles, role_hints, topics, prefix) %}
+<fieldset class="choice-group">
+    <legend>Role</legend>
+    {%- for key, name in roles.items() %}
+    <label class="choice" title="{{ role_hints[key] }}"><input type="checkbox" name="roles" value="{{ key }}"{% if (g and key in g.roles) or (not g and key == 'general') %} checked{% endif %}> {{ name }}</label>
+    {%- endfor %}
+</fieldset>
+<fieldset class="choice-group">
+    <legend>Sections it serves <span class="muted">(none = General: the classifier decides)</span></legend>
+    {%- set chosen = (g.sections | map(attribute='id') | list) if g else [] %}
+    {%- for topic in topics %}
+    <label class="choice{{ '' if topic.is_active else ' is-off' }}"><input type="checkbox" name="sections" value="{{ topic.id }}"{% if topic.id in chosen %} checked{% endif %}> {{ topic.label }}</label>
+    {%- endfor %}
+</fieldset>
+{% endmacro %}
+
+{% block styles %}
+<style>
+    .src-summary { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 4px; font-size: 13px; color: var(--text-muted); }
+    .src-summary .dot { margin-right: 5px; }
+    .src-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+    .app-page .page-body .src-filters select, .app-page .page-body .src-filters input { height: 30px; font-size: 13px; }
+    .src-filters input[type="search"] { flex: 1 1 200px; min-width: 0; }
+    .src-name { font-weight: 600; }
+    .src-url { font-size: 12px; color: var(--text-faint); overflow-wrap: anywhere; }
+    .src-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .chip-section { background: var(--accent-soft, rgba(76, 76, 143, 0.12)); color: var(--accent-text); }
+    .src-health { display: flex; align-items: center; gap: 6px; min-width: 170px; max-width: 260px; font-size: 12px; color: var(--text-muted); }
+    .src-health .dot { flex: none; }
+    .src-health-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .src-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+    .src-count b { color: var(--text); font-weight: 600; }
+    tr.src-editor[hidden] { display: none; }
+    tr.src-editor td { background: var(--bg-subtle, transparent); }
+    .src-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 10px 12px; }
+    .src-form .add-field input { width: 100%; }
+    .src-form .wide { grid-column: 1 / -1; }
+    .choice-group { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; grid-column: 1 / -1; }
+    .choice-group legend { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; padding: 0; }
+    .choice { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
+    .choice.is-off { opacity: 0.55; }
+    .src-actions { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+    .src-actions .spacer { flex: 1 1 auto; }
+    .src-add[hidden] { display: none; }
+    .src-add form { padding: 12px 16px 14px; }
+    #src-none[hidden] { display: none; }
+    @media (max-width: 600px) { .src-form { grid-template-columns: minmax(0, 1fr); } }
+</style>
+{% endblock %}
+
+{% block settings_body %}
+{%- set bad = health_counts.get('bad', 0) %}
+<div class="page-head page-head-row">
+    <div>
+        <h1>Sources</h1>
+        <p>Every feed and news-API search, the sections it serves and how its last read went. Articles from a source that serves sections take those sections; a General source's articles are sorted by the classifier. Feeds are read every few minutes for Breaking and in full on each <a href="{{ url_for('admin.pipeline_schedule_page') }}">scheduled run</a>.</p>
+        <div class="src-summary">
+            <span><span class="dot ok"></span>{{ health_counts.get('good', 0) }} reading fine</span>
+            <span><span class="dot warn"></span>{{ health_counts.get('warning', 0) }} on a fallback or a recent bad read</span>
+            <span><span class="dot bad"></span>{{ bad }} need{{ 's' if bad == 1 else '' }} attention</span>
+            <span><span class="dot off"></span>{{ health_counts.get('unknown', 0) }} off or not read yet</span>
+        </div>
+    </div>
+    <button type="button" class="btn" id="src-add-open">{{ icon('plus') }} Add feed</button>
+</div>
+
+<section class="panel src-add" id="src-add" hidden>
+    <div class="panel-head"><h2>Add a feed</h2></div>
+    <form method="POST" action="{{ url_for('admin.add_rss_feed') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="src-form">
+            <label class="add-field"><span>Name</span><input type="text" name="label" placeholder="e.g. Reuters World"></label>
+            <label class="add-field"><span>Feed URL</span><input type="url" name="url" placeholder="https://example.com/feed" required></label>
+            <label class="add-field wide"><span>Fallback feed <span class="muted">(optional, read when the feed fails)</span></span><input type="url" name="fallback_url" placeholder="https://news.google.com/rss/search?q=site:example.com"></label>
+            {{ feed_choices(none, roles, role_hints, topics, 'new') }}
+        </div>
+        <div class="src-actions">
+            <span class="spacer"></span>
+            <button type="button" class="btn btn-quiet" id="src-add-cancel">Cancel</button>
+            <button type="submit" class="btn">{{ icon('plus') }} Add feed</button>
+        </div>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head"><h2>Feeds</h2><span class="chip" id="src-count">{{ feeds|length }} feeds</span></div>
+    <div class="src-filters">
+        <label><span class="visually-hidden">Section</span>
+            <select id="f-section">
+                <option value="">All sections</option>
+                <option value="general">General only</option>
+                {%- for topic in topics %}<option value="{{ topic.id }}"{% if request.args.get('section') == topic.id|string %} selected{% endif %}>{{ topic.label }}</option>{% endfor %}
+            </select>
+        </label>
+        <label><span class="visually-hidden">Role</span>
+            <select id="f-role">
+                <option value="">All roles</option>
+                {%- for key, name in roles.items() %}<option value="{{ key }}">{{ name }}</option>{% endfor %}
+            </select>
+        </label>
+        <label><span class="visually-hidden">Health</span>
+            <select id="f-health">
+                <option value="">Any health</option>
+                <option value="bad">Needs attention</option>
+                <option value="warning">Fallback or recent bad read</option>
+                <option value="good">Reading fine</option>
+                <option value="unknown">Off or not read yet</option>
+            </select>
+        </label>
+        <input type="search" id="f-text" placeholder="Search names and URLs" autocomplete="off" aria-label="Search feeds">
+    </div>
+    <div class="table-scroll">
+    <table class="data-table" id="src-table">
+        <thead>
+            <tr>
+                <th scope="col">Feed</th>
+                <th scope="col">Role and sections</th>
+                <th scope="col">Last read</th>
+                <th scope="col" class="num" title="Headlines seen in 24 hours, and how many became articles">24 h</th>
+                <th scope="col">On</th>
+                <th scope="col"><span class="visually-hidden">Edit</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {%- for g in feeds %}
+            <tr id="feed-{{ g.id }}" class="src-row{{ '' if g.enabled else ' is-off' }}"
+                data-sections="{{ (g.sections | map(attribute='id') | join(' ')) or 'general' }}"
+                data-roles="{{ g.roles | join(' ') }}" data-health="{{ g.health }}"
+                data-text="{{ (g.name ~ ' ' ~ g.url)|lower }}">
+                <td>
+                    <div class="src-name">{{ g.name }}</div>
+                    <div class="src-url">{{ g.url }}</div>
+                </td>
+                <td>
+                    <div class="src-chips">
+                        {%- for role in g.roles %}<span class="chip" title="{{ role_hints[role] }}">{{ roles[role] }}</span>{% endfor %}
+                        {%- for topic in g.sections %}<span class="chip chip-section">{{ topic.label }}</span>{% else %}<span class="chip" title="The classifier picks each article's sections">General</span>{% endfor %}
+                    </div>
+                </td>
+                <td>
+                    <span class="src-health" title="{{ g.health_note }}"><span class="dot {{ {'good': 'ok', 'warning': 'warn', 'bad': 'bad'}.get(g.health, 'off') }}"></span><span class="src-health-text">{{ g.health_note }}</span></span>
+                    {%- if g.last_read_at %}<div class="src-url">{{ g.last_read_at|short_datetime }}</div>{% endif %}
+                </td>
+                <td class="num"><span class="src-count"><b>{{ g.headlines }}</b>{% if g.headlines %} · {{ g.stored }} stored{% endif %}</span></td>
+                <td>
+                    <label class="switch" title="{{ 'On' if g.enabled else 'Off' }}">
+                        <input type="checkbox" data-active-url="{{ url_for('admin.set_rss_feed_active', feed_id=g.id) }}" {{ 'checked' if g.enabled else '' }} aria-label="{{ g.name }} on"><span></span>
+                    </label>
+                </td>
+                <td><button type="button" class="btn btn-quiet btn-square btn-edit" data-editor="edit-{{ g.id }}" aria-label="Edit {{ g.name }}" title="Edit">{{ icon('pencil') }}</button></td>
+            </tr>
+            <tr class="src-editor" id="edit-{{ g.id }}" hidden>
+                <td colspan="6">
+                    <form method="POST" action="{{ url_for('admin.update_rss_feed', feed_id=g.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="src-form">
+                            <label class="add-field"><span>Name</span><input type="text" name="label" value="{{ g.label or '' }}" placeholder="{{ g.name }}"></label>
+                            <label class="add-field"><span>Fallback feed <span class="muted">(optional)</span></span><input type="url" name="fallback_url" value="{{ g.fallback_url or '' }}"></label>
+                            {{ feed_choices(g, roles, role_hints, topics, g.id) }}
+                        </div>
+                        <div class="src-actions">
+                            <button type="submit" form="feed-delete-{{ g.id }}" class="btn btn-danger btn-square" aria-label="Delete {{ g.name }}" title="Delete">{{ icon('trash') }}</button>
+                            <span class="spacer"></span>
+                            <button type="button" class="btn btn-quiet btn-square btn-close" aria-label="Close without saving" title="Close">{{ icon('x') }}</button>
+                            <button type="submit" class="btn btn-square" aria-label="Save {{ g.name }}" title="Save">{{ icon('save') }}</button>
+                        </div>
+                    </form>
+                    <form id="feed-delete-{{ g.id }}" method="POST" action="{{ url_for('admin.delete_rss_feed', feed_id=g.id) }}" onsubmit="return confirm({{ ('Delete the “' ~ g.name ~ '” feed?')|tojson|forceescape }});">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    </form>
+                </td>
+            </tr>
+            {%- endfor %}
+        </tbody>
+    </table>
+    </div>
+    <div class="panel-body muted" id="src-none" hidden>No feeds match.</div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>News API searches</h2>
+        <a class="btn btn-quiet" href="{{ url_for('admin.scheduled_fetches_page') }}">{{ icon('pencil') }} Edit searches</a>
+    </div>
+    {%- if searches %}
+    <div class="table-scroll">
+    <table class="data-table">
+        <thead><tr><th scope="col">Search</th><th scope="col">Section</th><th scope="col">Asks for</th><th scope="col">Outlets</th></tr></thead>
+        <tbody>
+            {%- for s in searches %}
+            <tr class="{{ '' if s.is_active else 'is-off' }}">
+                <td><span class="src-name">{{ s.label }}</span>{% if not s.is_active %} <span class="chip">Paused</span>{% endif %}</td>
+                <td>{% if s.topic %}<span class="chip chip-section">{{ s.topic.label }}</span>{% else %}<span class="chip">General</span>{% endif %}</td>
+                <td class="src-url">
+                    NewsAPI {% if s.mode == 'query' %}“{{ s.newsapi_query or '—' }}”{% else %}top {{ s.newsapi_category or 'headlines' }}{% endif %}
+                    {%- if s.gnews_query or s.gnews_category %} · GNews {{ s.gnews_query or s.gnews_category }}{% endif %}
+                </td>
+                <td>{% if s.known_outlets_only %}<span class="chip" title="Articles from outlets not already stored are skipped">Known only</span>{% else %}<span class="chip">Any</span>{% endif %}</td>
+            </tr>
+            {%- endfor %}
+        </tbody>
+    </table>
+    </div>
+    {%- else %}
+    <div class="panel-body muted">No searches. Runs read the feeds above only.</div>
+    {%- endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+    const post = (url, body) => fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+        body: JSON.stringify(body),
+    }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+
+    const addPanel = document.getElementById('src-add');
+    document.getElementById('src-add-open').addEventListener('click', () => {
+        addPanel.hidden = false;
+        addPanel.querySelector('input[name="label"]').focus();
+    });
+    document.getElementById('src-add-cancel').addEventListener('click', () => { addPanel.hidden = true; });
+
+    document.querySelectorAll('.btn-edit').forEach((btn) => {
+        const editor = document.getElementById(btn.dataset.editor);
+        btn.addEventListener('click', () => { editor.hidden = !editor.hidden; });
+        editor.querySelector('.btn-close').addEventListener('click', () => {
+            editor.querySelector('form').reset();
+            editor.hidden = true;
+        });
+    });
+
+    document.querySelectorAll('[data-active-url]').forEach((input) => {
+        input.addEventListener('change', () => {
+            const row = input.closest('tr');
+            post(input.dataset.activeUrl, { active: input.checked })
+                .then((data) => {
+                    row.classList.toggle('is-off', !data.active);
+                    input.closest('.switch').title = data.active ? 'On' : 'Off';
+                })
+                .catch(() => { input.checked = !input.checked; alert('Could not save. Reload and try again.'); });
+        });
+    });
+
+    const rows = Array.from(document.querySelectorAll('.src-row'));
+    const fSection = document.getElementById('f-section');
+    const fRole = document.getElementById('f-role');
+    const fHealth = document.getElementById('f-health');
+    const fText = document.getElementById('f-text');
+    const count = document.getElementById('src-count');
+    const none = document.getElementById('src-none');
+    const apply = () => {
+        const q = fText.value.trim().toLowerCase();
+        let shown = 0;
+        rows.forEach((row) => {
+            const ok = (!fSection.value || row.dataset.sections.split(' ').includes(fSection.value))
+                && (!fRole.value || row.dataset.roles.split(' ').includes(fRole.value))
+                && (!fHealth.value || row.dataset.health === fHealth.value)
+                && (!q || row.dataset.text.includes(q));
+            row.hidden = !ok;
+            if (!ok) document.getElementById('edit-' + row.id.slice(5)).hidden = true;
+            if (ok) shown += 1;
+        });
+        count.textContent = shown === rows.length ? rows.length + ' feeds' : shown + ' of ' + rows.length + ' feeds';
+        none.hidden = shown > 0;
+    };
+    [fSection, fRole, fHealth].forEach((el) => el.addEventListener('change', apply));
+    fText.addEventListener('input', apply);
+    apply();
+})();
+</script>
+{% endblock %}
