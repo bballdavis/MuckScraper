@@ -7,6 +7,18 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **Settings › Pipeline › Tasks.** One page for what the scheduler is doing:
+  the pipeline run in progress with its current step and stages, every
+  recurring task (pipeline hours, Breaking News feeds, photo focal points,
+  NewsBox schedules) with its last run, next run, Run now and Pause, the
+  last ten pipeline runs with where the time went, the job queue with
+  Cancel, and the one-off jobs moved over from Overview. The tables fit the
+  page width and stack into labelled rows on phones.
+- **Pipeline step timings.** Each run records how long every step took
+  (`timings` in the run status, the run history and `last_run_metrics`).
+- **Run schedule edits apply without a restart.** The scheduler re-reads
+  the schedule every 15 seconds, and restarts its job queue worker thread
+  if it ever dies.
 - **NYT API budget and the Times Wire.** NYT requests are counted in a
   `nyt_api_calls` ledger over the last 24 hours, shared by both containers
   and kept across restarts, with `NYT_API_DAILY_LIMIT` (default 500, never

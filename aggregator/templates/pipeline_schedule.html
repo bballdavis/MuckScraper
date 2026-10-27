@@ -26,7 +26,7 @@
 
 {%- if restart_needed %}
 <div class="notice" role="alert" style="margin-bottom: 16px;">
-    <span><strong>Scheduler restart needed.</strong> The schedule changed since the scheduler last started.</span>
+    <span><strong>Schedule change not applied.</strong> The scheduler isn't running, so this schedule hasn't taken effect. Changes apply within a few seconds while it runs.</span>
     <form method="POST" action="{{ url_for('admin.restart_container', name='scheduler') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-broad">{{ icon('rotate-cw') }} Restart scheduler</button>

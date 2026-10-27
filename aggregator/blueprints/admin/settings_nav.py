@@ -38,6 +38,7 @@ SETTINGS_SECTIONS = [
         ("prompts", "Prompts", "admin.prompts_page", PromptTemplate, False),
     ]),
     ("Pipeline", [
+        ("tasks", "Tasks", "admin.tasks_page", None, True),
         ("schedule", "Run schedule", "admin.pipeline_schedule_page", None, False),
     ]),
 ]

@@ -3,7 +3,7 @@
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
-from aggregator import create_app, db
+from aggregator import create_app, db, scheduler_tasks
 from aggregator.article_signals import bias_bucket_for_score, is_independent_source
 from aggregator.models import AppSetting, PipelineSchedule, ScheduledFetch
 from news_fetcher.fetch_and_store_articles import fetch_and_store_articles, process_current_edition, review_ambiguous_grouping_matches, sync_allsides_ratings, publish_edition, retry_unrated_outlets, clear_stale_single_article_headlines
@@ -208,8 +208,11 @@ def _build_scrape_outcome_history_entry(run_metrics, headline_site_metrics):
 
     return {
         "recorded_at": finished_at or datetime.utcnow().isoformat(),
+        "started_at": started_at,
+        "run_full_pipeline": run_metrics.get("run_full_pipeline"),
         "status": run_metrics.get("status"),
         "duration_seconds": duration_seconds,
+        "timings": [{"step": t["step"], "seconds": t.get("seconds")} for t in run_metrics.get("timings", [])],
         "edition": headline_site_metrics.get("edition"),
         "run_scrape_statuses": dict(run_metrics.get("totals", {}).get("scrape_statuses", {})),
         "run_skipped": dict(run_metrics.get("totals", {}).get("skipped", {})),
@@ -818,6 +821,33 @@ def _notify_fetch_report(report_payload):
         logging.warning(f"  [n8n] Fetch report webhook failed ({e}) — continuing normally")
 
 
+def _mark_step(run_metrics, label):
+    """Log a pipeline step and time it. Closes the previous step's timing in
+    run_metrics["timings"] and shows the new one as the live run's current
+    step (Settings › Pipeline › Tasks). None closes the last step."""
+    if label is not None:
+        logging.info(f"--- {label} ---")
+    now = datetime.utcnow()
+    timings = run_metrics.setdefault("timings", [])
+    if timings and timings[-1].get("seconds") is None:
+        started = datetime.fromisoformat(timings[-1]["started_at"])
+        timings[-1]["seconds"] = round((now - started).total_seconds(), 1)
+    if label is None:
+        return
+    timings.append({"step": label, "started_at": now.isoformat(), "seconds": None})
+    try:
+        scheduler_tasks.write_json(FETCH_RUN_STATUS_KEY, {
+            "status": "running",
+            "started_at": run_metrics["started_at"],
+            "run_full_pipeline": run_metrics.get("run_full_pipeline"),
+            "step": label,
+            "step_started_at": now.isoformat(),
+            "timings": timings,
+        })
+    except Exception:
+        logging.exception("Could not record the pipeline step")
+
+
 def run_all_fetches(run_full_pipeline=True):
     logging.info("=== Starting scheduled fetch run ===")
     with app.app_context():
@@ -845,6 +875,8 @@ def run_all_fetches(run_full_pipeline=True):
                 "bias_sources": {},
             },
             "steps": {},
+            "run_full_pipeline": run_full_pipeline,
+            "timings": [],
         }
         _save_json_setting(FETCH_RUN_STATUS_KEY, {
             "status": "running",
@@ -861,7 +893,7 @@ def run_all_fetches(run_full_pipeline=True):
                 "stage. Add them at /admin/scheduled-fetches. RSS ingestion still runs."
             )
         for fetch in scheduled_fetches:
-            logging.info(f"--- Fetching: {fetch['label']} ---")
+            _mark_step(run_metrics, f"Fetching: {fetch['label']}")
             try:
                 topic_metrics = fetch_and_store_articles(
                     fetch["label"],
@@ -902,7 +934,7 @@ def run_all_fetches(run_full_pipeline=True):
             run_metrics["steps"]["nyt_lead_paragraphs"] = {"status": "error", "reason": str(e)}
 
         # Run RSS fetch for major wire services and networks
-        logging.info("--- Fetching RSS feeds ---")
+        _mark_step(run_metrics, "Fetching RSS feeds")
         try:
             rss_metrics = fetch_and_store_rss()
             run_metrics["rss"] = rss_metrics
@@ -924,7 +956,7 @@ def run_all_fetches(run_full_pipeline=True):
             }
 
         # NYT articles from the Times Wire the poller job below stored.
-        logging.info("--- Ingesting NYT Times Wire items ---")
+        _mark_step(run_metrics, "Ingesting NYT Times Wire items")
         try:
             nyt_metrics = nyt_api.ingest_wire_items()
             run_metrics["nyt_wire"] = nyt_metrics
@@ -943,6 +975,7 @@ def run_all_fetches(run_full_pipeline=True):
             run_metrics["nyt_wire"] = {"status": "error", "reason": str(e)}
 
         # Op/Ed feeds go to their own table; their counts stay out of the news totals.
+        _mark_step(run_metrics, "Fetching Op/Ed feeds")
         try:
             run_metrics["oped_rss"] = fetch_and_store_oped_rss()
         except Exception as e:
@@ -953,7 +986,7 @@ def run_all_fetches(run_full_pipeline=True):
         # Cards with no article image fall back to another article's
         # image, then the outlet's logo (news_fetcher/outlet_logos.py). Every
         # run, not only full ones, so new outlets get a logo within the hour.
-        logging.info("--- Filling missing card images ---")
+        _mark_step(run_metrics, "Filling missing card images")
         try:
             run_metrics["steps"]["card_images"] = refresh_card_images()
         except Exception as e:
@@ -964,7 +997,7 @@ def run_all_fetches(run_full_pipeline=True):
 
         if run_full_pipeline:
             # Run Bias Checker ONCE after all fetches
-            logging.info("--- Retrying unrated outlets (Bias Checker) ---")
+            _mark_step(run_metrics, "Retrying unrated outlets (Bias Checker)")
             _check_ollama_status_for_report(ollama_state, "before_retry_unrated_outlets")
             try:
                 retry_unrated_outlets()
@@ -978,7 +1011,7 @@ def run_all_fetches(run_full_pipeline=True):
             # Run AllSides sync once a month
             last_sync = get_last_allsides_sync()
             if last_sync is None or (datetime.utcnow() - last_sync).days >= 30:
-                logging.info("--- Syncing AllSides bias ratings ---")
+                _mark_step(run_metrics, "Syncing AllSides bias ratings")
                 try:
                     sync_allsides_ratings()
                     set_last_allsides_sync()
@@ -996,7 +1029,7 @@ def run_all_fetches(run_full_pipeline=True):
                     "days_since_last_sync": days_since,
                 }
 
-            logging.info("--- Running headline ranking ---")
+            _mark_step(run_metrics, "Running headline ranking")
             _check_ollama_status_for_report(ollama_state, "before_headline_ranking")
             try:
                 cleared = clear_stale_single_article_headlines()
@@ -1019,6 +1052,7 @@ def run_all_fetches(run_full_pipeline=True):
             # Keyed on the fast provider: the load this guards against is
             # classification and bias rating, both fast-tier, so the global
             # provider is the wrong thing to ask under split routing.
+            _mark_step(run_metrics, "Targeted RSS enrichment")
             if llm_client.provider_for_tier(llm_client.TIER_FAST) == "groq":
                 # Targeted left/right RSS enrichment adds meaningful classification/
                 # bias-rating LLM load on top of the regular fetch; skip it on Groq's
@@ -1047,7 +1081,7 @@ def run_all_fetches(run_full_pipeline=True):
             # under two names) are marked after membership has settled and
             # before headlines, ranking and the edition, which all count
             # sources without them (aggregator/article_copies.py).
-            logging.info("--- Marking copied articles ---")
+            _mark_step(run_metrics, "Marking copied articles")
             try:
                 run_metrics["steps"]["article_copies"] = mark_recent_copies()
             except Exception as e:
@@ -1056,7 +1090,7 @@ def run_all_fetches(run_full_pipeline=True):
                 run_metrics["status"] = "partial_error"
                 run_metrics["steps"]["article_copies"] = {"status": "error", "reason": str(e)}
 
-            logging.info("--- Generating headlines ---")
+            _mark_step(run_metrics, "Generating headlines")
             try:
                 run_metrics["steps"]["headline_generation"] = generate_headlines_for_stale_stories()
             except Exception as e:
@@ -1080,7 +1114,7 @@ def run_all_fetches(run_full_pipeline=True):
                 run_metrics["status"] = "partial_error"
                 run_metrics["steps"]["headline_ranking"] = {"status": "error", "reason": str(e)}
 
-            logging.info("--- Publishing edition ---")
+            _mark_step(run_metrics, "Publishing edition")
             try:
                 run_metrics["steps"]["publish_edition"] = publish_edition()
             except Exception as e:
@@ -1089,7 +1123,7 @@ def run_all_fetches(run_full_pipeline=True):
                 run_metrics["status"] = "partial_error"
                 run_metrics["steps"]["publish_edition"] = {"status": "error", "reason": str(e)}
 
-            logging.info("--- Processing current edition content ---")
+            _mark_step(run_metrics, "Processing current edition content")
             _check_ollama_status_for_report(ollama_state, "before_process_current_edition")
             try:
                 run_metrics["steps"]["process_current_edition"] = process_current_edition(backfill_recent=True)
@@ -1102,7 +1136,7 @@ def run_all_fetches(run_full_pipeline=True):
             # Op/Ed: link new columns to stories and write roundups. After the
             # edition's summaries (the link check reads them) and before the
             # export, so the published story pages carry the roundups.
-            logging.info("--- Linking Op/Ed columns and writing roundups ---")
+            _mark_step(run_metrics, "Linking Op/Ed columns and writing roundups")
             try:
                 run_metrics["steps"]["opinion_roundups"] = link_opinion_and_write_roundups()
             except Exception as e:
@@ -1111,7 +1145,7 @@ def run_all_fetches(run_full_pipeline=True):
                 run_metrics["status"] = "partial_error"
                 run_metrics["steps"]["opinion_roundups"] = {"status": "error", "reason": str(e)}
 
-            logging.info("--- Daily horoscope ---")
+            _mark_step(run_metrics, "Daily horoscope")
             try:
                 run_metrics["steps"]["daily_horoscope"] = run_optional_daily_horoscope()
             except Exception as e:
@@ -1119,7 +1153,7 @@ def run_all_fetches(run_full_pipeline=True):
                 logging.error(f"Error writing the daily horoscope: {e}")
                 run_metrics["steps"]["daily_horoscope"] = {"status": "error", "reason": str(e)}
 
-            logging.info("--- Exporting static site ---")
+            _mark_step(run_metrics, "Exporting static site")
             try:
                 backfilled_edition_ids = run_metrics["steps"]["process_current_edition"].get(
                     "backfilled_edition_ids"
@@ -1156,6 +1190,7 @@ def run_all_fetches(run_full_pipeline=True):
             run_metrics["steps"]["daily_horoscope"] = {"status": "skipped", "reason": "fetch_only_run"}
             run_metrics["steps"]["static_export"] = {"status": "skipped", "reason": "fetch_only_run"}
 
+        _mark_step(run_metrics, None)
         set_last_fetch_time()
         run_metrics["finished_at"] = datetime.utcnow().isoformat()
         ollama_state["up_at_end"] = _check_ollama_status_for_report(ollama_state, "run_end")
@@ -1182,6 +1217,7 @@ def run_all_fetches(run_full_pipeline=True):
             "started_at": run_metrics["started_at"],
             "run_full_pipeline": run_full_pipeline,
             "finished_at": run_metrics.get("finished_at"),
+            "timings": run_metrics["timings"],
         })
 
     logging.info("=== Scheduled fetch run complete ===")
@@ -1189,14 +1225,15 @@ def run_all_fetches(run_full_pipeline=True):
 
 if __name__ == "__main__":
     logging.info("Scheduler starting up...")
+    started_at = datetime.utcnow()
 
     with app.app_context():
         db.create_all()
 
     # Admin bulk actions and AI tasks queued from the web app run here, in
-    # their own thread, so they start even while the startup run below is busy.
+    # their own thread. The control tick below restarts it if it ever dies.
     from aggregator.jobs import prune_finished, start_worker_thread
-    start_worker_thread(app)
+    worker = {"thread": start_worker_thread(app)[0]}
 
     with app.app_context():
         prune_finished()
@@ -1209,18 +1246,6 @@ if __name__ == "__main__":
         startup_full = startup_fetch and should_run_full_pipeline(last_fetch=get_last_fetch_time())
         if not startup_fetch:
             logging.info("Skipping startup fetch.")
-
-        schedule_entries = (
-            PipelineSchedule.query
-            .filter_by(is_active=True)
-            .order_by(PipelineSchedule.hour.asc())
-            .all()
-        )
-        # Snapshot (hour, run_full_pipeline) pairs now, before the app context
-        # closes -- each job below is registered with its own type baked in,
-        # so the live cron path never needs to re-check "is this hour a full
-        # pipeline hour" the way the startup catch-up path above still does.
-        schedule_snapshot = [(e.hour, e.run_full_pipeline) for e in schedule_entries]
         set_scheduler_started_at()
 
     # One pipeline run at a time: a scheduled hour that comes while the
@@ -1231,128 +1256,181 @@ if __name__ == "__main__":
     def run_pipeline(run_full_pipeline):
         if not pipeline_lock.acquire(blocking=False):
             logging.info("Skipping a pipeline run: the previous one is still going.")
-            return
+            return {"skipped": "previous run still going"}
         try:
             run_all_fetches(run_full_pipeline=run_full_pipeline)
         finally:
             pipeline_lock.release()
 
+    def tracked(task_id, func, *args):
+        """Run a task in the app context and record its run for the Tasks page."""
+        def run():
+            with app.app_context():
+                begun = datetime.utcnow()
+                status, error, result = "ok", None, None
+                try:
+                    scheduler_tasks.record_start(task_id)
+                    result = func(*args)
+                except Exception as e:
+                    db.session.rollback()
+                    status, error = "error", str(e)
+                    logging.exception("[Tasks] %s failed", task_id)
+                if isinstance(result, dict) and result.get("skipped"):
+                    status = "skipped"
+                try:
+                    scheduler_tasks.record_run(task_id, begun, datetime.utcnow(), status, error, result)
+                except Exception:
+                    logging.exception("[Tasks] Could not record %s", task_id)
+        return run
+
     scheduler = BlockingScheduler()
     if startup_fetch:
         scheduler.add_job(
-            run_pipeline,
+            tracked("pipeline_full" if startup_full else "pipeline_fetch", run_pipeline, startup_full),
             trigger="date",
             run_date=datetime.now(timezone.utc),
-            args=[startup_full],
             id="pipeline_startup",
             name=f"Startup {'full pipeline' if startup_full else 'fetch-only'} run",
             misfire_grace_time=None,
         )
-    for hour, run_full_pipeline in schedule_snapshot:
-        scheduler.add_job(
-            (lambda full=run_full_pipeline: run_pipeline(full)),
-            trigger=CronTrigger(hour=hour, minute=0, timezone=TIMEZONE),
-            id=f"pipeline_schedule_{hour}",
-            name=f"Scheduled {'full pipeline' if run_full_pipeline else 'fetch-only'} run at {hour}:00 ({TIMEZONE})",
-            replace_existing=True,
-        )
+
+    # The run schedule (Settings › Pipeline › Run schedule), applied on every
+    # control tick, so an edit takes effect within CONTROL_SECONDS and no
+    # longer needs a restart (which started a catch-up run).
+    schedule = {"types": {}, "loaded_at": None}
+
+    def sync_schedule():
+        from aggregator.models import PipelineSchedule
+        wanted = {f"pipeline_schedule_{e.hour}": (e.hour, e.run_full_pipeline)
+                  for e in PipelineSchedule.query.filter_by(is_active=True).all()}
+        for job_id in list(schedule["types"]):
+            if job_id not in wanted:
+                scheduler.remove_job(job_id)
+                del schedule["types"][job_id]
+        for job_id, (hour, full) in wanted.items():
+            if schedule["types"].get(job_id) == full:
+                continue
+            scheduler.add_job(
+                tracked("pipeline_full" if full else "pipeline_fetch", run_pipeline, full),
+                trigger=CronTrigger(hour=hour, minute=0, timezone=TIMEZONE),
+                id=job_id,
+                name=f"Scheduled {'full pipeline' if full else 'fetch-only'} run at {hour}:00 ({TIMEZONE})",
+                replace_existing=True,
+            )
+            schedule["types"][job_id] = full
+        schedule["loaded_at"] = datetime.utcnow()
+        db.session.rollback()
 
     # Each MuckScroller user's scheduled summaries (aggregator/newsbox.py):
     # a cheap check that queues jobs for whatever schedule is due.
     def run_due_newsbox_schedules():
         from aggregator.newsbox import run_due_schedules
-        with app.app_context():
-            try:
-                run_due_schedules()
-            except Exception:
-                db.session.rollback()
-                logging.exception("[NewsBox] Checking due schedules failed")
-
-    scheduler.add_job(
-        run_due_newsbox_schedules,
-        trigger="interval",
-        minutes=1,
-        id="newsbox_schedules",
-        name="App scheduled summaries (every minute)",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
+        return run_due_schedules()
 
     # Breaking News (news_fetcher/breaking_feed.py): RSS headlines only,
     # every few minutes, so the Headlines bar and the app see them before
     # the next pipeline run scrapes anything.
     def poll_breaking_feeds():
         from news_fetcher.breaking_feed import poll_feeds
-        with app.app_context():
-            try:
-                poll_feeds()
-            except Exception:
-                db.session.rollback()
-                logging.exception("[Breaking] Polling the feeds failed")
-
-    from news_fetcher.breaking_feed import POLL_MINUTES as BREAKING_POLL_MINUTES
-    scheduler.add_job(
-        poll_breaking_feeds,
-        trigger="interval",
-        minutes=BREAKING_POLL_MINUTES,
-        next_run_time=datetime.now(timezone.utc),
-        id="breaking_feeds",
-        name=f"Breaking News feed check (every {BREAKING_POLL_MINUTES} min)",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
+        return poll_feeds()
 
     # NYT Times Wire (news_fetcher/nyt_api.py): checked every minute, polled
     # on its own schedule so the day's 500 requests last the day.
     def poll_nyt_wire():
-        with app.app_context():
-            try:
-                nyt_api.poll_wire_if_due()
-            except Exception:
-                db.session.rollback()
-                logging.exception("[NYT API] Wire poll failed")
-
-    scheduler.add_job(
-        poll_nyt_wire,
-        trigger="interval",
-        minutes=1,
-        next_run_time=datetime.now(timezone.utc),
-        id="nyt_wire",
-        name="NYT Times Wire check (every minute, polls on its schedule)",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
+        return nyt_api.poll_wire_if_due()
 
     # Photo focal points (news_fetcher/image_focus.py): every few minutes, so
     # new articles' photos crop around their subject soon after they land.
     def find_image_focus():
         from news_fetcher.image_focus import refresh_image_focus
+        return refresh_image_focus()
+
+    from news_fetcher.breaking_feed import POLL_MINUTES as BREAKING_POLL_MINUTES
+    from news_fetcher.image_focus import RUN_MINUTES as FOCUS_RUN_MINUTES
+    RECURRING = {
+        "newsbox_schedules": (run_due_newsbox_schedules, 1, "App scheduled summaries (every minute)"),
+        "breaking_feeds": (poll_breaking_feeds, BREAKING_POLL_MINUTES,
+                           f"Breaking News feed check (every {BREAKING_POLL_MINUTES} min)"),
+        "image_focus": (find_image_focus, FOCUS_RUN_MINUTES, f"Photo focal points (every {FOCUS_RUN_MINUTES} min)"),
+        "nyt_wire": (poll_nyt_wire, 1, "NYT Times Wire check (every minute, polls on its schedule)"),
+    }
+    for job_id, (func, minutes, name) in RECURRING.items():
+        scheduler.add_job(
+            tracked(job_id, func),
+            trigger="interval",
+            minutes=minutes,
+            next_run_time=datetime.now(timezone.utc),
+            id=job_id,
+            name=name,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    def control_tick():
+        """Every CONTROL_SECONDS: apply the schedule and the Tasks page's
+        Pause / Run now, keep the queue worker thread alive, and write the
+        heartbeat the page reads."""
         with app.app_context():
             try:
-                refresh_image_focus()
+                sync_schedule()
+                paused = scheduler_tasks.paused_ids()
+                for job in scheduler.get_jobs():
+                    if job.id == "control":
+                        continue
+                    # Pausing "Full pipeline" or "Fetch only" pauses each of its hours.
+                    task_id = job.id if job.id in RECURRING else None
+                    if job.id in schedule["types"]:
+                        task_id = "pipeline_full" if schedule["types"][job.id] else "pipeline_fetch"
+                    if task_id is None:
+                        continue
+                    if task_id in paused and job.next_run_time is not None:
+                        job.pause()
+                    elif task_id not in paused and job.next_run_time is None:
+                        job.resume()
+                for task_id in scheduler_tasks.take_run_requests():
+                    if task_id in ("pipeline_full", "pipeline_fetch"):
+                        full = task_id == "pipeline_full"
+                        scheduler.add_job(
+                            tracked(task_id, run_pipeline, full), trigger="date",
+                            run_date=datetime.now(timezone.utc), misfire_grace_time=None,
+                            name=f"Run now: {'full pipeline' if full else 'fetch only'}",
+                        )
+                    elif task_id in RECURRING:
+                        func, _, name = RECURRING[task_id]
+                        scheduler.add_job(tracked(task_id, func), trigger="date",
+                                          run_date=datetime.now(timezone.utc), misfire_grace_time=None,
+                                          name=f"Run now: {name}")
+                if not worker["thread"].is_alive():
+                    logging.error("[Jobs] The queue worker thread died; starting a new one")
+                    worker["thread"] = start_worker_thread(app)[0]
+                jobs = [{
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run_at": job.next_run_time.astimezone(timezone.utc).replace(tzinfo=None).isoformat()
+                    if job.next_run_time else None,
+                } for job in scheduler.get_jobs() if job.id != "control"]
+                scheduler_tasks.write_state(started_at, jobs, worker["thread"].is_alive(), schedule["loaded_at"])
             except Exception:
                 db.session.rollback()
-                logging.exception("[Focus] Finding photo focal points failed")
+                logging.exception("[Tasks] Control tick failed")
 
-    from news_fetcher.image_focus import RUN_MINUTES as FOCUS_RUN_MINUTES
+    with app.app_context():
+        sync_schedule()
     scheduler.add_job(
-        find_image_focus,
+        control_tick,
         trigger="interval",
-        minutes=FOCUS_RUN_MINUTES,
-        id="image_focus",
-        name=f"Photo focal points (every {FOCUS_RUN_MINUTES} min)",
-        replace_existing=True,
+        seconds=scheduler_tasks.CONTROL_SECONDS,
+        next_run_time=datetime.now(timezone.utc),
+        id="control",
+        name="Tasks page controls and heartbeat",
         max_instances=1,
         coalesce=True,
     )
 
     logging.info(
-        "Scheduler running with %s scheduled run(s) in %s: %s",
-        len(schedule_snapshot),
+        "Scheduler running with %s scheduled run(s) in %s",
+        len(schedule["types"]),
         TIMEZONE,
-        ", ".join(f"{hour}:00={'full' if full else 'fetch-only'}" for hour, full in schedule_snapshot),
     )
     scheduler.start()

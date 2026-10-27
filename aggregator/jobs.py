@@ -170,6 +170,34 @@ def _wait_for_notify(conn, timeout):
         conn.notifies.clear()
 
 
+def register_handlers():
+    """Import the modules that register handlers: the admin bulk actions and
+    AI tasks, the app's NewsBox summaries, bookmark snapshots, Breaking
+    scrapes and article jobs."""
+    import aggregator.blueprints.admin._tasks  # noqa: F401
+    import aggregator.newsbox  # noqa: F401
+    import aggregator.bookmarks  # noqa: F401
+    import aggregator.breaking  # noqa: F401
+    import aggregator.article_jobs  # noqa: F401
+
+
+def cancel(job_id, message="Cancelled from Settings › Tasks."):
+    """Cancel a queued job, letting its fail handler clean up (a NewsBox
+    item shows as failed rather than pending forever). Returns False when it
+    isn't queued any more."""
+    row = db.session.execute(db.text(
+        "UPDATE jobs SET status = 'cancelled', finished_at = (now() at time zone 'utc'), error = :error "
+        "WHERE id = :id AND status = 'queued' RETURNING kind, payload"
+    ), {"id": job_id, "error": message}).fetchone()
+    db.session.commit()
+    if row is None:
+        return False
+    register_handlers()
+    _, fail = _HANDLERS.get(row.kind, (None, None))
+    _call_fail(fail, json.loads(row.payload or "{}"), message)
+    return True
+
+
 def worker_loop(app, stop_event=None, kinds=None):
     """Run jobs until `stop_event` is set: drain the queue, then sleep until
     a NOTIFY or POLL_SECONDS. Survives database outages by retrying.
@@ -179,13 +207,7 @@ def worker_loop(app, stop_event=None, kinds=None):
     exclude = None if kinds else BROWSER_KINDS
     with app.app_context():
         if not kinds:
-            # Registers the admin handlers (bulk actions, AI tasks), the
-            # app's NewsBox summaries, bookmark snapshots and article jobs.
-            import aggregator.blueprints.admin._tasks  # noqa: F401
-            import aggregator.newsbox  # noqa: F401
-            import aggregator.bookmarks  # noqa: F401
-            import aggregator.breaking  # noqa: F401
-            import aggregator.article_jobs  # noqa: F401
+            register_handlers()
         fail_interrupted_jobs(kinds, exclude)
         listen = None
         while not stop_event.is_set():
