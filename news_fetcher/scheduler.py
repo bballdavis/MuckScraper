@@ -1250,6 +1250,29 @@ if __name__ == "__main__":
         coalesce=True,
     )
 
+    # Photo focal points (news_fetcher/image_focus.py): every few minutes, so
+    # new articles' photos crop around their subject soon after they land.
+    def find_image_focus():
+        from news_fetcher.image_focus import refresh_image_focus
+        with app.app_context():
+            try:
+                refresh_image_focus()
+            except Exception:
+                db.session.rollback()
+                logging.exception("[Focus] Finding photo focal points failed")
+
+    from news_fetcher.image_focus import RUN_MINUTES as FOCUS_RUN_MINUTES
+    scheduler.add_job(
+        find_image_focus,
+        trigger="interval",
+        minutes=FOCUS_RUN_MINUTES,
+        id="image_focus",
+        name=f"Photo focal points (every {FOCUS_RUN_MINUTES} min)",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     logging.info(
         "Scheduler running with %s scheduled run(s) in %s: %s",
         len(schedule_snapshot),
