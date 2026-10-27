@@ -21,14 +21,14 @@ class AppLinksTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_lists_app_ids_and_story_paths(self):
-        with mock.patch.dict(os.environ, {"IOS_APP_IDS": "ABCDE12345.me.davisho.MuckScroller, X.y"}):
+        with mock.patch.dict(os.environ, {"IOS_APP_IDS": "ABCDE12345.com.example.MuckScroller, X.y"}):
             client = _client()
             for path in ("/.well-known/apple-app-site-association", "/apple-app-site-association"):
                 response = client.get(path)
                 self.assertEqual(response.status_code, 200, path)
                 self.assertEqual(response.mimetype, "application/json")
                 details = response.get_json()["applinks"]["details"][0]
-                self.assertEqual(details["appIDs"], ["ABCDE12345.me.davisho.MuckScroller", "X.y"])
+                self.assertEqual(details["appIDs"], ["ABCDE12345.com.example.MuckScroller", "X.y"])
                 self.assertEqual(details["components"], [{"/": "/story/*"}])
 
 
