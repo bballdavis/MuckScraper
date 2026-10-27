@@ -1,6 +1,6 @@
 {% extends '_app_page.html' %}
 {% from 'icons.html' import icon %}
-{% from 'story_card_macros.html' import bias_tag, outlet_flag with context %}
+{% from 'story_card_macros.html' import grade_pill, outlet_bias_tag, outlet_flag with context %}
 {% from 'pagination.html' import pager %}
 {#- Everything the reader marked read (aggregator/reads.py), stories and
     articles together, newest first. Mark unread takes a row off with Undo
@@ -42,7 +42,7 @@
                         <span>{{ n }} article{{ 's' if n != 1 else '' }}</span>
                         {% elif target.outlet %}
                         <span>{{ target.outlet.name }}{{ outlet_flag(target.outlet) }}</span>
-                        {{ bias_tag(target.outlet.bias_score, unrated=false) }}
+                        {% call grade_pill(target.outlet) %}{{ outlet_bias_tag(target.outlet, unrated=false) }}{% endcall %}
                         {% endif %}
                         <span>Read <span class="local-date" data-utc="{{ item.read_at.isoformat() }}Z">{{ item.read_at|short_datetime }}</span></span>
                     </div>

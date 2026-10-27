@@ -323,7 +323,7 @@
             {{ meta_item('Published', when=article.date) }}
             {% if article.last_updated and article.last_updated != article.date %}{{ meta_item('Last updated', when=article.last_updated) }}{% endif %}
             <span class="tm-chips">
-                {% call grade_pill(article.outlet) %}{% if lean is none and article.outlet %}{{ outlet_bias_tag(article.outlet) }}{% else %}{{ bias_tag(lean) }}{% endif %}{% endcall %}
+                {% call grade_pill(article.outlet, score=lean) %}{% if lean is none and article.outlet %}{{ outlet_bias_tag(article.outlet) }}{% else %}{{ bias_tag(lean) }}{% endif %}{% endcall %}
             </span>
         {% endcall %}
 

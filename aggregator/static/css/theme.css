@@ -121,13 +121,11 @@
 .outlet-flag:hover::after, .outlet-flag:focus-visible::after { opacity: 1; }
 
 /* Reporting grade (story_card_macros.html reporting_tag, 2026-10-23): the
-   word, then five bars filled up to the grade in its colour; "Reporting"
-   and the meaning in a dark tip above on hover or focus, like .outlet-flag.
-   The tip opens leftward, since the chip sits at the right of its row.
+   word, then five bars filled up to the grade in its colour.
    The word uses the lean chip's type exactly, caps and all (Philip, 2026-10-25). */
 .reporting-tag {
-    --rep: #2f9e5b; position: relative; display: inline-flex; align-items: center; gap: 6px;
-    font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; color: var(--text); white-space: nowrap; cursor: default; outline: none;
+    --rep: #2f9e5b; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; color: var(--text); white-space: nowrap;
 }
 .reporting-high { --rep: #4caf50; }
 .reporting-mostly-factual { --rep: #b3a12a; }
@@ -139,21 +137,30 @@
 /* Grade and lean as one split pill (story_card_macros.html grade_pill;
    Philip, 2026-10-25): the grade on the left in an outlined half, the lean
    chip as the whole right half, its colour running to the pill's outer
-   edge. No overflow:hidden, so the grade's tip can still open above. */
-.grade-pill { display: inline-flex; align-items: stretch; height: 20px; white-space: nowrap; }
+   edge. One tip for the whole pill, like the iOS app's popover (Philip,
+   2026-10-27), above it and right-aligned by default; story cards open it
+   left-aligned, since the pill starts their bottom row. A tap focuses the
+   pill, so :focus opens it too on touch screens. It sits above a compact
+   card's stretched headline link. */
+.grade-pill {
+    position: relative; z-index: 2; display: inline-flex; align-items: stretch; height: 20px;
+    white-space: nowrap; cursor: help; outline: none; border-radius: 4px;
+}
+.grade-pill:focus-visible { box-shadow: 0 0 0 2px var(--accent-light); }
 .grade-pill .reporting-tag {
     padding: 0 7px; box-sizing: border-box;
     border: 1px solid var(--input-border); border-right: none; border-radius: 4px 0 0 4px;
 }
-.grade-pill .bias-tag { height: 20px; box-sizing: border-box; margin: 0; border-radius: 0 4px 4px 0; }
-.reporting-tag::after {
-    content: attr(data-tip); position: absolute; right: 0; bottom: calc(100% + 7px);
-    width: max-content; max-width: 280px; white-space: normal;
-    padding: 6px 9px; border-radius: 6px; background: var(--topbar-bg); color: #fff;
-    font-size: 12px; font-weight: 500; line-height: 1.35; letter-spacing: normal; text-transform: none;
-    pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 30;
-}
-.reporting-tag:hover::after, .reporting-tag:focus-visible::after { opacity: 1; }
+.grade-pill .bias-tag { height: 20px; box-sizing: border-box; margin: 0; border-radius: 0 4px 4px 0; display: inline-flex; align-items: center; }
+.grade-pill.is-single .reporting-tag { border-right: 1px solid var(--input-border); border-radius: 4px; }
+.grade-pill.is-single .bias-tag { border-radius: 4px; }
+.grade-pill > .tip { right: 0; left: auto; top: auto; bottom: calc(100% + 8px); transform: none; width: 260px; }
+.card-bottom .grade-pill > .tip { left: 0; right: auto; }
+.grade-pill:focus > .tip { opacity: 1; visibility: visible; }
+.grade-pill:hover, .grade-pill:focus { z-index: 6; }
+.grade-pill .tip .gp-line { display: block; margin-top: 3px; }
+.grade-pill .tip .gp-muted { color: #b8bccc; }
+.grade-pill .tip .gp-small { color: #b8bccc; font-size: 11px; margin-top: 6px; }
 /* Phones: chips shrink rather than wrap their row (Philip, 2026-10-23). The
    lean chip switches to its short form (story_card_macros.html bias_short)
    and the reporting grade to its dots alone; tap one for its meaning. */
