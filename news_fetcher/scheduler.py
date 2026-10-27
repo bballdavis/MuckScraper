@@ -3,27 +3,35 @@
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
-from aggregator import create_app, db, scheduler_tasks
+from aggregator import create_app, db, jobs, scheduler_tasks
+from aggregator.workers import Workers
 from aggregator.article_signals import bias_bucket_for_score, is_independent_source
 from aggregator.models import AppSetting, PipelineSchedule, ScheduledFetch
-from news_fetcher.fetch_and_store_articles import fetch_and_store_articles, process_current_edition, review_ambiguous_grouping_matches, sync_allsides_ratings, publish_edition, retry_unrated_outlets, clear_stale_single_article_headlines
+from news_fetcher.fetch_and_store_articles import fetch_and_store_articles, review_ambiguous_grouping_matches, sync_allsides_ratings, publish_edition, retry_unrated_outlets, clear_stale_single_article_headlines
 from news_fetcher.headline_generator import generate_headlines_for_stale_stories
 from news_fetcher.copy_detector import mark_recent_copies
 from news_fetcher.opinion_linker import link_opinion_and_write_roundups
 from news_fetcher.outlet_logos import refresh_card_images
+from news_fetcher.fetch_and_store_articles.edition_content import (
+    edition_content_metrics,
+    edition_content_targets,
+    fill_story,
+)
 from news_fetcher.rss_fetcher import (
-    fetch_and_store_rss,
-    fetch_and_store_oped_rss,
+    active_feed_urls,
+    oped_feed_metrics,
+    oped_rss_metrics,
+    rss_feed_metrics,
+    rss_metrics,
     enrich_skewed_stories_with_right_feeds,
     get_skewed_story_ids_for_right_enrichment,
     enrich_skewed_stories_with_left_feeds,
     get_skewed_story_ids_for_left_enrichment,
 )
-from news_fetcher import llm_client, nyt_api
+from news_fetcher import llm_client, nyt_api, pipeline_run
 from datetime import datetime, timedelta, timezone
 import logging
 import sys
-import threading
 import os
 import requests
 import json
@@ -71,10 +79,12 @@ def get_scheduled_fetches():
     ]
 
 
-app = create_app()
+# The worker threads (aggregator/workers.py) and the ingest pool
+# (news_fetcher/workpool.py) each hold a connection while they work.
+app = create_app(engine_options={"pool_size": 20, "max_overflow": 20, "pool_pre_ping": True})
 SCRAPE_OUTCOME_HISTORY_KEY = "scrape_outcome_history_v1"
 SCRAPE_OUTCOME_HISTORY_MAX_RUNS = 40
-FETCH_RUN_STATUS_KEY = "fetch_run_status_v1"
+FETCH_RUN_STATUS_KEY = pipeline_run.FETCH_RUN_STATUS_KEY
 
 
 def run_optional_headline_ranking():
@@ -821,44 +831,29 @@ def _notify_fetch_report(report_payload):
         logging.warning(f"  [n8n] Fetch report webhook failed ({e}) — continuing normally")
 
 
-def _mark_step(run_metrics, label):
-    """Log a pipeline step and time it. Closes the previous step's timing in
-    run_metrics["timings"] and shows the new one as the live run's current
-    step (Settings › Pipeline › Tasks). None closes the last step."""
-    if label is not None:
-        logging.info(f"--- {label} ---")
-    now = datetime.utcnow()
-    timings = run_metrics.setdefault("timings", [])
-    if timings and timings[-1].get("seconds") is None:
-        started = datetime.fromisoformat(timings[-1]["started_at"])
-        timings[-1]["seconds"] = round((now - started).total_seconds(), 1)
-    if label is None:
-        return
-    timings.append({"step": label, "started_at": now.isoformat(), "seconds": None})
-    try:
-        scheduler_tasks.write_json(FETCH_RUN_STATUS_KEY, {
-            "status": "running",
-            "started_at": run_metrics["started_at"],
-            "run_full_pipeline": run_metrics.get("run_full_pipeline"),
-            "step": label,
-            "step_started_at": now.isoformat(),
-            "timings": timings,
-        })
-    except Exception:
-        logging.exception("Could not record the pipeline step")
+_mark_step = pipeline_run.mark_step
 
 
-def run_all_fetches(run_full_pipeline=True):
-    logging.info("=== Starting scheduled fetch run ===")
-    with app.app_context():
-        ollama_state = {
+def _add_totals(run_metrics, metrics):
+    """Add one source's ingest counts to the run's totals."""
+    totals = run_metrics["totals"]
+    for key in ("input_articles", "stored", "new_outlets", "stories_touched"):
+        totals[key] += metrics.get(key, 0) or 0
+    for key in ("skipped", "scrape_statuses", "bias_buckets", "bias_sources"):
+        _merge_counts(totals[key], metrics.get(key))
+
+
+def new_run_metrics(run_full_pipeline):
+    """What a run's stages build up, saved with its pipeline_runs row."""
+    return {
+        "ollama_state": {
             "up_at_start": False,
             "up_at_end": False,
             "went_down_during_run": False,
             "inference_wedged": False,
             "checks": [],
-        }
-        run_metrics = {
+        },
+        "run_metrics": {
             "status": "ok",
             "started_at": datetime.utcnow().isoformat(),
             "topics": {},
@@ -877,350 +872,426 @@ def run_all_fetches(run_full_pipeline=True):
             "steps": {},
             "run_full_pipeline": run_full_pipeline,
             "timings": [],
-        }
-        _save_json_setting(FETCH_RUN_STATUS_KEY, {
-            "status": "running",
-            "started_at": run_metrics["started_at"],
-            "run_full_pipeline": run_full_pipeline,
-        })
-        ollama_state["up_at_start"] = _check_ollama_status_for_report(ollama_state, "run_start")
+        },
+    }
 
-        # Fetch all categories
-        scheduled_fetches = get_scheduled_fetches()
-        if not scheduled_fetches:
-            logging.warning(
-                "No active scheduled fetches configured -- skipping the NewsAPI/GNews "
-                "stage. Add them at /admin/scheduled-fetches. RSS ingestion still runs."
+
+# The run's stages (news_fetcher/pipeline_run.py). Each takes the Run, works
+# on run.metrics, and queues what comes next.
+
+def stage_fetch(run):
+    """Topic fetches and NYT lead paragraphs, then one job per feed."""
+    logging.info("=== Starting scheduled fetch run ===")
+    run_metrics, ollama_state = run.metrics["run_metrics"], run.metrics["ollama_state"]
+    run_full_pipeline = run.full
+    _save_json_setting(FETCH_RUN_STATUS_KEY, {
+        "status": "running",
+        "started_at": run_metrics["started_at"],
+        "run_full_pipeline": run_full_pipeline,
+    })
+    ollama_state["up_at_start"] = _check_ollama_status_for_report(ollama_state, "run_start")
+
+    # Fetch all categories
+    scheduled_fetches = get_scheduled_fetches()
+    if not scheduled_fetches:
+        logging.warning(
+            "No active scheduled fetches configured -- skipping the NewsAPI/GNews "
+            "stage. Add them at /admin/scheduled-fetches. RSS ingestion still runs."
+        )
+    for fetch in scheduled_fetches:
+        _mark_step(run_metrics, f"Fetching: {fetch['label']}")
+        try:
+            topic_metrics = fetch_and_store_articles(
+                fetch["label"],
+                mode=fetch["mode"],
+                query=fetch["query"],
+                country=fetch["country"],
+                category=fetch["category"],
+                gnews_query=fetch["gnews_query"],
+                gnews_category=fetch["gnews_category"]
             )
-        for fetch in scheduled_fetches:
-            _mark_step(run_metrics, f"Fetching: {fetch['label']}")
-            try:
-                topic_metrics = fetch_and_store_articles(
-                    fetch["label"],
-                    mode=fetch["mode"],
-                    query=fetch["query"],
-                    country=fetch["country"],
-                    category=fetch["category"],
-                    gnews_query=fetch["gnews_query"],
-                    gnews_category=fetch["gnews_category"]
-                )
-                run_metrics["topics"][fetch["label"]] = topic_metrics
-                for provider_metrics in topic_metrics.get("providers", {}).values():
-                    run_metrics["totals"]["input_articles"] += provider_metrics.get("input_articles", 0)
-                    run_metrics["totals"]["stored"] += provider_metrics.get("stored", 0)
-                    run_metrics["totals"]["new_outlets"] += provider_metrics.get("new_outlets", 0)
-                    run_metrics["totals"]["stories_touched"] += provider_metrics.get("stories_touched", 0)
-                    _merge_counts(run_metrics["totals"]["skipped"], provider_metrics.get("skipped"))
-                    _merge_counts(run_metrics["totals"]["scrape_statuses"], provider_metrics.get("scrape_statuses"))
-                    _merge_counts(run_metrics["totals"]["bias_buckets"], provider_metrics.get("bias_buckets"))
-                    _merge_counts(run_metrics["totals"]["bias_sources"], provider_metrics.get("bias_sources"))
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error fetching {fetch['label']}: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["topics"][fetch["label"]] = {
-                    "status": "error",
-                    "reason": str(e),
-                }
-
-        # NYT lead paragraphs first (ten articles a request), so the NYT
-        # Opinion and World feed articles below get them too
-        # (news_fetcher/nyt_api.py).
-        try:
-            run_metrics["steps"]["nyt_lead_paragraphs"] = {"searched": nyt_api.search_lead_paragraphs()}
+            run_metrics["topics"][fetch["label"]] = topic_metrics
+            for provider_metrics in topic_metrics.get("providers", {}).values():
+                run_metrics["totals"]["input_articles"] += provider_metrics.get("input_articles", 0)
+                run_metrics["totals"]["stored"] += provider_metrics.get("stored", 0)
+                run_metrics["totals"]["new_outlets"] += provider_metrics.get("new_outlets", 0)
+                run_metrics["totals"]["stories_touched"] += provider_metrics.get("stories_touched", 0)
+                _merge_counts(run_metrics["totals"]["skipped"], provider_metrics.get("skipped"))
+                _merge_counts(run_metrics["totals"]["scrape_statuses"], provider_metrics.get("scrape_statuses"))
+                _merge_counts(run_metrics["totals"]["bias_buckets"], provider_metrics.get("bias_buckets"))
+                _merge_counts(run_metrics["totals"]["bias_sources"], provider_metrics.get("bias_sources"))
         except Exception as e:
             db.session.rollback()
-            logging.error(f"Error searching NYT lead paragraphs: {e}")
-            run_metrics["steps"]["nyt_lead_paragraphs"] = {"status": "error", "reason": str(e)}
-
-        # Run RSS fetch for major wire services and networks
-        _mark_step(run_metrics, "Fetching RSS feeds")
-        try:
-            rss_metrics = fetch_and_store_rss()
-            run_metrics["rss"] = rss_metrics
-            run_metrics["totals"]["input_articles"] += rss_metrics.get("input_articles", 0)
-            run_metrics["totals"]["stored"] += rss_metrics.get("stored", 0)
-            run_metrics["totals"]["new_outlets"] += rss_metrics.get("new_outlets", 0)
-            run_metrics["totals"]["stories_touched"] += rss_metrics.get("stories_touched", 0)
-            _merge_counts(run_metrics["totals"]["skipped"], rss_metrics.get("skipped"))
-            _merge_counts(run_metrics["totals"]["scrape_statuses"], rss_metrics.get("scrape_statuses"))
-            _merge_counts(run_metrics["totals"]["bias_buckets"], rss_metrics.get("bias_buckets"))
-            _merge_counts(run_metrics["totals"]["bias_sources"], rss_metrics.get("bias_sources"))
-        except Exception as e:
-            db.session.rollback()
-            logging.error(f"Error fetching RSS feeds: {e}")
+            logging.error(f"Error fetching {fetch['label']}: {e}")
             run_metrics["status"] = "partial_error"
-            run_metrics["rss"] = {
+            run_metrics["topics"][fetch["label"]] = {
                 "status": "error",
                 "reason": str(e),
             }
 
-        # NYT articles from the Times Wire the poller job below stored.
-        _mark_step(run_metrics, "Ingesting NYT Times Wire items")
+    # NYT lead paragraphs first (ten articles a request), so the NYT
+    # Opinion and World feed articles below get them too
+    # (news_fetcher/nyt_api.py).
+    try:
+        run_metrics["steps"]["nyt_lead_paragraphs"] = {"searched": nyt_api.search_lead_paragraphs()}
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error searching NYT lead paragraphs: {e}")
+        run_metrics["steps"]["nyt_lead_paragraphs"] = {"status": "error", "reason": str(e)}
+
+    # Every feed is its own job, run several at once on the ingest threads:
+    # the general news feeds, the NYT articles the Times Wire poller stored,
+    # and the Op/Ed feeds (their own table; their counts stay out of the news
+    # totals). Each feed's metrics come back to stage_enrich.
+    _mark_step(run_metrics, "Fetching feeds (RSS, NYT Times Wire, Op/Ed)")
+    payloads = (
+        [{"source": "rss", "feed_url": url} for url in active_feed_urls("general")]
+        + [{"source": "nyt_wire"}]
+        + [{"source": "op_ed", "feed_url": url} for url in active_feed_urls("op_ed")]
+    )
+    run.fan_out(pipeline_run.FEED_KIND, payloads, then="enrich")
+
+
+def ingest_feed(payload):
+    """One feed job: fetch and store one feed. Returns its metrics."""
+    source = payload.get("source")
+    if source == "rss":
+        return {"source": source, **rss_feed_metrics(payload["feed_url"])}
+    if source == "op_ed":
+        return {"source": source, **oped_feed_metrics(payload["feed_url"])}
+    if source == "nyt_wire":
+        return {"source": source, **nyt_api.ingest_wire_items()}
+    raise ValueError(f"Unknown feed source {source!r}")
+
+
+def _collect_feeds(run, run_metrics):
+    """The feed jobs' metrics into the run's, as the one-by-one fetch
+    reported them."""
+    results = run.results(pipeline_run.FEED_KIND)
+    run_metrics["rss"] = rss_metrics([r for r in results if r.get("source") == "rss"])
+    _add_totals(run_metrics, run_metrics["rss"])
+    nyt = next((r for r in results if r.get("source") == "nyt_wire"), None)
+    run_metrics["nyt_wire"] = nyt or {"status": "error", "reason": "the NYT Times Wire job failed"}
+    if nyt:
+        _add_totals(run_metrics, nyt)
+    run_metrics["oped_rss"] = oped_rss_metrics([r for r in results if r.get("source") == "op_ed"])
+    failed = run.failures(pipeline_run.FEED_KIND)
+    if failed:
+        logging.error(f"{failed} feed job(s) failed; see Settings › Pipeline › Tasks")
+        run_metrics["status"] = "partial_error"
+        run_metrics["rss"]["failed_feed_jobs"] = failed
+
+
+def stage_enrich(run):
+    """Card images, then (full runs) bias, grouping review, enrichment,
+    copies, headlines, ranking and the edition; then one job per story."""
+    run_metrics, ollama_state = run.metrics["run_metrics"], run.metrics["ollama_state"]
+    _collect_feeds(run, run_metrics)
+
+    # Cards with no article image fall back to another article's
+    # image, then the outlet's logo (news_fetcher/outlet_logos.py). Every
+    # run, not only full ones, so new outlets get a logo within the hour.
+    _mark_step(run_metrics, "Filling missing card images")
+    try:
+        run_metrics["steps"]["card_images"] = refresh_card_images()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error filling missing card images: {e}")
+        run_metrics["status"] = "partial_error"
+        run_metrics["steps"]["card_images"] = {"status": "error", "reason": str(e)}
+
+    if not run.full:
+        run_metrics["steps"]["retry_unrated_outlets"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["allsides_sync"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["clear_stale_single_article_headlines"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["review_ambiguous_grouping_matches"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["targeted_right_rss_enrichment"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["targeted_right_rss_bias_retry"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["targeted_right_rss_enrichment_second_pass"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["targeted_right_rss_second_pass_bias_retry"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["targeted_left_rss_enrichment"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["targeted_left_rss_bias_retry"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["targeted_left_rss_enrichment_second_pass"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["targeted_left_rss_second_pass_bias_retry"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["headline_generation"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["headline_ranking"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["publish_edition"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["process_current_edition"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["opinion_roundups"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["daily_horoscope"] = {"status": "skipped", "reason": "fetch_only_run"}
+        run_metrics["steps"]["static_export"] = {"status": "skipped", "reason": "fetch_only_run"}
+        _finish_run(run)
+        return
+
+    # Run Bias Checker ONCE after all fetches
+    _mark_step(run_metrics, "Retrying unrated outlets (Bias Checker)")
+    _check_ollama_status_for_report(ollama_state, "before_retry_unrated_outlets")
+    try:
+        retry_unrated_outlets()
+        run_metrics["steps"]["retry_unrated_outlets"] = {"status": "ok"}
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error checking outlet bias: {e}")
+        run_metrics["status"] = "partial_error"
+        run_metrics["steps"]["retry_unrated_outlets"] = {"status": "error", "reason": str(e)}
+
+    # Run AllSides sync once a month
+    last_sync = get_last_allsides_sync()
+    if last_sync is None or (datetime.utcnow() - last_sync).days >= 30:
+        _mark_step(run_metrics, "Syncing AllSides bias ratings")
         try:
-            nyt_metrics = nyt_api.ingest_wire_items()
-            run_metrics["nyt_wire"] = nyt_metrics
-            run_metrics["totals"]["input_articles"] += nyt_metrics.get("input_articles", 0)
-            run_metrics["totals"]["stored"] += nyt_metrics.get("stored", 0)
-            run_metrics["totals"]["new_outlets"] += nyt_metrics.get("new_outlets", 0)
-            run_metrics["totals"]["stories_touched"] += nyt_metrics.get("stories_touched", 0)
-            _merge_counts(run_metrics["totals"]["skipped"], nyt_metrics.get("skipped"))
-            _merge_counts(run_metrics["totals"]["scrape_statuses"], nyt_metrics.get("scrape_statuses"))
-            _merge_counts(run_metrics["totals"]["bias_buckets"], nyt_metrics.get("bias_buckets"))
-            _merge_counts(run_metrics["totals"]["bias_sources"], nyt_metrics.get("bias_sources"))
+            sync_allsides_ratings()
+            set_last_allsides_sync()
+            run_metrics["steps"]["allsides_sync"] = {"status": "ok"}
         except Exception as e:
             db.session.rollback()
-            logging.error(f"Error ingesting NYT Times Wire items: {e}")
+            logging.error(f"Error syncing AllSides ratings: {e}")
             run_metrics["status"] = "partial_error"
-            run_metrics["nyt_wire"] = {"status": "error", "reason": str(e)}
+            run_metrics["steps"]["allsides_sync"] = {"status": "error", "reason": str(e)}
+    else:
+        days_since = (datetime.utcnow() - last_sync).days
+        logging.info(f"--- AllSides sync skipped ({days_since}/30 days) ---")
+        run_metrics["steps"]["allsides_sync"] = {
+            "status": "skipped",
+            "days_since_last_sync": days_since,
+        }
 
-        # Op/Ed feeds go to their own table; their counts stay out of the news totals.
-        _mark_step(run_metrics, "Fetching Op/Ed feeds")
-        try:
-            run_metrics["oped_rss"] = fetch_and_store_oped_rss()
-        except Exception as e:
-            db.session.rollback()
-            logging.error(f"Error fetching Op/Ed RSS feeds: {e}")
-            run_metrics["oped_rss"] = {"status": "error", "reason": str(e)}
+    _mark_step(run_metrics, "Running headline ranking")
+    _check_ollama_status_for_report(ollama_state, "before_headline_ranking")
+    try:
+        cleared = clear_stale_single_article_headlines()
+        run_metrics["steps"]["clear_stale_single_article_headlines"] = {
+            "status": "ok",
+            "cleared": cleared,
+        }
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error clearing stale single-article headlines: {e}")
+        run_metrics["status"] = "partial_error"
+        run_metrics["steps"]["clear_stale_single_article_headlines"] = {"status": "error", "reason": str(e)}
+    try:
+        run_metrics["steps"]["review_ambiguous_grouping_matches"] = review_ambiguous_grouping_matches()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error reviewing ambiguous grouping matches: {e}")
+        run_metrics["status"] = "partial_error"
+        run_metrics["steps"]["review_ambiguous_grouping_matches"] = {"status": "error", "reason": str(e)}
+    # Keyed on the fast provider: the load this guards against is
+    # classification and bias rating, both fast-tier, so the global
+    # provider is the wrong thing to ask under split routing.
+    _mark_step(run_metrics, "Targeted RSS enrichment")
+    if llm_client.provider_for_tier(llm_client.TIER_FAST) == "groq":
+        # Targeted left/right RSS enrichment adds meaningful classification/
+        # bias-rating LLM load on top of the regular fetch; skip it on Groq's
+        # free tier. Re-enable once Ollama is back.
+        logging.info("--- Skipping targeted left/right RSS enrichment passes (fast tier on groq) ---")
+        for step in (
+            "targeted_right_rss_enrichment", "targeted_right_rss_bias_retry",
+            "targeted_right_rss_enrichment_second_pass", "targeted_right_rss_second_pass_bias_retry",
+            "targeted_left_rss_enrichment", "targeted_left_rss_bias_retry",
+            "targeted_left_rss_enrichment_second_pass", "targeted_left_rss_second_pass_bias_retry",
+        ):
+            run_metrics["steps"][step] = {"status": "skipped", "reason": "groq_fast_provider"}
+    else:
+        _run_targeted_rss_enrichment_pass(RIGHT_RSS_ENRICHMENT_CONFIG, run_metrics, ollama_state)
+        _run_targeted_rss_enrichment_pass(LEFT_RSS_ENRICHMENT_CONFIG, run_metrics, ollama_state)
 
-        # Cards with no article image fall back to another article's
-        # image, then the outlet's logo (news_fetcher/outlet_logos.py). Every
-        # run, not only full ones, so new outlets get a logo within the hour.
-        _mark_step(run_metrics, "Filling missing card images")
-        try:
-            run_metrics["steps"]["card_images"] = refresh_card_images()
-        except Exception as e:
-            db.session.rollback()
-            logging.error(f"Error filling missing card images: {e}")
+    # Every headline for the run is written here, in one pass. Position
+    # matters twice over: it must come after grouping review and both
+    # enrichment passes so story membership has settled, and it must sit
+    # immediately before ranking -> publish -> summaries, which is the
+    # stretch of the run that uses the quality model. Ollama holds one
+    # model at a time, so batching here means it loads once and stays
+    # loaded for the summary phase instead of being swapped in and out
+    # around every grouping and classification call.
+    # Copies (one outlet republishing another, or the same wire text
+    # under two names) are marked after membership has settled and
+    # before headlines, ranking and the edition, which all count
+    # sources without them (aggregator/article_copies.py).
+    _mark_step(run_metrics, "Marking copied articles")
+    try:
+        run_metrics["steps"]["article_copies"] = mark_recent_copies()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error marking copied articles: {e}")
+        run_metrics["status"] = "partial_error"
+        run_metrics["steps"]["article_copies"] = {"status": "error", "reason": str(e)}
+
+    _mark_step(run_metrics, "Generating headlines")
+    try:
+        run_metrics["steps"]["headline_generation"] = generate_headlines_for_stale_stories()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error generating headlines: {e}")
+        run_metrics["status"] = "partial_error"
+        run_metrics["steps"]["headline_generation"] = {"status": "error", "reason": str(e)}
+
+    # Single ranking pass for the whole run, positioned after all
+    # enrichment so publish_edition() below sees a fully fresh,
+    # post-enrichment score. Previously this ran up to 5x per run
+    # (once here, plus twice per enrichment direction) — trimmed
+    # since collect_all_external_headlines() + the Ollama matching/
+    # editorial-rerank calls inside it don't need to be redone
+    # mid-run just to catch a few newly-enriched articles.
+    try:
+        run_metrics["steps"]["headline_ranking"] = run_optional_headline_ranking()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error in headline ranking: {e}")
+        run_metrics["status"] = "partial_error"
+        run_metrics["steps"]["headline_ranking"] = {"status": "error", "reason": str(e)}
+
+    _mark_step(run_metrics, "Publishing edition")
+    try:
+        run_metrics["steps"]["publish_edition"] = publish_edition()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error publishing edition: {e}")
+        run_metrics["status"] = "partial_error"
+        run_metrics["steps"]["publish_edition"] = {"status": "error", "reason": str(e)}
+
+    # Summaries and deep reports, one job per story on the AI thread, behind
+    # any NewsBox request (aggregator/workers.py).
+    _mark_step(run_metrics, "Processing current edition content")
+    _check_ollama_status_for_report(ollama_state, "before_process_current_edition")
+    try:
+        base, targets = edition_content_targets(backfill_recent=True)
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error processing edition content: {e}")
+        run_metrics["status"] = "partial_error"
+        base, targets = {"status": "error", "reason": str(e)}, []
+    run.metrics["edition_content"] = base
+    run.fan_out(pipeline_run.STORY_KIND,
+                [{"story_id": story_id, "edition_id": edition_id} for story_id, edition_id in targets],
+                then="publish")
+
+
+def fill_edition_story(payload):
+    """One story job: its missing summary, deep report and child summaries."""
+    return fill_story(payload["story_id"], payload.get("edition_id"))
+
+
+def stage_publish(run):
+    """Op/Ed roundups, the horoscope, the static export, and the report."""
+    run_metrics = run.metrics["run_metrics"]
+    base = run.metrics.get("edition_content") or {}
+    if base.get("status") == "processed":
+        base = edition_content_metrics(base, run.results(pipeline_run.STORY_KIND))
+        failed = run.failures(pipeline_run.STORY_KIND)
+        if failed:
             run_metrics["status"] = "partial_error"
-            run_metrics["steps"]["card_images"] = {"status": "error", "reason": str(e)}
+            base["failed_story_jobs"] = failed
+    run_metrics["steps"]["process_current_edition"] = base
 
-        if run_full_pipeline:
-            # Run Bias Checker ONCE after all fetches
-            _mark_step(run_metrics, "Retrying unrated outlets (Bias Checker)")
-            _check_ollama_status_for_report(ollama_state, "before_retry_unrated_outlets")
-            try:
-                retry_unrated_outlets()
-                run_metrics["steps"]["retry_unrated_outlets"] = {"status": "ok"}
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error checking outlet bias: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["steps"]["retry_unrated_outlets"] = {"status": "error", "reason": str(e)}
+    # Op/Ed: link new columns to stories and write roundups. After the
+    # edition's summaries (the link check reads them) and before the
+    # export, so the published story pages carry the roundups.
+    _mark_step(run_metrics, "Linking Op/Ed columns and writing roundups")
+    try:
+        run_metrics["steps"]["opinion_roundups"] = link_opinion_and_write_roundups()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error linking Op/Ed columns: {e}")
+        run_metrics["status"] = "partial_error"
+        run_metrics["steps"]["opinion_roundups"] = {"status": "error", "reason": str(e)}
 
-            # Run AllSides sync once a month
-            last_sync = get_last_allsides_sync()
-            if last_sync is None or (datetime.utcnow() - last_sync).days >= 30:
-                _mark_step(run_metrics, "Syncing AllSides bias ratings")
-                try:
-                    sync_allsides_ratings()
-                    set_last_allsides_sync()
-                    run_metrics["steps"]["allsides_sync"] = {"status": "ok"}
-                except Exception as e:
-                    db.session.rollback()
-                    logging.error(f"Error syncing AllSides ratings: {e}")
-                    run_metrics["status"] = "partial_error"
-                    run_metrics["steps"]["allsides_sync"] = {"status": "error", "reason": str(e)}
-            else:
-                days_since = (datetime.utcnow() - last_sync).days
-                logging.info(f"--- AllSides sync skipped ({days_since}/30 days) ---")
-                run_metrics["steps"]["allsides_sync"] = {
-                    "status": "skipped",
-                    "days_since_last_sync": days_since,
-                }
+    _mark_step(run_metrics, "Daily horoscope")
+    try:
+        run_metrics["steps"]["daily_horoscope"] = run_optional_daily_horoscope()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error writing the daily horoscope: {e}")
+        run_metrics["steps"]["daily_horoscope"] = {"status": "error", "reason": str(e)}
 
-            _mark_step(run_metrics, "Running headline ranking")
-            _check_ollama_status_for_report(ollama_state, "before_headline_ranking")
-            try:
-                cleared = clear_stale_single_article_headlines()
-                run_metrics["steps"]["clear_stale_single_article_headlines"] = {
-                    "status": "ok",
-                    "cleared": cleared,
-                }
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error clearing stale single-article headlines: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["steps"]["clear_stale_single_article_headlines"] = {"status": "error", "reason": str(e)}
-            try:
-                run_metrics["steps"]["review_ambiguous_grouping_matches"] = review_ambiguous_grouping_matches()
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error reviewing ambiguous grouping matches: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["steps"]["review_ambiguous_grouping_matches"] = {"status": "error", "reason": str(e)}
-            # Keyed on the fast provider: the load this guards against is
-            # classification and bias rating, both fast-tier, so the global
-            # provider is the wrong thing to ask under split routing.
-            _mark_step(run_metrics, "Targeted RSS enrichment")
-            if llm_client.provider_for_tier(llm_client.TIER_FAST) == "groq":
-                # Targeted left/right RSS enrichment adds meaningful classification/
-                # bias-rating LLM load on top of the regular fetch; skip it on Groq's
-                # free tier. Re-enable once Ollama is back.
-                logging.info("--- Skipping targeted left/right RSS enrichment passes (fast tier on groq) ---")
-                for step in (
-                    "targeted_right_rss_enrichment", "targeted_right_rss_bias_retry",
-                    "targeted_right_rss_enrichment_second_pass", "targeted_right_rss_second_pass_bias_retry",
-                    "targeted_left_rss_enrichment", "targeted_left_rss_bias_retry",
-                    "targeted_left_rss_enrichment_second_pass", "targeted_left_rss_second_pass_bias_retry",
-                ):
-                    run_metrics["steps"][step] = {"status": "skipped", "reason": "groq_fast_provider"}
-            else:
-                _run_targeted_rss_enrichment_pass(RIGHT_RSS_ENRICHMENT_CONFIG, run_metrics, ollama_state)
-                _run_targeted_rss_enrichment_pass(LEFT_RSS_ENRICHMENT_CONFIG, run_metrics, ollama_state)
-
-            # Every headline for the run is written here, in one pass. Position
-            # matters twice over: it must come after grouping review and both
-            # enrichment passes so story membership has settled, and it must sit
-            # immediately before ranking -> publish -> summaries, which is the
-            # stretch of the run that uses the quality model. Ollama holds one
-            # model at a time, so batching here means it loads once and stays
-            # loaded for the summary phase instead of being swapped in and out
-            # around every grouping and classification call.
-            # Copies (one outlet republishing another, or the same wire text
-            # under two names) are marked after membership has settled and
-            # before headlines, ranking and the edition, which all count
-            # sources without them (aggregator/article_copies.py).
-            _mark_step(run_metrics, "Marking copied articles")
-            try:
-                run_metrics["steps"]["article_copies"] = mark_recent_copies()
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error marking copied articles: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["steps"]["article_copies"] = {"status": "error", "reason": str(e)}
-
-            _mark_step(run_metrics, "Generating headlines")
-            try:
-                run_metrics["steps"]["headline_generation"] = generate_headlines_for_stale_stories()
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error generating headlines: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["steps"]["headline_generation"] = {"status": "error", "reason": str(e)}
-
-            # Single ranking pass for the whole run, positioned after all
-            # enrichment so publish_edition() below sees a fully fresh,
-            # post-enrichment score. Previously this ran up to 5x per run
-            # (once here, plus twice per enrichment direction) — trimmed
-            # since collect_all_external_headlines() + the Ollama matching/
-            # editorial-rerank calls inside it don't need to be redone
-            # mid-run just to catch a few newly-enriched articles.
-            try:
-                run_metrics["steps"]["headline_ranking"] = run_optional_headline_ranking()
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error in headline ranking: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["steps"]["headline_ranking"] = {"status": "error", "reason": str(e)}
-
-            _mark_step(run_metrics, "Publishing edition")
-            try:
-                run_metrics["steps"]["publish_edition"] = publish_edition()
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error publishing edition: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["steps"]["publish_edition"] = {"status": "error", "reason": str(e)}
-
-            _mark_step(run_metrics, "Processing current edition content")
-            _check_ollama_status_for_report(ollama_state, "before_process_current_edition")
-            try:
-                run_metrics["steps"]["process_current_edition"] = process_current_edition(backfill_recent=True)
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error processing edition content: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["steps"]["process_current_edition"] = {"status": "error", "reason": str(e)}
-
-            # Op/Ed: link new columns to stories and write roundups. After the
-            # edition's summaries (the link check reads them) and before the
-            # export, so the published story pages carry the roundups.
-            _mark_step(run_metrics, "Linking Op/Ed columns and writing roundups")
-            try:
-                run_metrics["steps"]["opinion_roundups"] = link_opinion_and_write_roundups()
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error linking Op/Ed columns: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["steps"]["opinion_roundups"] = {"status": "error", "reason": str(e)}
-
-            _mark_step(run_metrics, "Daily horoscope")
-            try:
-                run_metrics["steps"]["daily_horoscope"] = run_optional_daily_horoscope()
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error writing the daily horoscope: {e}")
-                run_metrics["steps"]["daily_horoscope"] = {"status": "error", "reason": str(e)}
-
-            _mark_step(run_metrics, "Exporting static site")
-            try:
-                backfilled_edition_ids = run_metrics["steps"]["process_current_edition"].get(
-                    "backfilled_edition_ids"
-                ) if isinstance(run_metrics["steps"].get("process_current_edition"), dict) else None
-                opinion_step = run_metrics["steps"].get("opinion_roundups")
-                run_metrics["steps"]["static_export"] = run_optional_static_export(
-                    extra_edition_ids=backfilled_edition_ids,
-                    opinion_story_ids=opinion_step.get("changed_story_ids")
-                    if isinstance(opinion_step, dict) else None,
-                )
-            except Exception as e:
-                db.session.rollback()
-                logging.error(f"Error exporting static site: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["steps"]["static_export"] = {"status": "error", "reason": str(e)}
-        else:
-            run_metrics["steps"]["retry_unrated_outlets"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["allsides_sync"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["clear_stale_single_article_headlines"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["review_ambiguous_grouping_matches"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["targeted_right_rss_enrichment"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["targeted_right_rss_bias_retry"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["targeted_right_rss_enrichment_second_pass"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["targeted_right_rss_second_pass_bias_retry"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["targeted_left_rss_enrichment"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["targeted_left_rss_bias_retry"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["targeted_left_rss_enrichment_second_pass"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["targeted_left_rss_second_pass_bias_retry"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["headline_generation"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["headline_ranking"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["publish_edition"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["process_current_edition"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["opinion_roundups"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["daily_horoscope"] = {"status": "skipped", "reason": "fetch_only_run"}
-            run_metrics["steps"]["static_export"] = {"status": "skipped", "reason": "fetch_only_run"}
-
-        _mark_step(run_metrics, None)
-        set_last_fetch_time()
-        run_metrics["finished_at"] = datetime.utcnow().isoformat()
-        ollama_state["up_at_end"] = _check_ollama_status_for_report(ollama_state, "run_end")
-        _save_json_setting("last_run_metrics", run_metrics)
-        headline_site_metrics = build_headline_site_metrics()
-        _save_json_setting("last_headline_site_metrics", headline_site_metrics)
-        append_scrape_outcome_history(run_metrics, headline_site_metrics)
-        fetch_report = _build_fetch_report(run_metrics, headline_site_metrics, ollama_state)
-        _save_json_setting("last_fetch_report", fetch_report)
-        logging.info(
-            "[Metrics] Run stored=%s input=%s latest_edition=%s %s",
-            run_metrics["totals"]["stored"],
-            run_metrics["totals"]["input_articles"],
-            headline_site_metrics.get("edition", {}).get("date"),
-            headline_site_metrics.get("edition", {}).get("edition_type"),
+    _mark_step(run_metrics, "Exporting static site")
+    try:
+        backfilled_edition_ids = run_metrics["steps"]["process_current_edition"].get(
+            "backfilled_edition_ids"
+        ) if isinstance(run_metrics["steps"].get("process_current_edition"), dict) else None
+        opinion_step = run_metrics["steps"].get("opinion_roundups")
+        run_metrics["steps"]["static_export"] = run_optional_static_export(
+            extra_edition_ids=backfilled_edition_ids,
+            opinion_story_ids=opinion_step.get("changed_story_ids")
+            if isinstance(opinion_step, dict) else None,
         )
-        _notify_fetch_report(fetch_report)
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error exporting static site: {e}")
+        run_metrics["status"] = "partial_error"
+        run_metrics["steps"]["static_export"] = {"status": "error", "reason": str(e)}
+    _finish_run(run)
 
-        # Notify n8n pipeline is done — triggers Ollama machine suspend
-        _notify_n8n()
 
-        _save_json_setting(FETCH_RUN_STATUS_KEY, {
-            "status": "idle",
-            "started_at": run_metrics["started_at"],
-            "run_full_pipeline": run_full_pipeline,
-            "finished_at": run_metrics.get("finished_at"),
-            "timings": run_metrics["timings"],
-        })
+def _finish_run(run):
+    """Close the last step, save the run's metrics and history, send the
+    reports, and mark the run done."""
+    run_metrics, ollama_state = run.metrics["run_metrics"], run.metrics["ollama_state"]
+    run_full_pipeline = run.full
+    _mark_step(run_metrics, None)
+    set_last_fetch_time()
+    run_metrics["finished_at"] = datetime.utcnow().isoformat()
+    ollama_state["up_at_end"] = _check_ollama_status_for_report(ollama_state, "run_end")
+    _save_json_setting("last_run_metrics", run_metrics)
+    headline_site_metrics = build_headline_site_metrics()
+    _save_json_setting("last_headline_site_metrics", headline_site_metrics)
+    append_scrape_outcome_history(run_metrics, headline_site_metrics)
+    fetch_report = _build_fetch_report(run_metrics, headline_site_metrics, ollama_state)
+    _save_json_setting("last_fetch_report", fetch_report)
+    logging.info(
+        "[Metrics] Run stored=%s input=%s latest_edition=%s %s",
+        run_metrics["totals"]["stored"],
+        run_metrics["totals"]["input_articles"],
+        headline_site_metrics.get("edition", {}).get("date"),
+        headline_site_metrics.get("edition", {}).get("edition_type"),
+    )
+    _notify_fetch_report(fetch_report)
 
+    # Notify n8n pipeline is done — triggers Ollama machine suspend
+    _notify_n8n()
+
+    _save_json_setting(FETCH_RUN_STATUS_KEY, {
+        "status": "idle",
+        "started_at": run_metrics["started_at"],
+        "run_full_pipeline": run_full_pipeline,
+        "finished_at": run_metrics.get("finished_at"),
+        "timings": run_metrics["timings"],
+    })
+
+    run.finish(run_metrics.get("status", "ok"))
     logging.info("=== Scheduled fetch run complete ===")
+
+
+def _run_failed(run, message):
+    """A stage errored past its retries: keep what the run recorded."""
+    run_metrics = run.metrics.get("run_metrics") or {}
+    _mark_step(run_metrics, None)
+    run_metrics.update(status="error", error=message, finished_at=datetime.utcnow().isoformat())
+    _save_json_setting("last_run_metrics", run_metrics)
+    _save_json_setting(FETCH_RUN_STATUS_KEY, {
+        "status": "idle",
+        "started_at": run_metrics.get("started_at"),
+        "run_full_pipeline": run.full,
+        "finished_at": run_metrics.get("finished_at"),
+        "timings": run_metrics.get("timings") or [],
+        "error": message,
+    })
+
+
+pipeline_run.define(
+    {"fetch": stage_fetch, "enrich": stage_enrich, "publish": stage_publish},
+    feed=ingest_feed,
+    story=fill_edition_story,
+    failed=_run_failed,
+)
+
+
+def start_pipeline(run_full_pipeline):
+    """Start a run (its fetch stage goes on the queue), unless one is going."""
+    task_id = "pipeline_full" if run_full_pipeline else "pipeline_fetch"
+    with app.app_context():
+        run_id = pipeline_run.start(task_id, run_full_pipeline, new_run_metrics(run_full_pipeline))
+        return {"run_id": run_id} if run_id else {"skipped": "previous run still going"}
 
 
 if __name__ == "__main__":
@@ -1229,38 +1300,28 @@ if __name__ == "__main__":
 
     with app.app_context():
         db.create_all()
+        jobs.ensure_schema()
 
-    # Admin bulk actions and AI tasks queued from the web app run here, in
-    # their own thread. The control tick below restarts it if it ever dies.
-    from aggregator.jobs import prune_finished, start_worker_thread
-    worker = {"thread": start_worker_thread(app)[0]}
+    # The job queue's worker threads: the pipeline's stages, feed jobs on
+    # INGEST_WORKERS threads, AI work (NewsBox first), and everything else
+    # (aggregator/workers.py). Jobs a previous process left running are
+    # requeued first, so a run cut off by a restart carries on from the
+    # stage it was on. The control tick below is their watchdog.
+    workers = Workers(app).start()
 
     with app.app_context():
-        prune_finished()
-        # Only fetch on startup if enough time has passed. The run itself is a
-        # job below: run here, before scheduler.start(), it held up every
-        # interval job (Breaking News, NewsBox schedules) for the hour or more
-        # it takes, and with a few deploys a day the Breaking poller hardly
-        # ran (2026-10-27).
-        startup_fetch = should_fetch_now()
+        jobs.prune_finished()
+        # Only fetch on startup if a scheduled run was missed, and not while
+        # an interrupted run is resuming. The run itself is queued as jobs, so
+        # it never holds up the interval jobs (Breaking News, NewsBox).
+        resuming = pipeline_run.active_run()
+        startup_fetch = resuming is None and should_fetch_now()
         startup_full = startup_fetch and should_run_full_pipeline(last_fetch=get_last_fetch_time())
-        if not startup_fetch:
+        if resuming is not None:
+            logging.info("Resuming pipeline run %s at stage %s.", resuming.id, resuming.stage)
+        elif not startup_fetch:
             logging.info("Skipping startup fetch.")
         set_scheduler_started_at()
-
-    # One pipeline run at a time: a scheduled hour that comes while the
-    # startup run (or a long earlier run) is still going is skipped, as it
-    # was when the startup run blocked the scheduler.
-    pipeline_lock = threading.Lock()
-
-    def run_pipeline(run_full_pipeline):
-        if not pipeline_lock.acquire(blocking=False):
-            logging.info("Skipping a pipeline run: the previous one is still going.")
-            return {"skipped": "previous run still going"}
-        try:
-            run_all_fetches(run_full_pipeline=run_full_pipeline)
-        finally:
-            pipeline_lock.release()
 
     def tracked(task_id, func, *args):
         """Run a task in the app context and record its run for the Tasks page."""
@@ -1283,10 +1344,23 @@ if __name__ == "__main__":
                     logging.exception("[Tasks] Could not record %s", task_id)
         return run
 
+    def pipeline_starter(full):
+        """A scheduled or Run now pipeline run. It only queues the fetch
+        stage; the run records itself on the Tasks page when it finishes."""
+        def run():
+            try:
+                result = start_pipeline(full)
+                if result.get("skipped"):
+                    logging.info("[Tasks] %s skipped: %s", "pipeline_full" if full else "pipeline_fetch",
+                                 result["skipped"])
+            except Exception:
+                logging.exception("[Tasks] Could not start a pipeline run")
+        return run
+
     scheduler = BlockingScheduler()
     if startup_fetch:
         scheduler.add_job(
-            tracked("pipeline_full" if startup_full else "pipeline_fetch", run_pipeline, startup_full),
+            pipeline_starter(startup_full),
             trigger="date",
             run_date=datetime.now(timezone.utc),
             id="pipeline_startup",
@@ -1311,7 +1385,7 @@ if __name__ == "__main__":
             if schedule["types"].get(job_id) == full:
                 continue
             scheduler.add_job(
-                tracked("pipeline_full" if full else "pipeline_fetch", run_pipeline, full),
+                pipeline_starter(full),
                 trigger=CronTrigger(hour=hour, minute=0, timezone=TIMEZONE),
                 id=job_id,
                 name=f"Scheduled {'full pipeline' if full else 'fetch-only'} run at {hour}:00 ({TIMEZONE})",
@@ -1369,8 +1443,8 @@ if __name__ == "__main__":
 
     def control_tick():
         """Every CONTROL_SECONDS: apply the schedule and the Tasks page's
-        Pause / Run now, keep the queue worker thread alive, and write the
-        heartbeat the page reads."""
+        Pause / Run now, watch the worker threads and pipeline runs, and
+        write the heartbeat the page reads."""
         with app.app_context():
             try:
                 sync_schedule()
@@ -1392,7 +1466,7 @@ if __name__ == "__main__":
                     if task_id in ("pipeline_full", "pipeline_fetch"):
                         full = task_id == "pipeline_full"
                         scheduler.add_job(
-                            tracked(task_id, run_pipeline, full), trigger="date",
+                            pipeline_starter(full), trigger="date",
                             run_date=datetime.now(timezone.utc), misfire_grace_time=None,
                             name=f"Run now: {'full pipeline' if full else 'fetch only'}",
                         )
@@ -1401,16 +1475,19 @@ if __name__ == "__main__":
                         scheduler.add_job(tracked(task_id, func), trigger="date",
                                           run_date=datetime.now(timezone.utc), misfire_grace_time=None,
                                           name=f"Run now: {name}")
-                if not worker["thread"].is_alive():
-                    logging.error("[Jobs] The queue worker thread died; starting a new one")
-                    worker["thread"] = start_worker_thread(app)[0]
-                jobs = [{
+                # The watchdog: restart dead worker threads, requeue jobs
+                # whose heartbeat stopped, and keep pipeline runs moving.
+                workers.check()
+                pipeline_run.tick()
+                upcoming = [{
                     "id": job.id,
                     "name": job.name,
                     "next_run_at": job.next_run_time.astimezone(timezone.utc).replace(tzinfo=None).isoformat()
                     if job.next_run_time else None,
                 } for job in scheduler.get_jobs() if job.id != "control"]
-                scheduler_tasks.write_state(started_at, jobs, worker["thread"].is_alive(), schedule["loaded_at"])
+                scheduler_tasks.write_state(started_at, upcoming, workers.all_alive(), schedule["loaded_at"],
+                                            workers=workers.status(), restarted=workers.restarted,
+                                            requeued=workers.requeued)
             except Exception:
                 db.session.rollback()
                 logging.exception("[Tasks] Control tick failed")

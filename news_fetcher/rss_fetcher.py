@@ -235,39 +235,51 @@ def read_feed_headlines(feed_url, max_entries=30, fallback_url=None, etag=None, 
 RSS_MAX_ENTRIES_PER_FEED_GROQ = 10
 
 
-def fetch_and_store_oped_rss():
-    """Fetch the `op_ed` feeds into the Op/Ed table (opinion_pieces).
-
-    No scraping, embedding or LLM call, so the Groq cap above doesn't apply.
-    Must be called within a Flask app context.
-    """
+def oped_feed_metrics(feed_url):
+    """Fetch one `op_ed` feed into the Op/Ed table (opinion_pieces). Its
+    metrics, for oped_rss_metrics()."""
     from news_fetcher.fetch_and_store_articles import store_opinion_feed
 
-    feed_urls = _active_feed_urls("op_ed")
-    metrics = {"status": "ok", "feeds_attempted": len(feed_urls), "input_articles": 0,
+    source_name, articles = _fetch_with_fallback(feed_url)
+    feed_metrics = store_opinion_feed(articles) if articles else {"input_articles": 0, "saved": 0}
+    return {
+        "feed_url": feed_url,
+        "source_name": source_name,
+        "input_articles": feed_metrics.get("input_articles", 0),
+        "saved": feed_metrics.get("saved", 0),
+        "skipped": feed_metrics.get("skipped") or {},
+    }
+
+
+def oped_rss_metrics(per_feed):
+    """The Op/Ed run metrics from each feed's oped_feed_metrics()."""
+    metrics = {"status": "ok", "feeds_attempted": len(per_feed), "input_articles": 0,
                "saved": 0, "skipped": {}, "per_feed": []}
-    for feed_url in feed_urls:
-        source_name, articles = _fetch_with_fallback(feed_url)
-        feed_metrics = store_opinion_feed(articles) if articles else {"input_articles": 0, "saved": 0}
-        metrics["input_articles"] += feed_metrics.get("input_articles", 0)
-        metrics["saved"] += feed_metrics.get("saved", 0)
-        merge_count_maps(metrics["skipped"], feed_metrics.get("skipped"))
-        metrics["per_feed"].append({
-            "feed_url": feed_url,
-            "source_name": source_name,
-            "input_articles": feed_metrics.get("input_articles", 0),
-            "saved": feed_metrics.get("saved", 0),
-        })
-    logger.info(f"=== Op/Ed RSS: saved {metrics['saved']} of {metrics['input_articles']} from {len(feed_urls)} feeds ===")
+    for feed in per_feed:
+        metrics["input_articles"] += feed.get("input_articles", 0)
+        metrics["saved"] += feed.get("saved", 0)
+        merge_count_maps(metrics["skipped"], feed.get("skipped"))
+        metrics["per_feed"].append({k: feed.get(k) for k in ("feed_url", "source_name", "input_articles", "saved")})
+    logger.info(f"=== Op/Ed RSS: saved {metrics['saved']} of {metrics['input_articles']} from {len(per_feed)} feeds ===")
     return metrics
 
 
-def fetch_and_store_rss():
-    """
-    Fetch all RSS feeds and store articles via the normal ingestion pipeline.
-    Each article goes through the same dedup, scraping, embedding, topic
-    classification, and story grouping as NewsAPI/GNews articles.
+def fetch_and_store_oped_rss():
+    """Fetch the `op_ed` feeds into the Op/Ed table (opinion_pieces).
+
+    No scraping, embedding or LLM call, so the Groq cap below doesn't apply.
     Must be called within a Flask app context.
+    """
+    return oped_rss_metrics([oped_feed_metrics(feed_url) for feed_url in _active_feed_urls("op_ed")])
+
+
+def active_feed_urls(bucket):
+    """Enabled feed URLs for a bucket ("general" news or "op_ed")."""
+    return _active_feed_urls(bucket)
+
+
+def rss_max_entries():
+    """Entries read per news feed.
 
     While Groq serves the fast tier, entries per feed are capped well below the
     normal 30 — every stored article costs at least one classify_article()
@@ -279,19 +291,33 @@ def fetch_and_store_rss():
     LLM_FAST_PROVIDER=groq) the global provider says nothing about whether
     this budget applies.
     """
-    from news_fetcher.fetch_and_store_articles import store_articles
     from news_fetcher import llm_client
-
     fast_provider = llm_client.provider_for_tier(llm_client.TIER_FAST)
-    max_entries = RSS_MAX_ENTRIES_PER_FEED_GROQ if fast_provider == "groq" else 30
-    feed_urls = _active_feed_urls("general")
+    return RSS_MAX_ENTRIES_PER_FEED_GROQ if fast_provider == "groq" else 30
 
-    logger.info("=== RSS fetch starting ===")
-    total = 0
+
+def rss_feed_metrics(feed_url, max_entries=None):
+    """Fetch one news feed and store its articles via the normal ingestion
+    pipeline (store_articles). Its metrics, for rss_metrics()."""
+    from news_fetcher.fetch_and_store_articles import store_articles
+
+    source_name, articles = _fetch_with_fallback(feed_url, max_entries=max_entries or rss_max_entries())
+    feed_metrics = store_articles(articles, "Global News", provider="rss") if articles else {}
+    return {
+        "feed_url": feed_url,
+        "source_name": source_name,
+        "has_articles": bool(articles),
+        **{key: feed_metrics.get(key, 0) for key in ("input_articles", "stored", "new_outlets", "stories_touched")},
+        **{key: feed_metrics.get(key) or {} for key in ("skipped", "scrape_statuses", "bias_buckets", "bias_sources")},
+    }
+
+
+def rss_metrics(per_feed):
+    """The RSS run metrics from each feed's rss_feed_metrics()."""
     metrics = {
         "provider": "rss",
         "status": "ok",
-        "feeds_attempted": len(feed_urls),
+        "feeds_attempted": len(per_feed),
         "feeds_with_articles": 0,
         "input_articles": 0,
         "stored": 0,
@@ -303,37 +329,30 @@ def fetch_and_store_rss():
         "bias_sources": {},
         "per_feed": [],
     }
-
-    for feed_url in feed_urls:
-        source_name, articles = _fetch_with_fallback(feed_url, max_entries=max_entries)
-        if articles:
-            feed_metrics = store_articles(articles, "Global News", provider="rss")
+    for feed in per_feed:
+        if feed.get("has_articles"):
             metrics["feeds_with_articles"] += 1
-            metrics["input_articles"] += feed_metrics.get("input_articles", 0)
-            metrics["stored"] += feed_metrics.get("stored", 0)
-            metrics["new_outlets"] += feed_metrics.get("new_outlets", 0)
-            metrics["stories_touched"] += feed_metrics.get("stories_touched", 0)
-            merge_count_maps(metrics["skipped"], feed_metrics.get("skipped"))
-            merge_count_maps(metrics["scrape_statuses"], feed_metrics.get("scrape_statuses"))
-            merge_count_maps(metrics["bias_buckets"], feed_metrics.get("bias_buckets"))
-            merge_count_maps(metrics["bias_sources"], feed_metrics.get("bias_sources"))
-            metrics["per_feed"].append({
-                "feed_url": feed_url,
-                "source_name": source_name,
-                "input_articles": feed_metrics.get("input_articles", 0),
-                "stored": feed_metrics.get("stored", 0),
-            })
-            total += len(articles)
-        else:
-            metrics["per_feed"].append({
-                "feed_url": feed_url,
-                "source_name": source_name,
-                "input_articles": 0,
-                "stored": 0,
-            })
-
-    logger.info(f"=== RSS fetch complete. Processed {total} articles. ===")
+        for key in ("input_articles", "stored", "new_outlets", "stories_touched"):
+            metrics[key] += feed.get(key, 0)
+        for key in ("skipped", "scrape_statuses", "bias_buckets", "bias_sources"):
+            merge_count_maps(metrics[key], feed.get(key))
+        metrics["per_feed"].append({k: feed.get(k) for k in ("feed_url", "source_name", "input_articles", "stored")})
+    logger.info(f"=== RSS fetch complete. Processed {metrics['input_articles']} articles. ===")
     return metrics
+
+
+def fetch_and_store_rss():
+    """
+    Fetch all RSS feeds and store articles via the normal ingestion pipeline,
+    one feed after another. Each article goes through the same dedup,
+    scraping, embedding, topic classification, and story grouping as
+    NewsAPI/GNews articles. The scheduler instead runs each feed as its own
+    job, several at once (news_fetcher/pipeline_run.py).
+    Must be called within a Flask app context.
+    """
+    logger.info("=== RSS fetch starting ===")
+    max_entries = rss_max_entries()
+    return rss_metrics([rss_feed_metrics(url, max_entries) for url in _active_feed_urls("general")])
 
 
 def _story_bias_counts(story):
