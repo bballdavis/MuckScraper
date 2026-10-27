@@ -1,7 +1,7 @@
 {% extends 'settings_base.html' %}
 {% from 'icons.html' import icon %}
-{% block title %}Scrape Blocklist{% endblock %}
-{% block settings_key %}scrapeblock{% endblock %}
+{% block title %}Scrape health{% endblock %}
+{% block settings_key %}scrapehealth{% endblock %}
 {% block styles %}
     <style>
         .container { max-width: 900px; margin: 48px auto; padding: 0 20px; }
@@ -112,8 +112,8 @@
 {% endblock %}
 {% block settings_body %}
 <div class="container">
-    <h1>Scrape Blocklist</h1>
-    <p class="subtitle">Domains that will not be scraped. Permanent entries are pre-configured hard paywalls. Auto-blocked entries were detected at runtime.</p>
+    <h1>Scrape health</h1>
+    <p class="subtitle">How article pages scraped in the last {{ telemetry_window_hours }} hours, which outlets fail most, and the back-offs the scraper is waiting out. Domains that are never scraped are on the <a href="{{ url_for('admin.blocklist_page') }}">Blocklist</a>.</p>
 
     <form method="POST" action="{{ url_for('admin.audit_scrapes') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -215,78 +215,5 @@
         {% endif %}
     </div>
 
-    <div class="card">
-        <div style="padding: 20px 20px 0 20px;">
-            <div class="section-title">Blocklist Entries</div>
-            <div class="section-subtitle">Recent scrape counts are shown per blocked domain for the last {{ telemetry_window_hours }} hours.</div>
-        </div>
-        {% if entries %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Domain</th>
-                    <th>Reason</th>
-                    <th>24h Telemetry</th>
-                    <th>Hits</th>
-                    <th>Added</th>
-                    <th>Type</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in entries %}
-                {% set entry = row.entry %}
-                <tr>
-                    <td><strong>{{ entry.domain }}</strong></td>
-                    <td style="color: var(--text-muted);">{{ entry.reason }}</td>
-                    <td style="color: var(--text-muted);">
-                        b {{ row.blocked }} · f {{ row.failed }} · fb {{ row.fallback }} · ok {{ row.success }}
-                        <div style="color: var(--text-faint); font-size: 12px; margin-top: 4px;">
-                            Last seen: {{ row.last_seen.strftime('%Y-%m-%d %H:%M') if row.last_seen else '—' }}
-                        </div>
-                    </td>
-                    <td style="color: var(--text-faint); white-space: nowrap;">
-                        {% if entry.is_permanent %}
-                            —
-                        {% else %}
-                            {{ entry.hit_count }}/{{ row.hit_threshold }}
-                            <div style="color: var(--text-faint); font-size: 12px; margin-top: 4px;">
-                                {% if row.is_active %}
-                                    Expires: {{ entry.expires_at.strftime('%Y-%m-%d %H:%M') if entry.expires_at else '—' }}
-                                {% else %}
-                                    Not yet blocked
-                                {% endif %}
-                            </div>
-                        {% endif %}
-                    </td>
-                    <td style="color: var(--text-faint); white-space: nowrap;">
-                        {{ entry.added_at.strftime('%Y-%m-%d') if entry.added_at else '—' }}
-                    </td>
-                    <td>
-                        {% if entry.is_permanent %}
-                            <span class="tag-permanent">Permanent</span>
-                        {% elif row.is_active %}
-                            <span class="tag-auto">Auto-blocked</span>
-                        {% else %}
-                            <span class="tag-auto" style="opacity: 0.6;">Pending</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if not entry.is_permanent %}
-                        <form method="POST" action="{{ url_for('admin.unblock_domain') }}" style="display:inline;">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="domain" value="{{ entry.domain }}">
-                            <button type="submit" class="unblock-btn">Unblock</button>
-                        </form>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="empty">No blocked domains yet.</div>
-        {% endif %}
-    </div>
 </div>
 {% endblock %}

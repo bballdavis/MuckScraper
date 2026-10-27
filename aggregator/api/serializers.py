@@ -296,7 +296,9 @@ def edition(edition_row, edition_stories):
 
 
 def topic(t):
-    return {"id": t.id, "name": t.name, "icon": t.icon or None, "sort_order": t.sort_order}
+    # `icon` is always null: sections have no icon of their own any more (the
+    # app picks one by name). Kept so older app builds still decode.
+    return {"id": t.id, "name": t.name, "display_name": t.label, "icon": None, "sort_order": t.sort_order}
 
 
 def search_story_hit(story):

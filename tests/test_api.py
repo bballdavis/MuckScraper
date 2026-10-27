@@ -182,7 +182,7 @@ class ApiEndToEndTests(unittest.TestCase):
         reader = User(username="reader", email="r@example.com", role="reader")
         reader.set_password("password123")
         off = User(username="off", email="o@example.com", role="reader", is_active=False)
-        politics = Topic(name="US Politics", icon="🏛", sort_order=1)
+        politics = Topic(name="US Politics", sort_order=1)
         left = Outlet(name="Left Daily", bias_score=1.5)
         right = Outlet(name="Right Times", bias_score=4.5)
         story = Story(title="Budget vote", headline="Senate passes budget", summary="The big picture: The Senate passed it.\nWhy it matters: Money.",

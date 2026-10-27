@@ -91,13 +91,25 @@ class Outlet(db.Model):
 
 
 class Topic(db.Model):
+    """A section: the sidebar, the app's menu, the classifier's categories
+    and the sources all hang off this one list (Settings › Sections).
+    `name` is the fixed key used in URLs, the API and the classifier;
+    `display_name` is what readers see; `description` tells the classifier
+    what belongs here (news_fetcher/topic_classifier.py)."""
     __tablename__ = "topics"
 
-    id         = db.Column(db.Integer, primary_key=True)
-    name       = db.Column(db.String, unique=True, nullable=False)
-    icon       = db.Column(db.String(4), nullable=True)
-    sort_order = db.Column(db.Integer, nullable=True)
-    is_active  = db.Column(db.Boolean, nullable=False, default=True, server_default="true")
+    id           = db.Column(db.Integer, primary_key=True)
+    name         = db.Column(db.String, unique=True, nullable=False)
+    display_name = db.Column(db.String(80), nullable=True)
+    description  = db.Column(db.String(300), nullable=True)
+    sort_order   = db.Column(db.Integer, nullable=True)
+    is_active    = db.Column(db.Boolean, nullable=False, default=True, server_default="true")
+
+    @property
+    def label(self):
+        """The reader-facing name."""
+        from aggregator.constants import section_name
+        return self.display_name or section_name(self.name)
 
     stories  = db.relationship("Story",   secondary=story_topics,  back_populates="topics")
     articles = db.relationship("Article", secondary=article_topics, back_populates="topics")
@@ -557,6 +569,20 @@ class IngestionBlock(db.Model):
     added_at  = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class IngestionBlockHit(db.Model):
+    """Articles each ingestion block stopped, per day, for the Blocklist
+    page's "caught in 7 days" column."""
+    __tablename__ = "ingestion_block_hits"
+    __table_args__ = (
+        db.UniqueConstraint("block_id", "day", name="uq_ingestion_block_hit_day"),
+    )
+
+    id       = db.Column(db.Integer, primary_key=True)
+    block_id = db.Column(db.Integer, db.ForeignKey("ingestion_blocks.id", ondelete="CASCADE"), nullable=False)
+    day      = db.Column(db.Date, nullable=False)
+    count    = db.Column(db.Integer, nullable=False, default=0)
+
+
 class RssFeed(db.Model):
     __tablename__ = "rss_feeds"
     __table_args__ = (
@@ -576,6 +602,14 @@ class RssFeed(db.Model):
     # Fetched instead when `url` answers with an HTTP error or can't be
     # parsed; normally a Google News search feed for the same outlet/section.
     fallback_url = db.Column(db.String, nullable=True)
+    # The last read of this feed, by a pipeline run or the Breaking poller
+    # (aggregator/feed_health.py). last_status: ok / fallback / empty / error.
+    last_read_at    = db.Column(db.DateTime, nullable=True)
+    last_status     = db.Column(db.String(16), nullable=True)
+    last_error      = db.Column(db.String(300), nullable=True)
+    last_item_count = db.Column(db.Integer, nullable=True)
+    failures_in_row = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+
     # The outlet its articles last came in under (normalize_source_name), so
     # an unlabelled feed still has a reporting grade for the scan order
     # (aggregator/feed_order.py).
@@ -586,6 +620,24 @@ class RssFeed(db.Model):
         """The outlet's reporting level (aggregator/outlet_reporting.py), or None."""
         from aggregator.outlet_reporting import reporting_for
         return reporting_for(self.label) or reporting_for(self.source_name)
+
+
+class FeedSection(db.Model):
+    """The sections a feed serves, keyed by feed URL so a URL listed in more
+    than one bucket (Fox News as news and as right-side balance) shares one
+    set. Articles from the feed are tagged with these sections instead of
+    asking the classifier. A feed with none is General: the classifier
+    decides (aggregator/sources.py)."""
+    __tablename__ = "feed_sections"
+    __table_args__ = (
+        db.UniqueConstraint("feed_url", "topic_id", name="uq_feed_section"),
+    )
+
+    id       = db.Column(db.Integer, primary_key=True)
+    feed_url = db.Column(db.String(2000), nullable=False, index=True)
+    topic_id = db.Column(db.Integer, db.ForeignKey("topics.id", ondelete="CASCADE"), nullable=False)
+
+    topic = db.relationship("Topic")
 
 
 class PromptTemplate(db.Model):
@@ -652,6 +704,14 @@ class ScheduledFetch(db.Model):
     gnews_category   = db.Column(db.String(32), nullable=True)
     sort_order       = db.Column(db.Integer, default=0, nullable=False)
     is_active        = db.Column(db.Boolean, default=True, nullable=False)
+    # The section this search serves (none = General, the classifier
+    # decides), and whether to keep only outlets already in the database:
+    # the broad Sports and World searches brought in dozens of one-article
+    # fringe sites (2026-10-27).
+    topic_id           = db.Column(db.Integer, db.ForeignKey("topics.id", ondelete="SET NULL"), nullable=True)
+    known_outlets_only = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+
+    topic = db.relationship("Topic")
 
 
 class Edition(db.Model):

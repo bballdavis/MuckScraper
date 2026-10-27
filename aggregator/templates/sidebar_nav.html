@@ -2,7 +2,7 @@
     lists, Opinion & Editorials and the topic filters; Search needs an account and Fetch Articles
     the Scraper role.
     Three groups (Philip, 2026-10-22: headings and links were hard to tell
-    apart): the story lists, Topics, and More. Headings are small muted
+    apart): the story lists, Sections, and More. Headings are small muted
     labels that never highlight; every link is a full-width row with a hover
     and a full-width active fill. The story lists and More keep their icons;
     topics are text only. -#}
@@ -29,12 +29,12 @@
                 </div>
 
                 <div class="nav-group">
-                    <h2 class="nav-heading">Topics</h2>
-                    {#- Topics show their full section names (constants.SECTION_NAMES); links keep the key. #}
+                    <h2 class="nav-heading">Sections</h2>
+                    {#- Sections show their display names (Settings › Sections); links keep the key. #}
                     {% for topic in topics|default([]) %}
                     {%- set is_active = active_label|default(none) == topic.name %}
                     <a class="nav-link nav-topic {% if is_active %}active{% endif %}" href="{{ url_for('admin.list_articles', topic=topic.name, scrape_status=nav_scrape, show_single=show_single|default(none)|string|lower if show_single is defined else none, q=active_search_query|default(none) or '', range=active_range|default(none)) }}"{% if is_active %} aria-current="page"{% endif %}>
-                        <span class="full-text">{{ topic.name|section_name }}</span>
+                        <span class="full-text">{{ topic.label }}</span>
                     </a>
                     {% endfor %}
                 </div>

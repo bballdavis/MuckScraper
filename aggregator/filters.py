@@ -47,8 +47,8 @@ def register_filters(app):
     app.add_template_filter(summary_paragraph, "summary_paragraph")
 
     # A topic key as its full section name ("Sci/Tech" -> "Science & Technology").
-    from aggregator.constants import section_name
-    app.add_template_filter(section_name, "section_name")
+    from aggregator.sections import section_label
+    app.add_template_filter(section_label, "section_name")
 
     # A photo's focal point as CSS object-position (aggregator/story_image.py).
     from aggregator.story_image import object_position

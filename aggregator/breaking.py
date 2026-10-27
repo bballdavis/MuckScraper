@@ -50,6 +50,7 @@ SKIP_NOTES = {
     "cartoon": "Skipped as a cartoon.",
     "promotional": "Skipped as promotional.",
     "low_value_url": "Skipped as a low-value page.",
+    "unknown_outlet": "Its outlet isn't one we already carry.",
 }
 
 
@@ -299,6 +300,8 @@ def _scrape(entry):
         if not resolved:
             return None, "Couldn't find the publisher's link behind the Google News entry."
         data = resolved[0]
+    # Keeps the feed's sections (aggregator/sources.py).
+    data["feed_url"] = entry.feed_url
     metrics = store_articles([data], "Global News", provider="rss_breaking")
     found = (Article.query.filter_by(url=normalize_url(data["url"])).first()
              or Article.query.filter(Article.title == entry.title,

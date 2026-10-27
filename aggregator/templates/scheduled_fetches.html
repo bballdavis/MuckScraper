@@ -1,10 +1,10 @@
 {% extends 'settings_base.html' %}
 {% from 'icons.html' import icon %}
-{% block title %}Scheduled Fetches{% endblock %}
-{% block settings_key %}fetches{% endblock %}
+{% block title %}News API searches{% endblock %}
+{% block settings_key %}rss{% endblock %}
 
 {#- The editor's fields, for a new fetch (f is none) or an existing one. -#}
-{% macro fetch_fields(f, modes) %}
+{% macro fetch_fields(f, modes, topics) %}
 <div class="fetch-fields">
     <label class="add-field"><span>Label</span><input type="text" name="label" value="{{ f.label if f else '' }}" placeholder="e.g. Technology" required></label>
     <label class="add-field"><span>Mode</span>
@@ -21,6 +21,15 @@
     <label class="add-field wide" data-mode="top"><span>NewsAPI sources (instead of country and category)</span><input type="text" name="newsapi_sources" value="{{ (f.newsapi_sources or '') if f else '' }}" placeholder="e.g. bbc-news,reuters"></label>
     <label class="add-field"><span>GNews query</span><input type="text" name="gnews_query" value="{{ (f.gnews_query or '') if f else '' }}"></label>
     <label class="add-field"><span>GNews category</span><input type="text" name="gnews_category" value="{{ (f.gnews_category or '') if f else '' }}"></label>
+    <label class="add-field"><span>Section</span>
+        <select name="topic_id">
+            <option value="">General (the classifier decides)</option>
+            {%- for topic in topics %}
+            <option value="{{ topic.id }}"{% if f and f.topic_id == topic.id %} selected{% endif %}>{{ topic.label }}</option>
+            {%- endfor %}
+        </select>
+    </label>
+    <label class="add-field check-field"><input type="checkbox" name="known_outlets_only"{% if f and f.known_outlets_only %} checked{% endif %}> <span>Only outlets already stored</span></label>
 </div>
 {% endmacro %}
 
@@ -52,6 +61,8 @@
     .fetch-fields input, .fetch-fields select { width: 100%; }
     .app-page .page-body .fetch-fields input, .app-page .page-body .fetch-fields select { height: 34px; }
     .fetch-fields [hidden] { display: none; }
+    .fetch-fields .check-field { flex-direction: row; align-items: center; gap: 6px; align-self: end; min-height: 34px; }
+    .fetch-fields .check-field input { width: auto; height: auto; }
     .editor-actions { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
     .editor-actions .spacer { flex: 1 1 auto; }
     .fetch-add[hidden] { display: none; }
@@ -64,21 +75,21 @@
 {% block settings_body %}
 <div class="page-head page-head-row">
     <div>
-        <h1>Scheduled fetches</h1>
-        <p>What each pipeline run pulls from NewsAPI and GNews. <a href="{{ url_for('admin.pipeline_schedule_page') }}">Run schedule</a> controls when. Drag a fetch up or down to change the run order. Changes apply on the next run.</p>
+        <h1>News API searches</h1>
+        <p>What each pipeline run asks NewsAPI and GNews for, part of <a href="{{ url_for('admin.rss_feeds_page') }}">Sources</a>. A search that serves a section tags its articles with it; "Only outlets already stored" skips sites the database has never seen, which keeps broad searches from filling up with one-article outlets. <a href="{{ url_for('admin.pipeline_schedule_page') }}">Run schedule</a> controls when. Drag a search to change the run order. Changes apply on the next run.</p>
     </div>
-    <button type="button" class="btn" id="fetch-add-open">{{ icon('plus') }} Add fetch</button>
+    <button type="button" class="btn" id="fetch-add-open">{{ icon('plus') }} Add search</button>
 </div>
 
 <section class="panel fetch-add" id="fetch-add" hidden>
-    <div class="panel-head"><h2>Add a fetch</h2><p>It joins the end of the run order and starts active.</p></div>
+    <div class="panel-head"><h2>Add a search</h2><p>It joins the end of the run order and starts active.</p></div>
     <form method="POST" action="{{ url_for('admin.add_scheduled_fetch') }}" data-fetch-form>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {{ fetch_fields(none, modes) }}
+        {{ fetch_fields(none, modes, topics) }}
         <div class="editor-actions">
             <span class="spacer"></span>
             <button type="button" class="btn btn-quiet" id="fetch-add-cancel">Cancel</button>
-            <button type="submit" class="btn">{{ icon('plus') }} Add fetch</button>
+            <button type="submit" class="btn">{{ icon('plus') }} Add search</button>
         </div>
     </form>
 </section>
@@ -91,6 +102,8 @@
             <button type="button" class="fetch-grip" draggable="true" aria-label="Move {{ fetch.label }} (Alt + up or down arrow)" title="Drag to reorder">{{ icon('grip') }}</button>
             <span class="fetch-label" title="{{ fetch.label }}">{{ fetch.label }}</span>
             <span class="chip">{{ 'Search' if fetch.mode == 'query' else 'Top' }}</span>
+            <span class="chip">{{ fetch.topic.label if fetch.topic else 'General' }}</span>
+            {%- if fetch.known_outlets_only %}<span class="chip" title="Outlets not already stored are skipped">Known outlets</span>{% endif %}
             <label class="switch" title="{{ 'Active' if fetch.is_active else 'Paused' }}">
                 <input type="checkbox" data-active-url="{{ url_for('admin.set_scheduled_fetch_active', fetch_id=fetch.id) }}" {{ 'checked' if fetch.is_active else '' }} aria-label="{{ fetch.label }} active"><span></span>
             </label>
@@ -113,7 +126,7 @@
         <div class="fetch-editor">
             <form method="POST" action="{{ url_for('admin.update_scheduled_fetch', fetch_id=fetch.id) }}" data-fetch-form>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                {{ fetch_fields(fetch, modes) }}
+                {{ fetch_fields(fetch, modes, topics) }}
                 <div class="editor-actions">
                     <button type="submit" form="fetch-delete-{{ fetch.id }}" class="btn btn-danger btn-square" aria-label="Delete {{ fetch.label }}" title="Delete">{{ icon('trash') }}</button>
                     <span class="spacer"></span>

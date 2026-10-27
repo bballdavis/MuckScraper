@@ -1,16 +1,7 @@
-TOPICS = [
-    {"label": "US Politics", "icon": "UP"},
-    {"label": "US News", "icon": "UN"},
-    {"label": "International News", "icon": "IN"},
-    {"label": "Sci/Tech", "icon": "ST"},
-    {"label": "Sports", "icon": "SP"},
-    {"label": "Buss/Fin", "icon": "BF"},
-    {"label": "Other", "icon": "OT"},
-]
-
-# What readers see for a topic: the sidebar, section headers and empty
-# states spell the short keys out (Philip, 2026-10-27). Topic.name stays the
-# key everywhere else (URLs, the API, the classifier prompt).
+# What readers see for a topic when its section has no display name of its
+# own (Settings › Sections sets one; aggregator/sections.py section_label).
+# Topic.name stays the key everywhere else (URLs, the API, the classifier
+# prompt).
 SECTION_NAMES = {
     "Sci/Tech": "Science & Technology",
     "Buss/Fin": "Business & Finance",

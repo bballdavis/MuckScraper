@@ -21,7 +21,7 @@
 {% block settings_body %}
 <div class="page-head">
     <h1>Run schedule</h1>
-    <p>When the scheduler runs, in New York time. A full run fetches, groups, summarizes and publishes an edition; a fetch-only run just ingests new articles. <a href="{{ url_for('admin.scheduled_fetches_page') }}">Scheduled fetches</a> controls what each run pulls.</p>
+    <p>When the scheduler runs, in New York time. A full run fetches, groups, summarizes and publishes an edition; a fetch-only run just ingests new articles. <a href="{{ url_for('admin.rss_feeds_page') }}">Sources</a> controls what each run pulls.</p>
 </div>
 
 {%- if restart_needed %}

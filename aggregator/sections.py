@@ -37,3 +37,38 @@ def in_section(topic):
                   .correlate(Story).exists())
     return and_(Story.topics.any(Topic.id == topic_id),
                 or_(tagged * SHARE_DIVISOR >= total, ~any_tagged))
+
+
+# Reader-facing section names (Settings › Sections), cached briefly: every
+# page renders the sidebar, and names change only when an admin edits them.
+_LABEL_TTL_SECONDS = 30
+_labels = {"map": None, "expires_at": 0.0}
+
+
+def _label_map():
+    import time
+    now = time.monotonic()
+    if _labels["map"] is None or now >= _labels["expires_at"]:
+        try:
+            _labels["map"] = {name: display for name, display in
+                              Topic.query.with_entities(Topic.name, Topic.display_name) if display}
+        except Exception:
+            from aggregator import db
+            db.session.rollback()
+            return {}
+        _labels["expires_at"] = now + _LABEL_TTL_SECONDS
+    return _labels["map"]
+
+
+def forget_section_labels():
+    """Drop the cache after an edit, so this process shows it at once."""
+    _labels["map"] = None
+
+
+def section_label(topic_name):
+    """What readers see for a section key: its display name, else the
+    built-in name (constants.SECTION_NAMES), else the key itself."""
+    from aggregator.constants import section_name
+    if not topic_name:
+        return topic_name
+    return _label_map().get(topic_name) or section_name(topic_name)

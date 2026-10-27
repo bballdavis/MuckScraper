@@ -1,0 +1,205 @@
+{% extends 'settings_base.html' %}
+{% from 'icons.html' import icon %}
+{% block title %}Blocklist{% endblock %}
+{% block settings_key %}blocklist{% endblock %}
+
+{%- set effect_names = {'skip': "Don't collect", 'noscrape': "Collect, don't scrape"} %}
+{%- set effect_hints = {'skip': 'Refused before anything is stored', 'noscrape': "Stored and counted in its story, but the page isn't scraped"} %}
+{%- set match_names = {'url': 'URL contains', 'title': 'Headline contains', 'domain': 'Domain'} %}
+{%- set origin_names = {'seeded': 'Built in', 'hand': 'Added by hand', 'auto': 'Automatic'} %}
+
+{% block styles %}
+<style>
+    .bl-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+    .app-page .page-body .bl-filters select, .app-page .page-body .bl-filters input { height: 30px; font-size: 13px; }
+    .bl-filters input[type="search"] { flex: 1 1 200px; min-width: 0; }
+    .bl-pattern { font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+    .bl-match { font-size: 12px; color: var(--text-faint); }
+    .bl-reason { font-size: 13px; color: var(--text-muted); }
+    .app-page .page-body .bl-reason input { width: 100%; height: 30px; font-size: 13px; }
+    .bl-sub { font-size: 12px; color: var(--text-faint); }
+    .bl-caught { font-weight: 600; }
+    .bl-caught.zero { color: var(--text-faint); font-weight: 400; }
+    .bl-add { display: grid; grid-template-columns: minmax(150px, 190px) minmax(140px, 170px) minmax(0, 1fr) minmax(0, 1.5fr) auto; gap: 10px 12px; align-items: end; padding: 12px 16px; }
+    .bl-add .add-field input, .bl-add .add-field select { width: 100%; }
+    .app-page .page-body .bl-add input, .app-page .page-body .bl-add select { height: 30px; }
+    .bl-add [hidden] { display: none; }
+    #bl-none[hidden] { display: none; }
+    @media (max-width: 800px) { .bl-add { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .bl-add .btn { grid-column: 1 / -1; justify-self: end; } }
+    @media (max-width: 600px) { .bl-col-origin, .bl-col-added { display: none; } }
+</style>
+{% endblock %}
+
+{% block settings_body %}
+<div class="page-head">
+    <h1>Blocklist</h1>
+    <p>Everything that keeps an article out, or keeps its page from being scraped, with the reason and how many articles each rule stopped in the last {{ caught_days }} days. <b>Don't collect</b> rules refuse a URL or headline before anything is stored. <b>Collect, don't scrape</b> rules keep the article and its place in the story but skip its page (hard paywalls, and domains blocked on their own after repeated bad scrapes). Scrape back-offs and failing outlets are on <a href="{{ url_for('admin.scrape_blocklist') }}">Scrape health</a>.</p>
+</div>
+
+<section class="panel">
+    <div class="panel-head"><h2>Add a rule</h2></div>
+    <form method="POST" action="{{ url_for('admin.add_block_rule') }}" class="bl-add" id="bl-add">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="add-field"><span>Effect</span>
+            <select name="effect" id="bl-effect">
+                <option value="skip">Don't collect</option>
+                <option value="noscrape">Collect, don't scrape</option>
+            </select>
+        </label>
+        <label class="add-field" id="bl-match-field"><span>Match</span>
+            <select name="match">
+                <option value="url">URL contains</option>
+                <option value="title">Headline contains</option>
+            </select>
+        </label>
+        <label class="add-field"><span id="bl-pattern-label">Text</span><input type="text" name="pattern" class="mono" placeholder="e.g. example.com or game recap" required></label>
+        <label class="add-field"><span>Reason</span><input type="text" name="reason" placeholder="Why, for the next person" required></label>
+        <button type="submit" class="btn">{{ icon('plus') }} Add rule</button>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head"><h2>Rules</h2><span class="chip" id="bl-count">{{ active_count }} active of {{ rules|length }}</span></div>
+    <div class="bl-filters">
+        <label><span class="visually-hidden">Effect</span>
+            <select id="f-effect">
+                <option value="">Both effects</option>
+                <option value="skip">Don't collect</option>
+                <option value="noscrape">Collect, don't scrape</option>
+            </select>
+        </label>
+        <label><span class="visually-hidden">Origin</span>
+            <select id="f-origin">
+                <option value="">Any origin</option>
+                {%- for key, name in origin_names.items() %}<option value="{{ key }}">{{ name }}</option>{% endfor %}
+            </select>
+        </label>
+        <label><span class="visually-hidden">State</span>
+            <select id="f-state">
+                <option value="">On and off</option>
+                <option value="on">On</option>
+                <option value="off">Off</option>
+            </select>
+        </label>
+        <input type="search" id="f-text" placeholder="Search patterns and reasons" autocomplete="off" aria-label="Search rules">
+    </div>
+    {%- if rules %}
+    <div class="table-scroll">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th scope="col">Rule</th>
+                <th scope="col">Reason</th>
+                <th scope="col" class="bl-col-origin">Origin</th>
+                <th scope="col" class="num">Caught, {{ caught_days }} d</th>
+                <th scope="col">On</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {%- for r in rules %}
+            {%- set f = 'rule-' ~ r.table ~ '-' ~ r.id %}
+            <tr id="{{ f }}" class="bl-row{{ '' if r.active else ' is-off' }}" data-effect="{{ r.effect }}" data-origin="{{ r.origin }}"
+                data-state="{{ 'on' if r.active else 'off' }}" data-text="{{ (r.pattern ~ ' ' ~ r.reason)|lower }}">
+                <td>
+                    <div class="bl-pattern">{{ r.pattern }}</div>
+                    <div class="bl-match" title="{{ effect_hints[r.effect] }}">{{ effect_names[r.effect] }} · {{ match_names[r.match] }}</div>
+                </td>
+                <td class="bl-reason">
+                    <form id="{{ f }}-form" method="POST" action="{{ url_for('admin.update_ingestion_block', block_id=r.id) if r.table == 'ingestion' else url_for('admin.update_scrape_block', entry_id=r.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="text" name="reason" value="{{ r.reason }}" placeholder="Why this is blocked" aria-label="Reason for {{ r.pattern }}" onchange="this.form.requestSubmit()">
+                    </form>
+                    {%- if r.origin == 'auto' %}
+                    <div class="bl-sub">{{ r.hits }}/{{ r.hit_threshold }} bad scrapes{% if r.active and r.expires_at %} · lapses {{ r.expires_at|short_datetime }}{% elif not r.active %} · not blocking yet{% endif %}</div>
+                    {%- endif %}
+                </td>
+                <td class="bl-col-origin"><span class="chip">{{ origin_names[r.origin] }}</span></td>
+                <td class="num"><span class="bl-caught{{ ' zero' if not r.caught }}">{{ r.caught }}</span></td>
+                <td>
+                    {%- if r.table == 'ingestion' %}
+                    <label class="switch" title="{{ 'On' if r.active else 'Off' }}">
+                        <input type="checkbox" data-active-url="{{ url_for('admin.set_ingestion_block_active', block_id=r.id) }}" {{ 'checked' if r.active else '' }} aria-label="{{ r.pattern }} on"><span></span>
+                    </label>
+                    {%- else %}
+                    <span class="bl-sub" title="Scrape rules are on until deleted, or until an automatic one lapses">{{ 'On' if r.active else 'Pending' }}</span>
+                    {%- endif %}
+                </td>
+                <td>
+                    <form method="POST" action="{{ url_for('admin.delete_block_rule', table=r.table, rule_id=r.id) }}" onsubmit="return confirm({{ ('Delete the “' ~ r.pattern ~ '” rule?')|tojson|forceescape }});">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger btn-square" aria-label="Delete {{ r.pattern }}" title="Delete">{{ icon('trash') }}</button>
+                    </form>
+                </td>
+            </tr>
+            {%- endfor %}
+        </tbody>
+    </table>
+    </div>
+    <div class="panel-body muted" id="bl-none" hidden>No rules match.</div>
+    {%- else %}
+    <div class="panel-body muted">No rules yet.</div>
+    {%- endif %}
+</section>
+<p class="muted" style="margin-top: 12px; font-size: 12px; line-height: 1.6;">
+    Matching is a plain, case-insensitive substring, not a regex: <code>nfl.com</code> catches <code>*.pocket.nfl.com</code>, but <code>nba.com</code> also catches <code>wnba.com</code>, and a single common word like <code>picks</code> would drop "Trump picks Supreme Court nominee". Switch a rule off to pause it without losing it. Changes apply on the next run.
+</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+    // A scrape rule matches a domain only.
+    const effect = document.getElementById('bl-effect');
+    const matchField = document.getElementById('bl-match-field');
+    const label = document.getElementById('bl-pattern-label');
+    const syncAdd = () => {
+        const noScrape = effect.value === 'noscrape';
+        matchField.hidden = noScrape;
+        label.textContent = noScrape ? 'Domain' : 'Text';
+    };
+    effect.addEventListener('change', syncAdd);
+    syncAdd();
+
+    document.querySelectorAll('[data-active-url]').forEach((input) => {
+        input.addEventListener('change', () => {
+            const row = input.closest('tr');
+            fetch(input.dataset.activeUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                body: JSON.stringify({ active: input.checked }),
+            }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+                .then((data) => {
+                    row.classList.toggle('is-off', !data.active);
+                    row.dataset.state = data.active ? 'on' : 'off';
+                    input.closest('.switch').title = data.active ? 'On' : 'Off';
+                })
+                .catch(() => { input.checked = !input.checked; alert('Could not save. Reload and try again.'); });
+        });
+    });
+
+    const rows = Array.from(document.querySelectorAll('.bl-row'));
+    const fEffect = document.getElementById('f-effect');
+    const fOrigin = document.getElementById('f-origin');
+    const fState = document.getElementById('f-state');
+    const fText = document.getElementById('f-text');
+    const none = document.getElementById('bl-none');
+    const apply = () => {
+        const q = fText.value.trim().toLowerCase();
+        let shown = 0;
+        rows.forEach((row) => {
+            const ok = (!fEffect.value || row.dataset.effect === fEffect.value)
+                && (!fOrigin.value || row.dataset.origin === fOrigin.value)
+                && (!fState.value || row.dataset.state === fState.value)
+                && (!q || row.dataset.text.includes(q));
+            row.hidden = !ok;
+            if (ok) shown += 1;
+        });
+        if (none) none.hidden = shown > 0;
+    };
+    [fEffect, fOrigin, fState].forEach((el) => el.addEventListener('change', apply));
+    fText.addEventListener('input', apply);
+})();
+</script>
+{% endblock %}

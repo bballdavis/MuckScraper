@@ -1,115 +1,15 @@
 import logging
 from datetime import datetime
-from flask import abort, jsonify, render_template, request, redirect, url_for
+from flask import jsonify, render_template, request, redirect, url_for
 from aggregator.permissions import ROLE_ADMIN, role_required
 from sqlalchemy import func
-from aggregator import db, feed_order
-from aggregator.models import AppSetting, Topic, RssFeed, PromptTemplate, PipelineSchedule, ScheduledFetch, IngestionBlock
+from aggregator import db
+from aggregator.models import AppSetting, Topic, PromptTemplate, PipelineSchedule, ScheduledFetch
 from news_fetcher.prompt_registry import validate_prompt_text, invalidate_cache as invalidate_prompt_cache, KNOWN_VARS as PROMPT_KNOWN_VARS
 
 from . import admin
 
 logger = logging.getLogger(__name__)
-
-
-@admin.route("/topics")
-@role_required(ROLE_ADMIN)
-def topics_page():
-    topics = Topic.query.order_by(Topic.sort_order.asc().nullslast(), Topic.name.asc()).all()
-    return render_template("topics.html", topics=topics)
-
-
-@admin.route("/topics/add", methods=["POST"])
-@role_required(ROLE_ADMIN)
-def add_topic():
-    name = request.form.get("name", "").strip()
-    icon = request.form.get("icon", "").strip()[:4] or None
-    sort_order = request.form.get("sort_order", type=int)
-
-    if name and not Topic.query.filter_by(name=name).first():
-        max_order = db.session.query(func.max(Topic.sort_order)).scalar()
-        db.session.add(Topic(
-            name=name,
-            icon=icon,
-            sort_order=sort_order if sort_order is not None else (max_order or 0) + 1,
-            is_active=True,
-        ))
-        db.session.commit()
-        logger.info(f"[Topics] Added topic: {name}")
-    return redirect(url_for("admin.topics_page"))
-
-
-@admin.route("/topics/<int:topic_id>/update", methods=["POST"])
-@role_required(ROLE_ADMIN)
-def update_topic(topic_id):
-    topic = Topic.query.get_or_404(topic_id)
-    icon = request.form.get("icon", "").strip()[:4]
-    sort_order = request.form.get("sort_order", type=int)
-
-    topic.icon = icon or None
-    if sort_order is not None:
-        topic.sort_order = sort_order
-    topic.is_active = request.form.get("is_active") == "on"
-    db.session.commit()
-    return redirect(url_for("admin.topics_page", _anchor=f"topic-{topic.id}"))
-
-
-RSS_FEED_BUCKETS = ["general", "right_enrichment", "left_enrichment", "op_ed"]
-
-
-@admin.route("/rss-feeds")
-@role_required(ROLE_ADMIN)
-def rss_feeds_page():
-    # Listed in the order they're fetched.
-    order = feed_order.current()
-    feeds_by_bucket = {
-        bucket: feed_order.sort_feeds(RssFeed.query.filter_by(bucket=bucket).all(), order)
-        for bucket in RSS_FEED_BUCKETS
-    }
-    return render_template("rss_feeds.html", feeds_by_bucket=feeds_by_bucket, buckets=RSS_FEED_BUCKETS,
-                           scan_order=order, scan_orders=feed_order.CHOICES, feed_name=feed_order.feed_name)
-
-
-@admin.route("/rss-feeds/order", methods=["POST"])
-@role_required(ROLE_ADMIN)
-def save_rss_scan_order():
-    feed_order.save(request.form.get("order", ""))
-    return redirect(url_for("admin.rss_feeds_page"))
-
-
-@admin.route("/rss-feeds/add", methods=["POST"])
-@role_required(ROLE_ADMIN)
-def add_rss_feed():
-    url = request.form.get("url", "").strip()
-    bucket = request.form.get("bucket", "").strip()
-    label = request.form.get("label", "").strip() or None
-    fallback_url = request.form.get("fallback_url", "").strip() or None
-
-    if url and bucket in RSS_FEED_BUCKETS and not RssFeed.query.filter_by(url=url, bucket=bucket).first():
-        db.session.add(RssFeed(url=url, bucket=bucket, label=label, enabled=True, fallback_url=fallback_url))
-        db.session.commit()
-        logger.info(f"[RssFeeds] Added feed: {url} ({bucket})")
-    return redirect(url_for("admin.rss_feeds_page"))
-
-
-@admin.route("/rss-feeds/<int:feed_id>/update", methods=["POST"])
-@role_required(ROLE_ADMIN)
-def update_rss_feed(feed_id):
-    feed = RssFeed.query.get_or_404(feed_id)
-    feed.label = request.form.get("label", "").strip() or None
-    feed.fallback_url = request.form.get("fallback_url", "").strip() or None
-    feed.enabled = request.form.get("enabled") == "on"
-    db.session.commit()
-    return redirect(url_for("admin.rss_feeds_page", _anchor=f"feed-{feed.id}"))
-
-
-@admin.route("/rss-feeds/<int:feed_id>/delete", methods=["POST"])
-@role_required(ROLE_ADMIN)
-def delete_rss_feed(feed_id):
-    feed = RssFeed.query.get_or_404(feed_id)
-    db.session.delete(feed)
-    db.session.commit()
-    return redirect(url_for("admin.rss_feeds_page"))
 
 
 @admin.route("/prompts")
@@ -244,81 +144,6 @@ def delete_pipeline_schedule(entry_id):
     return redirect(url_for("admin.pipeline_schedule_page"))
 
 
-INGESTION_BLOCK_KINDS = ["source", "title_keyword"]
-
-
-# Each kind has its own page under Settings › Blocklists, keyed by a slug.
-INGESTION_BLOCK_SLUGS = {"sources": "source", "keywords": "title_keyword"}
-INGESTION_BLOCK_SLUG_FOR = {kind: slug for slug, kind in INGESTION_BLOCK_SLUGS.items()}
-
-
-@admin.route("/ingestion-blocks", defaults={"slug": "sources"})
-@admin.route("/ingestion-blocks/<slug>")
-@role_required(ROLE_ADMIN)
-def ingestion_blocks_page(slug):
-    kind = INGESTION_BLOCK_SLUGS.get(slug)
-    if kind is None:
-        abort(404)
-    blocks = IngestionBlock.query.filter_by(kind=kind).order_by(
-        IngestionBlock.note.asc(), IngestionBlock.pattern.asc()
-    ).all()
-    return render_template("ingestion_blocks.html", blocks=blocks, kind=kind)
-
-
-def _ingestion_blocks_redirect(kind, block_id=None):
-    return redirect(url_for(
-        "admin.ingestion_blocks_page",
-        slug=INGESTION_BLOCK_SLUG_FOR.get(kind, "sources"),
-        _anchor=f"block-{block_id}" if block_id else None,
-    ))
-
-
-@admin.route("/ingestion-blocks/add", methods=["POST"])
-@role_required(ROLE_ADMIN)
-def add_ingestion_block():
-    kind = request.form.get("kind", "").strip()
-    # Stored lowercase because that is how both checks compare -- normalizing
-    # on the way in keeps the unique constraint honest, so "NFL.com" can't be
-    # added alongside an existing "nfl.com" as a second row that never fires.
-    pattern = request.form.get("pattern", "").strip().lower()
-    note = request.form.get("note", "").strip() or None
-
-    if pattern and kind in INGESTION_BLOCK_KINDS and not IngestionBlock.query.filter_by(kind=kind, pattern=pattern).first():
-        db.session.add(IngestionBlock(kind=kind, pattern=pattern, note=note, is_active=True))
-        db.session.commit()
-        logger.info(f"[IngestionBlocks] Added {kind} block: {pattern}")
-    return _ingestion_blocks_redirect(kind)
-
-
-@admin.route("/ingestion-blocks/<int:block_id>/update", methods=["POST"])
-@role_required(ROLE_ADMIN)
-def update_ingestion_block(block_id):
-    block = IngestionBlock.query.get_or_404(block_id)
-    pattern = request.form.get("pattern", "").strip().lower()
-
-    clash = IngestionBlock.query.filter(
-        IngestionBlock.kind == block.kind,
-        IngestionBlock.pattern == pattern,
-        IngestionBlock.id != block.id,
-    ).first()
-    if pattern and not clash:
-        block.pattern = pattern
-    block.note = request.form.get("note", "").strip() or None
-    block.is_active = request.form.get("is_active") == "on"
-    db.session.commit()
-    return _ingestion_blocks_redirect(block.kind, block.id)
-
-
-@admin.route("/ingestion-blocks/<int:block_id>/delete", methods=["POST"])
-@role_required(ROLE_ADMIN)
-def delete_ingestion_block(block_id):
-    block = IngestionBlock.query.get_or_404(block_id)
-    kind = block.kind
-    db.session.delete(block)
-    db.session.commit()
-    return _ingestion_blocks_redirect(kind)
-
-
 SCHEDULED_FETCH_MODES = ["query", "top"]
 
 
@@ -347,7 +172,11 @@ def _scheduled_fetch_form_values(form):
         "newsapi_category": field("newsapi_category") if mode == "top" else None,
         "newsapi_sources":  field("newsapi_sources") if mode == "top" else None,
         "newsapi_query":    field("newsapi_query") if mode == "query" else None,
+        "known_outlets_only": form.get("known_outlets_only") == "on",
     }
+    # The section this search serves; blank is General (the classifier decides).
+    topic_id = form.get("topic_id", type=int)
+    values["topic_id"] = topic_id if topic_id and db.session.get(Topic, topic_id) else None
     return values
 
 
@@ -357,8 +186,9 @@ def scheduled_fetches_page():
     fetches = ScheduledFetch.query.order_by(
         ScheduledFetch.sort_order.asc(), ScheduledFetch.id.asc()
     ).all()
+    topics = Topic.query.order_by(Topic.sort_order.asc().nullslast(), Topic.name.asc()).all()
     return render_template(
-        "scheduled_fetches.html", fetches=fetches, modes=SCHEDULED_FETCH_MODES,
+        "scheduled_fetches.html", fetches=fetches, modes=SCHEDULED_FETCH_MODES, topics=topics,
     )
 
 
