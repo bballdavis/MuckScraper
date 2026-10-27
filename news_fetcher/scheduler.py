@@ -5,8 +5,8 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from aggregator import create_app, db, scheduler_tasks
 from aggregator.article_signals import bias_bucket_for_score, is_independent_source
-from aggregator.models import AppSetting, PipelineSchedule, ScheduledFetch
-from news_fetcher.fetch_and_store_articles import fetch_and_store_articles, process_current_edition, review_ambiguous_grouping_matches, sync_allsides_ratings, publish_edition, retry_unrated_outlets, clear_stale_single_article_headlines
+from aggregator.models import AppSetting, PipelineSchedule
+from news_fetcher.fetch_and_store_articles import cleanup_old_payloads, ingest_payloads, poll_news_apis_if_due, scheduled_fetches, process_current_edition, review_ambiguous_grouping_matches, sync_allsides_ratings, publish_edition, retry_unrated_outlets, clear_stale_single_article_headlines
 from news_fetcher.headline_generator import generate_headlines_for_stale_stories
 from news_fetcher.copy_detector import mark_recent_copies
 from news_fetcher.opinion_linker import link_opinion_and_write_roundups
@@ -42,33 +42,14 @@ TIMEZONE = "America/New_York"
 
 def get_scheduled_fetches():
     """
-    What each run fetches from the news APIs -- DB-backed (ScheduledFetch,
+    What NewsAPI and GNews are asked for -- DB-backed (ScheduledFetch,
     admin-editable at /admin/scheduled-fetches) rather than a hardcoded list.
 
-    Read fresh at the start of every run, so an edit takes effect on the next
-    scheduled run with no restart. This is deliberately unlike
-    PipelineSchedule, where each row becomes an APScheduler job at process
-    boot and a restart *is* required.
-
-    Returns a list of plain dicts rather than ORM instances: the caller's
-    error path rolls back the session, which would expire live instances
-    mid-loop and re-query on the next attribute access.
+    Read fresh on every poll, so an edit takes effect with no restart. The
+    polls themselves run on each API's own schedule within its daily budget
+    (news_fetcher/api_budget.py); pipeline runs store what they brought.
     """
-    rows = ScheduledFetch.query.filter_by(is_active=True).order_by(
-        ScheduledFetch.sort_order.asc(), ScheduledFetch.id.asc()
-    ).all()
-    return [
-        {
-            "label":          row.label,
-            "mode":           row.mode,
-            "country":        row.newsapi_country,
-            "category":       row.newsapi_category,
-            "query":          row.newsapi_query,
-            "gnews_query":    row.gnews_query,
-            "gnews_category": row.gnews_category,
-        }
-        for row in rows
-    ]
+    return scheduled_fetches()
 
 
 app = create_app()
@@ -885,43 +866,44 @@ def run_all_fetches(run_full_pipeline=True):
         })
         ollama_state["up_at_start"] = _check_ollama_status_for_report(ollama_state, "run_start")
 
-        # Fetch all categories
+        # NewsAPI and GNews: their scheduled polls (poll_news_apis_if_due,
+        # every minute between runs) keep payloads; poll now too if one is
+        # due, then store everything the polls brought.
         scheduled_fetches = get_scheduled_fetches()
         if not scheduled_fetches:
             logging.warning(
                 "No active scheduled fetches configured -- skipping the NewsAPI/GNews "
                 "stage. Add them at /admin/scheduled-fetches. RSS ingestion still runs."
             )
-        for fetch in scheduled_fetches:
-            _mark_step(run_metrics, f"Fetching: {fetch['label']}")
+        else:
+            _mark_step(run_metrics, "Polling NewsAPI and GNews if due")
             try:
-                topic_metrics = fetch_and_store_articles(
-                    fetch["label"],
-                    mode=fetch["mode"],
-                    query=fetch["query"],
-                    country=fetch["country"],
-                    category=fetch["category"],
-                    gnews_query=fetch["gnews_query"],
-                    gnews_category=fetch["gnews_category"]
-                )
-                run_metrics["topics"][fetch["label"]] = topic_metrics
-                for provider_metrics in topic_metrics.get("providers", {}).values():
-                    run_metrics["totals"]["input_articles"] += provider_metrics.get("input_articles", 0)
-                    run_metrics["totals"]["stored"] += provider_metrics.get("stored", 0)
-                    run_metrics["totals"]["new_outlets"] += provider_metrics.get("new_outlets", 0)
-                    run_metrics["totals"]["stories_touched"] += provider_metrics.get("stories_touched", 0)
-                    _merge_counts(run_metrics["totals"]["skipped"], provider_metrics.get("skipped"))
-                    _merge_counts(run_metrics["totals"]["scrape_statuses"], provider_metrics.get("scrape_statuses"))
-                    _merge_counts(run_metrics["totals"]["bias_buckets"], provider_metrics.get("bias_buckets"))
-                    _merge_counts(run_metrics["totals"]["bias_sources"], provider_metrics.get("bias_sources"))
+                run_metrics["steps"]["news_api_polls"] = poll_news_apis_if_due(fetches=scheduled_fetches)
             except Exception as e:
                 db.session.rollback()
-                logging.error(f"Error fetching {fetch['label']}: {e}")
-                run_metrics["status"] = "partial_error"
-                run_metrics["topics"][fetch["label"]] = {
-                    "status": "error",
-                    "reason": str(e),
-                }
+                logging.error(f"Error polling NewsAPI/GNews: {e}")
+        _mark_step(run_metrics, "Storing NewsAPI and GNews articles")
+        try:
+            polled_topics = ingest_payloads()
+            cleanup_old_payloads()
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error storing NewsAPI/GNews payloads: {e}")
+            run_metrics["status"] = "partial_error"
+            polled_topics = {}
+        for label, topic_metrics in polled_topics.items():
+            run_metrics["topics"][label] = topic_metrics
+            for provider_metrics in topic_metrics.get("providers", {}).values():
+                if provider_metrics.get("status") == "error":
+                    run_metrics["status"] = "partial_error"
+                run_metrics["totals"]["input_articles"] += provider_metrics.get("input_articles", 0)
+                run_metrics["totals"]["stored"] += provider_metrics.get("stored", 0)
+                run_metrics["totals"]["new_outlets"] += provider_metrics.get("new_outlets", 0)
+                run_metrics["totals"]["stories_touched"] += provider_metrics.get("stories_touched", 0)
+                _merge_counts(run_metrics["totals"]["skipped"], provider_metrics.get("skipped"))
+                _merge_counts(run_metrics["totals"]["scrape_statuses"], provider_metrics.get("scrape_statuses"))
+                _merge_counts(run_metrics["totals"]["bias_buckets"], provider_metrics.get("bias_buckets"))
+                _merge_counts(run_metrics["totals"]["bias_sources"], provider_metrics.get("bias_sources"))
 
         # NYT lead paragraphs first (ten articles a request), so the NYT
         # Opinion and World feed articles below get them too
@@ -1339,6 +1321,12 @@ if __name__ == "__main__":
     def poll_nyt_wire():
         return nyt_api.poll_wire_if_due()
 
+    # NewsAPI and GNews (news_fetcher/fetch_and_store_articles/providers.py):
+    # checked every minute, each polled on its own schedule within its daily
+    # budget; the next pipeline run stores what they brought.
+    def poll_news_apis():
+        return poll_news_apis_if_due()
+
     # Photo focal points (news_fetcher/image_focus.py): every few minutes, so
     # new articles' photos crop around their subject soon after they land.
     def find_image_focus():
@@ -1353,6 +1341,7 @@ if __name__ == "__main__":
                            f"Breaking News feed check (every {BREAKING_POLL_MINUTES} min)"),
         "image_focus": (find_image_focus, FOCUS_RUN_MINUTES, f"Photo focal points (every {FOCUS_RUN_MINUTES} min)"),
         "nyt_wire": (poll_nyt_wire, 1, "NYT Times Wire check (every minute, polls on its schedule)"),
+        "news_api_polls": (poll_news_apis, 1, "NewsAPI and GNews check (every minute, poll on their schedules)"),
     }
     for job_id, (func, minutes, name) in RECURRING.items():
         scheduler.add_job(

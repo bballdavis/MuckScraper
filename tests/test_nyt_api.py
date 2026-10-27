@@ -14,7 +14,9 @@ import unittest
 from datetime import datetime, timedelta
 from unittest import mock
 
-from news_fetcher import nyt_api, scraper
+import dataclasses
+
+from news_fetcher import api_budget, nyt_api, scraper
 
 TEST_DB = os.environ.get("API_TEST_DATABASE_URL", "")
 NYT_URL = "https://www.nytimes.com/2026/10/21/us/politics/example.html"
@@ -45,13 +47,14 @@ def _wire_item(n, section="U.S.", published=None, **fields):
 class _Base(unittest.TestCase):
     def setUp(self):
         nyt_api._cache.clear()
-        nyt_api._state.update(filter_field=None, rejected_key=None, wire_page_size=None)
+        nyt_api._state.update(filter_field=None, wire_page_size=None)
+        api_budget._rejected.clear()
         self.settings = {"NYT_API_KEY": "test-key"}
         self.calls = []
         self._patchers = [
-            mock.patch.object(nyt_api, "_setting",
+            mock.patch.object(api_budget, "_setting",
                               side_effect=lambda name, default="": self.settings.get(name, default)),
-            mock.patch.object(nyt_api, "MIN_INTERVAL_SECONDS", 0),
+            mock.patch.object(nyt_api, "PROVIDER", dataclasses.replace(nyt_api.PROVIDER, min_interval_seconds=0)),
         ]
         for patcher in self._patchers:
             patcher.start()
@@ -68,26 +71,26 @@ class NytApiTests(_Base):
         super().setUp()
         ids = itertools.count(1)
 
-        def take(kind):
+        def take(p, kind):
             if len(self.calls) >= nyt_api.daily_limit() - nyt_api.RESERVES.get(kind, 0):
                 return None
             self.calls.append(kind)
             return next(ids)
 
-        for patcher in (mock.patch.object(nyt_api, "_take_request_slot", side_effect=take),
-                        mock.patch.object(nyt_api, "_record_result"),
+        for patcher in (mock.patch.object(api_budget, "take_slot", side_effect=take),
+                        mock.patch.object(api_budget, "record_result"),
                         mock.patch.object(nyt_api, "_stored_paragraphs", return_value=None)):
             patcher.start()
             self._patchers.append(patcher)
 
     def test_no_key_means_no_request(self):
         self.settings["NYT_API_KEY"] = ""
-        with mock.patch.object(nyt_api.requests, "get") as get:
+        with mock.patch.object(api_budget.requests, "get") as get:
             self.assertIsNone(nyt_api.lookup_article(NYT_URL))
         get.assert_not_called()
 
     def test_other_domains_are_ignored(self):
-        with mock.patch.object(nyt_api.requests, "get") as get:
+        with mock.patch.object(api_budget.requests, "get") as get:
             self.assertIsNone(nyt_api.lookup_article("https://www.wsj.com/articles/x"))
             self.assertIsNone(nyt_api.lookup_article("https://notnytimes.com/a"))
         get.assert_not_called()
@@ -95,26 +98,26 @@ class NytApiTests(_Base):
     def test_returns_abstract_and_lead_paragraph_without_repeats(self):
         doc = _doc(abstract="The abstract.", lead_paragraph="The opening paragraph.",
                    snippet="The abstract.")
-        with mock.patch.object(nyt_api.requests, "get", return_value=_FakeResponse(docs=[doc])):
+        with mock.patch.object(api_budget.requests, "get", return_value=_FakeResponse(docs=[doc])):
             result = nyt_api.lookup_article(NYT_URL + "?smid=share")
         self.assertEqual(result, ["The abstract.", "The opening paragraph."])
         self.assertEqual(self.calls, ["lookup"])
 
     def test_a_stored_wire_item_answers_without_a_request(self):
         with mock.patch.object(nyt_api, "_stored_paragraphs", return_value=["A.", "Lead."]), \
-                mock.patch.object(nyt_api.requests, "get") as get:
+                mock.patch.object(api_budget.requests, "get") as get:
             self.assertEqual(nyt_api.lookup_article(NYT_URL), ["A.", "Lead."])
         get.assert_not_called()
 
     def test_falls_back_to_web_url_filter_and_remembers_it(self):
         responses = [_FakeResponse(status_code=400), _FakeResponse(docs=[_doc(abstract="A.")])]
-        with mock.patch.object(nyt_api.requests, "get", side_effect=responses) as get:
+        with mock.patch.object(api_budget.requests, "get", side_effect=responses) as get:
             self.assertEqual(nyt_api.lookup_article(NYT_URL), ["A."])
         self.assertEqual(get.call_count, 2)
         self.assertEqual(nyt_api._state["filter_field"], "web_url")
 
     def test_result_is_cached(self):
-        with mock.patch.object(nyt_api.requests, "get",
+        with mock.patch.object(api_budget.requests, "get",
                                return_value=_FakeResponse(docs=[_doc(abstract="A.")])) as get:
             nyt_api.lookup_article(NYT_URL)
             nyt_api.lookup_article(NYT_URL)
@@ -122,7 +125,7 @@ class NytApiTests(_Base):
 
     def test_spent_budget_stops_requests_and_is_not_cached(self):
         self.settings["NYT_API_DAILY_LIMIT"] = "0"
-        with mock.patch.object(nyt_api.requests, "get") as get:
+        with mock.patch.object(api_budget.requests, "get") as get:
             self.assertIsNone(nyt_api.lookup_article(NYT_URL))
         get.assert_not_called()
         self.assertNotIn(NYT_URL, nyt_api._cache)
@@ -134,31 +137,31 @@ class NytApiTests(_Base):
         self.assertEqual(nyt_api.daily_limit(), 300)
 
     def test_rejected_key_stops_further_requests(self):
-        with mock.patch.object(nyt_api.requests, "get",
+        with mock.patch.object(api_budget.requests, "get",
                                return_value=_FakeResponse(status_code=401)) as get:
             self.assertIsNone(nyt_api.lookup_article(NYT_URL))
             self.assertIsNone(nyt_api.lookup_article(NYT_URL.replace("example", "other")))
         get.assert_called_once()
 
     def test_saving_a_new_key_lifts_the_rejection(self):
-        with mock.patch.object(nyt_api.requests, "get",
+        with mock.patch.object(api_budget.requests, "get",
                                return_value=_FakeResponse(status_code=403)):
             nyt_api.lookup_article(NYT_URL)
         self.assertFalse(nyt_api.enabled())
         self.settings["NYT_API_KEY"] = "new-key"
-        with mock.patch.object(nyt_api.requests, "get",
+        with mock.patch.object(api_budget.requests, "get",
                                return_value=_FakeResponse(docs=[_doc(abstract="A.")])) as get:
             self.assertEqual(nyt_api.lookup_article(NYT_URL), ["A."])
         self.assertEqual(get.call_args.kwargs["params"]["api-key"], "new-key")
 
     def test_errors_never_carry_the_key(self):
-        error = nyt_api.requests.ConnectionError(f"Max retries exceeded with url: /x?api-key=test-key")
-        with mock.patch.object(nyt_api.requests, "get", side_effect=error), \
+        error = api_budget.requests.ConnectionError(f"Max retries exceeded with url: /x?api-key=test-key")
+        with mock.patch.object(api_budget.requests, "get", side_effect=error), \
                 self.assertRaises(RuntimeError) as raised:
             nyt_api._get("lookup", nyt_api.ARTICLE_SEARCH_URL, {}, "test-key", len)
         self.assertNotIn("test-key", str(raised.exception))
         self.assertIsNone(raised.exception.__cause__)
-        with mock.patch.object(nyt_api.requests, "get", return_value=_FakeResponse(status_code=500)), \
+        with mock.patch.object(api_budget.requests, "get", return_value=_FakeResponse(status_code=500)), \
                 self.assertRaises(RuntimeError) as raised:
             nyt_api._get("lookup", nyt_api.ARTICLE_SEARCH_URL, {}, "test-key", len)
         self.assertNotIn("test-key", str(raised.exception))
@@ -166,7 +169,7 @@ class NytApiTests(_Base):
     def test_ten_urls_share_one_search(self):
         urls = [f"https://www.nytimes.com/2026/10/27/us/s{n}.html" for n in range(10)]
         docs = [_doc(u, abstract=f"A{n}.", lead_paragraph=f"L{n}.") for n, u in enumerate(urls)]
-        with mock.patch.object(nyt_api.requests, "get", return_value=_FakeResponse(docs=docs)) as get:
+        with mock.patch.object(api_budget.requests, "get", return_value=_FakeResponse(docs=docs)) as get:
             found = nyt_api._docs_for("search", urls, "test-key")
         get.assert_called_once()
         self.assertEqual(len(found), 10)
@@ -175,11 +178,11 @@ class NytApiTests(_Base):
     def test_reserves_keep_room_for_the_other_kinds(self):
         self.settings["NYT_API_DAILY_LIMIT"] = "200"
         self.calls.extend(["wire"] * 50)  # 150 left, the search reserve
-        self.assertIsNone(nyt_api._take_request_slot("search"))
-        self.assertIsNotNone(nyt_api._take_request_slot("wire"))
+        self.assertIsNone(api_budget.take_slot(nyt_api.PROVIDER, "search"))
+        self.assertIsNotNone(api_budget.take_slot(nyt_api.PROVIDER, "wire"))
         self.calls.extend(["wire"] * 124)  # 25 left, the wire reserve
-        self.assertIsNone(nyt_api._take_request_slot("wire"))
-        self.assertIsNotNone(nyt_api._take_request_slot("lookup"))
+        self.assertIsNone(api_budget.take_slot(nyt_api.PROVIDER, "wire"))
+        self.assertIsNotNone(api_budget.take_slot(nyt_api.PROVIDER, "lookup"))
 
     def test_wire_row_parsing(self):
         now = datetime(2026, 10, 27, 13, 0)
@@ -271,7 +274,7 @@ class NytDatabaseTests(_Base):
         from aggregator import db
         self.ctx = self.app.app_context()
         self.ctx.push()
-        for table in ("nyt_api_calls", "nyt_wire_items", "feed_entries", "app_settings"):
+        for table in ("source_api_calls", "nyt_wire_items", "feed_entries", "app_settings"):
             db.session.execute(db.text(f"DELETE FROM {table}"))
         db.session.commit()
 
@@ -283,46 +286,46 @@ class NytDatabaseTests(_Base):
 
     def test_ledger_counts_the_last_24_hours_across_restarts(self):
         from aggregator import db
-        from aggregator.models import NytApiCall
+        from aggregator.models import SourceApiCall
         now = datetime.utcnow()
-        db.session.add_all([NytApiCall(kind="wire", called_at=now - timedelta(hours=25))] +
-                           [NytApiCall(kind="wire", called_at=now - timedelta(hours=1)) for _ in range(3)])
+        db.session.add_all([SourceApiCall(provider="nyt", kind="wire", called_at=now - timedelta(hours=25))] +
+                           [SourceApiCall(provider="nyt", kind="wire", called_at=now - timedelta(hours=1)) for _ in range(3)])
         db.session.commit()
         self.settings["NYT_API_DAILY_LIMIT"] = "4"
         self.assertEqual(nyt_api.window_usage()[0], 3)
-        self.assertIsNotNone(nyt_api._take_request_slot("lookup"))
-        self.assertIsNone(nyt_api._take_request_slot("lookup"))
-        self.assertEqual(NytApiCall.query.count(), 5)
+        self.assertIsNotNone(api_budget.take_slot(nyt_api.PROVIDER, "lookup"))
+        self.assertIsNone(api_budget.take_slot(nyt_api.PROVIDER, "lookup"))
+        self.assertEqual(SourceApiCall.query.count(), 5)
 
     def test_a_429_pauses_every_kind(self):
         from aggregator import db
-        from aggregator.models import NytApiCall
-        db.session.add(NytApiCall(kind="wire", called_at=datetime.utcnow(), http_status=429))
+        from aggregator.models import SourceApiCall
+        db.session.add(SourceApiCall(provider="nyt", kind="wire", called_at=datetime.utcnow(), http_status=429))
         db.session.commit()
-        self.assertIsNone(nyt_api._take_request_slot("lookup"))
+        self.assertIsNone(api_budget.take_slot(nyt_api.PROVIDER, "lookup"))
 
     def test_wire_poll_stores_new_items_and_breaking_headlines(self):
-        from aggregator.models import FeedEntry, NytApiCall, NytWireItem
+        from aggregator.models import FeedEntry, SourceApiCall, NytWireItem
         now = datetime(2026, 10, 27, 13, 0)
         page = [_wire_item(n) for n in range(3)] + [_wire_item(9, section="Food")]
         body = {"num_results": 4, "results": page}
-        with mock.patch.object(nyt_api.requests, "get", return_value=_FakeResponse(body=body)) as get:
+        with mock.patch.object(api_budget.requests, "get", return_value=_FakeResponse(body=body)) as get:
             metrics = nyt_api.poll_wire(now)
         get.assert_called_once()
         self.assertEqual(get.call_args.kwargs["params"]["limit"], nyt_api.WIRE_PAGE_SIZE)
         self.assertEqual(metrics["new"], 4)
         self.assertEqual(NytWireItem.query.count(), 4)
         self.assertEqual(FeedEntry.query.filter_by(source_name="New York Times").count(), 3)
-        self.assertEqual(NytApiCall.query.one().items, 4)
+        self.assertEqual(SourceApiCall.query.one().items, 4)
         # Polled again with nothing new: one request, nothing added.
-        with mock.patch.object(nyt_api.requests, "get", return_value=_FakeResponse(body=body)):
+        with mock.patch.object(api_budget.requests, "get", return_value=_FakeResponse(body=body)):
             self.assertEqual(nyt_api.poll_wire(now)["new"], 0)
 
     def test_wire_pages_back_only_while_every_item_is_new(self):
         size = nyt_api.WIRE_FALLBACK_PAGE_SIZE
         nyt_api._state["wire_page_size"] = size
         pages = [{"results": [_wire_item(p * size + n) for n in range(size)]} for p in range(3)]
-        with mock.patch.object(nyt_api.requests, "get",
+        with mock.patch.object(api_budget.requests, "get",
                                side_effect=[_FakeResponse(body=b) for b in pages]) as get:
             nyt_api.poll_wire(datetime(2026, 10, 27, 13, 0))
         self.assertEqual(get.call_count, nyt_api.WIRE_MAX_PAGES)
@@ -330,18 +333,18 @@ class NytDatabaseTests(_Base):
 
     def test_a_refused_page_size_falls_back(self):
         responses = [_FakeResponse(status_code=400), _FakeResponse(body={"results": [_wire_item(1)]})]
-        with mock.patch.object(nyt_api.requests, "get", side_effect=responses) as get:
+        with mock.patch.object(api_budget.requests, "get", side_effect=responses) as get:
             nyt_api.poll_wire(datetime(2026, 10, 27, 13, 0))
         self.assertEqual(get.call_args.kwargs["params"]["limit"], nyt_api.WIRE_FALLBACK_PAGE_SIZE)
 
     def test_poll_waits_for_its_interval(self):
         from aggregator import db
-        from aggregator.models import NytApiCall
+        from aggregator.models import SourceApiCall
         now = datetime(2026, 10, 27, 12, 0)  # 8am in New York: every 3 minutes
-        db.session.add(NytApiCall(kind="wire", called_at=now - timedelta(minutes=1)))
+        db.session.add(SourceApiCall(provider="nyt", kind="wire", called_at=now - timedelta(minutes=1)))
         db.session.commit()
         with mock.patch.object(nyt_api, "poll_wire") as poll, \
-                mock.patch.object(nyt_api, "window_usage", return_value=(1, None, None)):
+                mock.patch.object(api_budget, "window_usage", return_value=(1, None, None)):
             self.assertIsNone(nyt_api.poll_wire_if_due(now))
             poll.assert_not_called()
             nyt_api.poll_wire_if_due(now + timedelta(minutes=2, seconds=40))
@@ -357,11 +360,11 @@ class NytDatabaseTests(_Base):
         db.session.commit()
         docs = lambda urls: [_doc(u, lead_paragraph=f"Lead for {u[-12:]}") for u in urls]  # noqa: E731
 
-        def get(url, params, timeout):
+        def get(url, params, timeout, **_):
             urls = [u.strip('"') for u in params["fq"].split("(", 1)[1].rstrip(")").split('" "')]
             return _FakeResponse(docs=docs(urls))
 
-        with mock.patch.object(nyt_api.requests, "get", side_effect=get) as fake:
+        with mock.patch.object(api_budget.requests, "get", side_effect=get) as fake:
             self.assertEqual(nyt_api.search_lead_paragraphs(now), 12)
         self.assertEqual(fake.call_count, 2)
         self.assertEqual(NytWireItem.query.filter(NytWireItem.lead_paragraph.isnot(None)).count(), 12)
@@ -376,7 +379,7 @@ class NytDatabaseTests(_Base):
         db.session.add_all(NytWireItem(**r) for r in rows)
         db.session.commit()
         bare = _FakeResponse(docs=[_doc(r["url"], abstract="A.") for r in rows[:10]])
-        with mock.patch.object(nyt_api.requests, "get", return_value=bare) as fake:
+        with mock.patch.object(api_budget.requests, "get", return_value=bare) as fake:
             nyt_api.search_lead_paragraphs(now)
             nyt_api.search_lead_paragraphs(now)
         fake.assert_called_once()

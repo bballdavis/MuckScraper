@@ -7,6 +7,21 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **Source API budgets for NYT, NewsAPI and GNews.** The NYT request ledger
+  is now `source_api_calls`, shared by every news source API
+  (`news_fetcher/api_budget.py`): a rolling 24-hour count under each
+  provider's daily limit, request spacing, and a 15-minute pause after a
+  429. NewsAPI and GNews are no longer fetched only inside pipeline runs:
+  the scheduler polls each on its own time-of-day schedule (one request per
+  active scheduled fetch), keeps the payloads, and the next run stores
+  their articles. A schedule that would spend more than the provider's
+  share of its limit stretches to fit, and past the slow-down percent polls
+  come half as often.
+- **Settings › Source API keys redesign.** Each provider gets a card with
+  the last 24 hours against its limit (by kind of request and by hour), the
+  current poll interval and next poll, an editable schedule of time-of-day
+  bands with a live estimate of requests a day, and its key, daily limit
+  and slow-down percent.
 - **Settings › Pipeline › Tasks.** One page for what the scheduler is doing:
   the pipeline run in progress with its current step and stages, every
   recurring task (pipeline hours, Breaking News feeds, photo focal points,

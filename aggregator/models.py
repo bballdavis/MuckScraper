@@ -379,6 +379,9 @@ class RawArticlePayload(db.Model):
     source     = db.Column(db.String, nullable=False)  # "newsapi" or "gnews"
     topic_name = db.Column(db.String, nullable=False)
     payload    = db.Column(db.Text, nullable=False)     # JSON string
+    # When a pipeline run stored the payload's articles; a scheduled poll
+    # (news_fetcher/fetch_and_store_articles/providers.py) leaves it empty.
+    ingested_at = db.Column(db.DateTime, nullable=True)
     fetched_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class EditorialHistory(db.Model):
@@ -932,16 +935,19 @@ class StorySkip(db.Model):
     user = db.relationship("User", backref=db.backref("story_skips", lazy="dynamic", cascade="all, delete-orphan"))
 
 
-class NytApiCall(db.Model):
-    """One request to a New York Times API (news_fetcher/nyt_api.py). The key
-    allows 500 a day, so the budget counts these rows over the last 24 hours,
-    which stays under the limit however NYT counts its day and whichever
-    container (scheduler or web) made the call. `kind` is what the call was
-    for (wire / search / lookup), `items` how many articles it returned."""
-    __tablename__ = "nyt_api_calls"
-    __table_args__ = (db.Index("ix_nyt_api_calls_called_at", "called_at"),)
+class SourceApiCall(db.Model):
+    """One request to a news source API (news_fetcher/api_budget.py): the
+    New York Times, NewsAPI or GNews. Each key allows so many a day, so the
+    budget counts a provider's rows over the last 24 hours, which stays under
+    the limit however the provider counts its day and whichever container
+    (scheduler or web) made the call. `kind` is what the call was for (NYT:
+    wire / search / lookup; NewsAPI and GNews: poll / manual), `items` how
+    many articles it returned."""
+    __tablename__ = "source_api_calls"
+    __table_args__ = (db.Index("ix_source_api_calls_provider_called_at", "provider", "called_at"),)
 
     id          = db.Column(db.Integer, primary_key=True)
+    provider    = db.Column(db.String(16), nullable=False, default="nyt")
     called_at   = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     kind        = db.Column(db.String(16), nullable=False)
     http_status = db.Column(db.Integer, nullable=True)

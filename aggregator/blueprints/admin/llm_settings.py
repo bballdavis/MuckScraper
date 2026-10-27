@@ -302,8 +302,10 @@ def assign_llm_role():
     return redirect(url_for("admin.llm_providers_page") + f"#provider-{provider}")
 
 
-def save_fields_form(fields):
+def save_fields_form(fields, values_in=None):
     """Save a form of config_field()s (templates/_config_fields.html).
+    `values_in` gives a field's value when the form sends it some other way
+    (Settings › Source API keys' schedule rows).
     Non-key fields are saved as typed (blank goes back to the environment);
     one that wasn't saved and still shows its environment or default value
     is left alone, so it keeps following the environment. A key field left
@@ -312,7 +314,7 @@ def save_fields_form(fields):
     states = config_store.field_states()
     values = {}
     for name, _, kind in fields:
-        value = request.form.get(name, "").strip()
+        value = (values_in or {}).get(name, request.form.get(name, "")).strip()
         state = states.get(name, {})
         if kind != "secret" and state.get("source") != "saved" and value in (state.get("env"), state.get("default")):
             continue

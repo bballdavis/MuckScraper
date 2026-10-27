@@ -70,20 +70,38 @@ ROUTING_FIELDS = ("LLM_PROVIDER", "LLM_FAST_PROVIDER")
 # Saved with the routing form but checked against the embedding providers.
 EMBEDDING_FIELDS = ("EMBEDDING_PROVIDER",)
 
-# News source APIs (Settings › Source API keys), same shape as PROVIDER_FIELDS.
-SOURCE_FIELDS = {
-    "newsapi": [("NEWS_API_KEY", "API key", "secret")],
-    "gnews": [("GNEWS_API_KEY", "API key", "secret")],
-    "nyt": [
-        ("NYT_API_KEY", "API key", "secret"),
-        ("NYT_API_DAILY_LIMIT", "Daily request limit", "int"),
-    ],
-}
+# News source APIs (Settings › Source API keys), same shape as PROVIDER_FIELDS:
+# each one's key, and the budget and poll schedule news_fetcher/api_budget.py
+# reads. The schedule field is edited as rows of bands and saved as text.
+def _source_fields():
+    from news_fetcher.api_budget import PROVIDERS
+    return {
+        key: [
+            (p.key_setting, "API key", "secret"),
+            (p.limit_setting, "Daily request limit", "int"),
+            (p.slowdown_setting, "Slow down at (% used)", "percent"),
+            (p.schedule_setting, "Poll schedule", "schedule"),
+        ]
+        for key, p in PROVIDERS.items()
+    }
+
+
+def _source_defaults():
+    from news_fetcher.api_budget import DEFAULT_SLOWDOWN, PROVIDERS, format_schedule
+    defaults = {}
+    for p in PROVIDERS.values():
+        defaults[p.limit_setting] = str(p.default_limit)
+        defaults[p.slowdown_setting] = str(DEFAULT_SLOWDOWN)
+        defaults[p.schedule_setting] = format_schedule(p.default_schedule)
+    return defaults
+
+
+SOURCE_FIELDS = _source_fields()
 
 # Defaults the code applies when neither a saved value nor the environment
 # sets one, shown as the field's placeholder.
-DEFAULTS = {"NYT_API_DAILY_LIMIT": "500", "LMSTUDIO_HOST": "http://localhost:1234/v1",
-            "EMBEDDING_MODEL": "nomic-embed-text"}
+DEFAULTS = {"LMSTUDIO_HOST": "http://localhost:1234/v1", "EMBEDDING_MODEL": "nomic-embed-text",
+            **_source_defaults()}
 
 _FIELD_GROUPS = list(PROVIDER_FIELDS.values()) + list(SOURCE_FIELDS.values())
 SECRET_NAMES = {name for fields in _FIELD_GROUPS for name, _, kind in fields if kind == "secret"}
@@ -112,6 +130,11 @@ def validate(name, value, kind=None):
         return None if _MODEL_RE.match(value) else "Model names have no spaces and are at most 200 characters."
     if kind == "int":
         return None if value.isdigit() and 0 < int(value) <= 100000 else "Enter a whole number."
+    if kind == "percent":
+        return None if value.isdigit() and 0 < int(value) <= 100 else "Enter a percent from 1 to 100."
+    if kind == "schedule":
+        from news_fetcher.api_budget import parse_schedule
+        return None if parse_schedule(value) else "Each band needs a start hour (0-23) and minutes between polls (1-1440)."
     if kind == "secret":
         if len(value) > 500 or any(c.isspace() for c in value):
             return "That doesn't look like an API key."
