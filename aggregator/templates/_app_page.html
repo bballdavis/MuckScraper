@@ -6,6 +6,7 @@
 <head>
 {% block head %}{% endblock %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app_page.css') }}">
+{% block styles %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
 {% block topbar %}{% endblock %}

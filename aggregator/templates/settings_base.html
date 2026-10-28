@@ -14,7 +14,7 @@
 {% from 'icons.html' import icon %}
 {% block section %}Settings{% endblock %}
 {% block nav %}settings{% endblock %}
-{% block head %}<title>{% block title %}Settings{% endblock %}</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">{% endblock %}
+{% block head %}<script src="{{ url_for('static', filename='js/theme_toggle.js') }}"></script><title>{% block title %}Settings{% endblock %}</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">{% endblock %}
 {% block topbar %}{% from 'account_menu.html' import account_menu with context %}{% from 'icons.html' import theme_toggle %}{% call feed_topbar() %}<span class="topbar-title">MuckScraper / Settings</span><div class="header-controls">{{ theme_toggle() }}{{ account_menu() }}</div>{% endcall %}{% endblock %}
 {% block body_class %}app-page settings-page{% endblock %}
 {% block body %}

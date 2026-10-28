@@ -53,13 +53,13 @@
 .app-page .btn-icon { width: 26px; height: 26px; padding: 0; border: 0; background: var(--btn-muted-bg); color: var(--text-muted); }
 .app-page .btn-icon:hover { background: var(--border); color: var(--text); }
 
-.app-page .page-body input[type="text"], .app-page .page-body input[type="email"], .app-page .page-body input[type="password"],
-.app-page .page-body input[type="number"], .app-page .page-body input[type="date"], .app-page .page-body input[type="time"],
-.app-page .page-body input[type="url"], .app-page .page-body input[type="search"], .app-page .page-body select, .app-page .page-body textarea {
+.app-page input[type="text"], .app-page input[type="email"], .app-page input[type="password"],
+.app-page input[type="number"], .app-page input[type="date"], .app-page input[type="time"],
+.app-page input[type="url"], .app-page input[type="search"], .app-page select, .app-page textarea {
     font: inherit; font-size: 14px; color: var(--text); background: var(--bg);
     border: 1px solid var(--input-border, var(--border)); border-radius: 3px; padding: 5px 8px;
 }
-.app-page .page-body input:focus-visible, .app-page .page-body select:focus-visible, .app-page .page-body textarea:focus-visible {
+.app-page input:focus-visible, .app-page select:focus-visible, .app-page textarea:focus-visible {
     outline: 2px solid var(--accent-text); outline-offset: 1px;
 }
 
@@ -189,3 +189,6 @@
 
 .settings-link[hidden], .settings-group[hidden] { display: none; }
 .settings-main { min-width: 0; }
+
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (max-width: 800px) { .settings-nav .settings-find { display: block; flex: 0 0 180px; } }
