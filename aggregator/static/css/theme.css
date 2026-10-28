@@ -226,3 +226,6 @@
 
 
 :root { --settings-on-accent: #ffffff; }
+
+:root { --settings-accent-soft: #ededf5; --settings-status-ok: #2f9e5b; --settings-status-warn: #d29a1e; --settings-status-bad: #c94a4a; }
+[data-theme="dark"] { --settings-accent-soft: #303047; }

@@ -68,12 +68,12 @@
 .chip-safe { background: var(--risk-safe-bg); color: var(--risk-safe-text); }
 .chip-broad { background: var(--risk-broad-bg); color: var(--risk-broad-text); }
 .chip-danger { background: var(--risk-danger-bg); color: var(--risk-danger-text); }
-.chip-new { background: var(--accent-soft, rgba(76, 76, 143, 0.12)); color: var(--accent-text); letter-spacing: 0.6px; }
+.chip-new { background: var(--settings-accent-soft); color: var(--accent-text); letter-spacing: 0.6px; }
 
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #8c8c8c; flex: 0 0 auto; }
-.dot.ok { background: #2f9e5b; }
-.dot.warn { background: #d29a1e; }
-.dot.bad { background: #c94a4a; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--bias-3-bg); flex: 0 0 auto; }
+.dot.ok { background: var(--settings-status-ok); }
+.dot.warn { background: var(--settings-status-warn); }
+.dot.bad { background: var(--settings-status-bad); }
 .dot.off { background: var(--border); }
 
 /* A row of options where one is chosen (radio inputs underneath). */
@@ -81,10 +81,10 @@
 .seg label { position: relative; }
 .seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
 .seg span { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 3px; font-size: 13px; font-weight: 600; color: var(--text-muted); }
-.seg input:checked + span { background: var(--surface); color: var(--accent-text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.seg input:checked + span { background: var(--surface); color: var(--accent-text); box-shadow: var(--shadow); }
 .seg input:focus-visible + span { outline: 2px solid var(--accent-text); outline-offset: 1px; }
 .seg button { height: 26px; padding: 0 10px; border: 0; border-radius: 3px; background: transparent; font: inherit; font-size: 12px; font-weight: 700; color: var(--text-muted); cursor: pointer; }
-.seg button[aria-pressed="true"] { background: var(--surface); color: var(--accent-text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--accent-text); box-shadow: var(--shadow); }
 
 /* An on/off switch (a checkbox underneath). */
 .switch { position: relative; display: inline-flex; flex: 0 0 auto; }
@@ -132,7 +132,7 @@
     font-size: 14px; font-weight: 500; color: var(--text); text-decoration: none;
 }
 .settings-link:hover { background: var(--btn-muted-bg); }
-.settings-link[aria-current="page"] { background: var(--accent-soft, rgba(76, 76, 143, 0.12)); color: var(--accent-text); font-weight: 700; }
+.settings-link[aria-current="page"] { background: var(--settings-accent-soft); color: var(--accent-text); font-weight: 700; }
 .settings-link .count { font-size: 12px; color: var(--text-muted); font-weight: 500; }
 .settings-link[hidden] { display: none; }
 .settings-main { flex: 1 1 auto; min-width: 0; padding: 20px 28px 48px; }
