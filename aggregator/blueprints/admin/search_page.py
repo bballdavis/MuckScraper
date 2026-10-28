@@ -12,14 +12,14 @@ straight from SQL.
 import logging
 from datetime import datetime, timedelta
 
-from flask import render_template, request, url_for
+from flask import jsonify, render_template, request, url_for
 from aggregator.permissions import ROLE_READER, role_required
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import aliased
 
 from aggregator import db
 from aggregator.article_signals import bias_bucket_for_score
-from aggregator.display_time import local_day_end_utc, local_day_start_utc
+from aggregator.display_time import local_day_end_utc, local_day_start_utc, local_datetime
 from aggregator.models import Article, Outlet, Story, Topic, story_topics
 from aggregator.search import SearchUnavailableError, search_article_ids, search_story_ids
 
@@ -407,3 +407,65 @@ def search_page():
         time_ranges=[("24h", "24 hours"), ("7d", "7 days"), ("30d", "30 days"), ("all", "All time"), ("custom", "Custom")],
         active_nav="search",
     )
+
+
+# Live search, extracted from dev; uses the existing search backend interface.
+SUGGEST_MIN_CHARS = 2
+SUGGEST_STORIES = 5
+SUGGEST_ARTICLES = 4
+
+
+@admin.route("/search/suggest")
+@role_required(ROLE_READER)
+def search_suggest():
+    """The best few stories and articles for `q` in the feed's time window, as
+    JSON. Same matching as the Search page (the configured search backend, or
+    the SQL match if that fails), relevance first."""
+    text_query = request.args.get("q", "").strip()
+    if len(text_query) < SUGGEST_MIN_CHARS:
+        return jsonify({"q": text_query, "stories": [], "articles": [], "story_total": 0})
+    window = _resolve_window(request.args)
+
+    story_ids = article_ids = None
+    try:
+        story_ids = search_story_ids(text_query, limit=SEARCH_CANDIDATE_LIMIT, since=window["since"], until=window["until"])
+        article_ids = search_article_ids(text_query, limit=SEARCH_CANDIDATE_LIMIT, since=window["since"], until=window["until"])
+    except SearchUnavailableError as exc:
+        logger.warning("Full-text search failed for search suggestions, using SQL match: %s", exc)
+        story_ids = article_ids = None
+
+    story_sort = RELEVANCE if story_ids is not None else "updated"
+    article_sort = RELEVANCE if article_ids is not None else "date"
+    story_rows, story_page = _story_rows(story_ids, window, story_sort, True, 1, text_query, per_page=SUGGEST_STORIES)
+    article_rows, _ = _article_rows(article_ids, window, article_sort, True, 1, text_query, per_page=SUGGEST_ARTICLES)
+
+    stories = [{
+        "title": row["headline"],
+        "url": url_for("public.view_story", story_id=row["id"]),
+        "articles": row["articles"],
+        "sources": row["sources"],
+        "left": row["left"],
+        "center": row["center"],
+        "right": row["right"],
+        "date": local_datetime(row["updated"]),
+    } for row in story_rows]
+    articles = [{
+        "title": row["title"],
+        "url": url_for("public.view_article", article_id=row["id"]),
+        "outlet": row["outlet_name"],
+        "lean": BIAS_CHIPS[bias_bucket_for_score(row["bias"])][1],
+        "lean_class": row["bias_chip"][2],
+        "date": local_datetime(row["date"]),
+    } for row in article_rows]
+
+    args = {"q": text_query, "range": window["range"]}
+    if window["range"] == "custom":
+        args.update(start=window["start"], end=window["end"])
+    all_url = url_for("admin.search_page", **args)
+    return jsonify({
+        "q": text_query,
+        "stories": stories,
+        "articles": articles,
+        "story_total": story_page.total,
+        "all_url": all_url,
+    })
