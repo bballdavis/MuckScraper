@@ -4,6 +4,17 @@ All notable changes to MuckScraper are documented here.
  
 ---
 
+## Unreleased
+
+### Changed
+- **Search now uses PostgreSQL** instead of Meilisearch. The upgrade adds stored
+  search vectors and indexes to stories and articles. Adding the stored columns
+  rewrites and locks those tables; schedule the upgrade between fetches and
+  allow time for it to finish. Duration depends on data size and hardware.
+  Remove the Meilisearch service, dependencies and `MEILI_*` variables from any
+  custom Compose overrides and `.env`. After confirming the upgrade, remove the
+  old Meilisearch container and, if no longer needed, its `meili_data` directory.
+
 ## [Unreleased]
 
 ### Changed
