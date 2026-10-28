@@ -112,6 +112,49 @@ BETTING_TITLE_PATTERNS = (
     re.compile(r"\bfaab\b", re.IGNORECASE),
 )
 
+# Prediction-market and gambling filler (Philip, 2026-10-28): "Kalshi odds"
+# and "Polymarket traders say" pieces that restate a market's prices as news,
+# sportsbook and casino affiliate promos, and sweepstakes-casino roundups.
+# These reached the Breaking bar and headline-only stories. Same rule as the
+# tipster patterns above: phrases, never a bare brand, so reporting *about*
+# the companies ("Kalshi sues Nevada regulators", "CFTC approves Polymarket's
+# return") still passes. Not yet checked against the stored corpus; the
+# Blocklist page can add a bare "kalshi" title block if this is too narrow.
+PREDICTION_MARKETS = r"(?:kalshi|polymarket|prizepicks|predictit)"
+SPORTSBOOKS = (r"(?:draftkings|fanduel|betmgm|bet365|caesars sportsbook|fanatics sportsbook"
+               r"|espn bet|hard rock bet|underdog fantasy|betrivers|bally bet)")
+GAMBLING_TITLE_PATTERNS = (
+    # "Kalshi odds for the Fed", "Polymarket traders give Trump 60%",
+    # "Kalshi predicts...", "Kalshi market shows..."
+    re.compile(
+        rf"\b{PREDICTION_MARKETS}(?:['\u2019]s)?\s+(?:odds|traders?|bettors?|users?|predicts?|predictions?"
+        r"|forecasts?|markets?\s+(?:says?|shows?|gives?|puts?|sees?|predicts?))\b",
+        re.IGNORECASE,
+    ),
+    # "...odds on Kalshi", "...according to Polymarket", "bettors on Kalshi"
+    re.compile(
+        rf"\b(?:odds|bettors|traders|bets|chances?)\s+(?:on|from|at|via|per)\s+{PREDICTION_MARKETS}\b"
+        rf"|\baccording to {PREDICTION_MARKETS}\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bprediction markets?\s+(?:odds|bettors|traders|says?|shows?|gives?|puts?|predicts?|favou?rs?)\b",
+               re.IGNORECASE),
+    # Affiliate promos that skip the words "promo code": "DraftKings promo:
+    # bet $5, get $200", "Kalshi referral bonus".
+    re.compile(rf"\b(?:{PREDICTION_MARKETS}|{SPORTSBOOKS})\s+(?:promo(?:tion)?s?|bonus|referral|offer|sign[- ]?up)\b",
+               re.IGNORECASE),
+    re.compile(r"\breferral code\b", re.IGNORECASE),
+    re.compile(r"\bsign[- ]?up bonus\b", re.IGNORECASE),
+    # Casino affiliate pages. "Online casino" alone is news phrasing
+    # (legalization bills), so only the shopping forms are here.
+    re.compile(r"\bsweepstakes casinos?\b", re.IGNORECASE),
+    re.compile(r"\b(?:best|top)\s+(?:\d+\s+)?(?:online |real[- ]money |crypto |bitcoin |new )?"
+               r"(?:casinos|sportsbooks|betting (?:sites|apps))\b", re.IGNORECASE),
+    re.compile(r"\bno[- ]deposit bonus\b", re.IGNORECASE),
+    re.compile(r"\bfree spins\b", re.IGNORECASE),
+    re.compile(r"\b(?:casino|sportsbook) (?:bonus|promos?|review)\b", re.IGNORECASE),
+)
+
 # Syndicated personal-advice columns. Not news, but they arrive through ordinary
 # outlet feeds and have reached published editions (2026-08-09 morning, rank 18,
 # a Dear Abby about a houseguest's hygiene).
@@ -307,9 +350,11 @@ def bias_bucket_for_score(score):
 
 
 def is_betting_article(title=None):
-    """Sports-betting tipster content (odds/picks/parlays), which is not news."""
+    """Sports-betting tipster content (odds/picks/parlays) and prediction-market
+    or gambling filler, which is not news."""
     normalized_title = (title or "").strip()
-    return any(pattern.search(normalized_title) for pattern in BETTING_TITLE_PATTERNS)
+    return any(pattern.search(normalized_title)
+               for pattern in BETTING_TITLE_PATTERNS + GAMBLING_TITLE_PATTERNS)
 
 
 def is_advice_column(title=None):

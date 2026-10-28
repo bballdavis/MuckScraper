@@ -28,6 +28,9 @@ ORIGIN_AUTO = "auto"
 
 CAUGHT_DAYS = 7
 
+BLOCK_KIND_SOURCE = "source"
+BLOCK_KIND_TITLE = "title_keyword"
+
 
 def record_block_hits(hits, today=None):
     """Add {block id: articles stopped} to today's counts. Doesn't commit."""
@@ -119,3 +122,43 @@ def blocklist_rows(now=None):
         })
     rows.sort(key=lambda r: (r["effect"] != EFFECT_NO_SCRAPE, not r["active"], -r["caught"], r["pattern"]))
     return rows
+
+
+class IngestionBlocks:
+    """The active ingestion blocks for one batch, counting which rule
+    stopped each article so the Blocklist page can say what every rule
+    caught (blocklist_rows()). Ingestion and the Breaking poller
+    (news_fetcher/breaking_feed.py) both use it. Patterns are lowercased
+    once here, as in get_ingestion_blocks()."""
+
+    def __init__(self):
+        self.sources, self.title_keywords = [], []
+        for row in IngestionBlock.query.filter_by(is_active=True).all():
+            pattern = (row.pattern or "").strip().lower()
+            if not pattern:
+                continue
+            if row.kind == BLOCK_KIND_SOURCE:
+                self.sources.append((pattern, row.id))
+            elif row.kind == BLOCK_KIND_TITLE:
+                self.title_keywords.append((pattern, row.id))
+        self.hits = {}
+
+    def _match(self, rules, text, count):
+        text = (text or "").lower()
+        for pattern, block_id in rules:
+            if pattern in text:
+                if count:
+                    self.hits[block_id] = self.hits.get(block_id, 0) + 1
+                return True
+        return False
+
+    def blocks_url(self, url, count=True):
+        return self._match(self.sources, url, count)
+
+    def blocks_title(self, title, count=True):
+        return self._match(self.title_keywords, title, count)
+
+    def save_hits(self):
+        """Add this batch's hits to today's counts. Doesn't commit."""
+        record_block_hits(self.hits)
+        self.hits = {}

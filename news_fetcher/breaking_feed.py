@@ -9,11 +9,15 @@ on shared title words, like the story grouper's quick check), or when a
 feed marks it ("BREAKING:", "LIVE:", "Developing", "Live updates"), and it
 doesn't match a story we already had before it was published. Each event
 shows once, as the entry that reported it first.
+
+Headlines the pipeline would refuse (ingestion blocks, betting and gambling,
+promos, opinion, roundups; see is_junk()) are neither stored nor counted.
 """
 import logging
 import os
 import re
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 from aggregator import breaking, feed_health
 from aggregator.models import FeedEntry, RssFeed, Story, db
@@ -31,6 +35,29 @@ _MARKER = re.compile(r"^\s*(breaking(\s+news)?|live|developing|just in)\b\s*[:|\
 
 # feed URL -> (etag, modified), for conditional GETs. Per process.
 _validators = {}
+
+
+# low_value_article_reason() results Breaking keeps: live blogs and video
+# pages of a news event are what it is looking for, even though the pipeline
+# skips them as articles. LOW_VALUE_URL_PREFIXES (shopping, stock tips) are
+# still dropped; they share the "low_value_url" reason.
+_KEPT_REASONS = {"low_value_title", "low_value_url", "video_asset"}
+
+
+def is_junk(title, url, blocks):
+    """Whether Breaking should ignore a headline: it matches an active
+    ingestion block (Settings › Blocklist) or is content the pipeline refuses
+    as news. `blocks` is an IngestionBlocks; hits aren't counted here, since
+    ingestion counts them when it reads the same feed."""
+    from aggregator.article_signals import LOW_VALUE_URL_PREFIXES, low_value_article_reason
+    if blocks.blocks_url(url, count=False) or blocks.blocks_title(title, count=False):
+        return True
+    reason = low_value_article_reason(title, url)
+    if reason == "low_value_url":
+        parsed = urlparse(url or "")
+        host_path = parsed.netloc.lower().removeprefix("www.") + parsed.path.lower()
+        return any(host_path.startswith(prefix) for prefix in LOW_VALUE_URL_PREFIXES)
+    return bool(reason) and reason not in _KEPT_REASONS
 
 
 def is_marked(title):
@@ -89,7 +116,16 @@ def mark_breaking(now=None):
     Commits."""
     now = now or datetime.utcnow()
     since = now - breaking.WINDOW - CLUSTER_SPAN
-    entries = FeedEntry.query.filter(FeedEntry.published_at >= since).all()
+    from aggregator.blocklist import IngestionBlocks
+    blocks = IngestionBlocks()
+    entries = []
+    for e in FeedEntry.query.filter(FeedEntry.published_at >= since).all():
+        # Stored before a block was added, or before the filter existed.
+        if is_junk(e.title, e.url, blocks):
+            e.is_breaking = False
+            e.cluster_id = None
+            continue
+        entries.append(e)
     stories = (Story.query.with_entities(Story.title, Story.headline, Story.created_at)
                .filter(Story.created_at >= since - STORY_LOOKBACK).all())
     flagged = 0
@@ -114,6 +150,8 @@ def poll_feeds(now=None):
     Returns a small metrics dict."""
     from news_fetcher.rss_fetcher import read_feed_headlines
     now = now or datetime.utcnow()
+    from aggregator.blocklist import IngestionBlocks
+    blocks = IngestionBlocks()
     feeds = {}
     for row in RssFeed.query.filter_by(bucket="general", enabled=True).all():
         feeds.setdefault(row.url, row.fallback_url)
@@ -140,6 +178,7 @@ def poll_feeds(now=None):
         else:
             status = feed_health.STATUS_OK if articles else feed_health.STATUS_EMPTY
         feed_health.record_feed_read(url, status, items=len(articles))
+        articles = [a for a in articles if not is_junk(a.get("title"), a.get("url"), blocks)]
         metrics["new"] += breaking.store_headlines(articles, read_url, now)
     breaking.link_scraped(now)
     metrics["breaking"] = mark_breaking(now)
