@@ -1,4 +1,5 @@
 {% extends 'settings_base.html' %}
+{% block title %}Pipeline Schedule — MuckScraper{% endblock %}
 {% block settings_key %}schedule{% endblock %}
 {% set shared_sidebar = false %}
 {% from 'icons.html' import theme_toggle %}
@@ -13,7 +14,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192.png') }}">
     <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512.png') }}">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='favicon_180.png') }}">
-    <title>Pipeline Schedule — MuckScraper</title>
+    
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }

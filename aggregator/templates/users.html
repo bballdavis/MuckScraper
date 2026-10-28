@@ -1,10 +1,11 @@
 {% extends 'settings_base.html' %}
+{% block title %}Users — MuckScraper{% endblock %}
 {% block settings_key %}users{% endblock %}
 {% set shared_sidebar = false %}
 
 
 {% block head %}{{ super() }}
-    <title>Users — MuckScraper</title>
+    
 {% include '_account_page_head.html' %}
 {% endblock %}
 {% block topbar %}{% include '_account_topbar.html' %}{% endblock %}
