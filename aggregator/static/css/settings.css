@@ -192,3 +192,8 @@
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 800px) { .settings-nav .settings-find { display: block; flex: 0 0 180px; } }
+
+.settings-main { width: 100%; max-width: 100%; box-sizing: border-box; }
+.settings-content .card { overflow-x: auto; }
+.settings-content .add-form { flex-wrap: wrap; }
+.settings-content input, .settings-content select { max-width: 100%; }
