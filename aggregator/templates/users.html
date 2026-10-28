@@ -1,13 +1,14 @@
-{% extends '_app_page.html' %}
+{% extends 'settings_base.html' %}
+{% block settings_key %}users{% endblock %}
 {% set shared_sidebar = false %}
 
 
-{% block head %}
+{% block head %}{{ super() }}
     <title>Users — MuckScraper</title>
 {% include '_account_page_head.html' %}
 {% endblock %}
 {% block topbar %}{% include '_account_topbar.html' %}{% endblock %}
-{% block body %}
+{% block settings_body %}
 
 
 <div class="container wide">

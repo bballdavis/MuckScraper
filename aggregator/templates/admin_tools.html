@@ -1,10 +1,11 @@
-{% extends '_app_page.html' %}
+{% extends 'settings_base.html' %}
+{% block settings_key %}overview{% endblock %}
 {% set shared_sidebar = false %}
 {% from 'icons.html' import theme_toggle %}
 {% from 'account_menu.html' import account_menu with context %}
 
 {% from 'breadcrumb.html' import back_link %}
-{% block head %}
+{% block head %}{{ super() }}
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -350,7 +351,7 @@
         {{ account_menu() }}
     </div>
 {% endcall %}{% endblock %}
-{% block body %}
+{% block settings_body %}
 {% macro bulk_task_status_box(action) %}
 <div class="status-box" id="bulk-status-box-{{ action }}">
     <div class="status-line">
