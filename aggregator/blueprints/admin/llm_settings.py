@@ -151,7 +151,7 @@ def _provider_rows(states):
 @role_required(ROLE_ADMIN)
 def llm_providers_page():
     from news_fetcher import llm_client as llm
-    from news_fetcher.fetch_and_store_articles import AUTO_ARTICLE_DEEP_ANALYSIS_SETTING_KEY
+    AUTO_ARTICLE_DEEP_ANALYSIS_SETTING_KEY = "auto_article_deep_analysis_enabled"
 
     tiers = {
         "quality": {

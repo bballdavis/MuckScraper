@@ -55,3 +55,24 @@ def test_non_admin_cannot_write_settings(app, path):
     user = SimpleNamespace(is_authenticated=True, has_role=lambda minimum: False)
     with patch('aggregator.permissions.current_user', user):
         assert app.test_client().post(path).status_code == 403
+
+
+def test_admin_settings_pages_render_without_exposing_saved_keys(app):
+    from aggregator import db, config_store
+    from aggregator.models import User, AppSetting, Topic, RssFeed, PromptTemplate, ScheduledFetch
+    for model in (User, AppSetting, Topic, RssFeed, PromptTemplate, ScheduledFetch):
+        model.__table__.create(db.engine)
+    user = User(username='sample-admin', email='admin@example.com', role='admin')
+    user.set_password('password123')
+    db.session.add(user)
+    config_store.save('GEMINI_API_KEY', 'private-browser-fixture-key', 'sample-admin')
+    db.session.commit()
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session['_user_id'] = str(user.id)
+        session['_fresh'] = True
+    for path in ('/admin/settings/llm', '/admin/settings/source-keys', '/admin/topics'):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert 'private-browser-fixture-key' not in response.text
+        assert response.text.count('<title>') == 1
