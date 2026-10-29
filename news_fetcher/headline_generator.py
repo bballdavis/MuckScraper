@@ -11,7 +11,7 @@ from langfuse.decorators import observe, langfuse_context
 
 from news_fetcher import llm_client
 from news_fetcher.prompt_registry import render_prompt
-from news_fetcher.quality_checks import fix_acronym_casing, fix_current_officeholder_titles
+from news_fetcher.quality_checks import fix_acronym_casing, fix_current_officeholder_titles, unsupported_numbers
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,16 @@ HEADLINE_TIER = llm_client.TIER_QUALITY
 # accumulating articles, short enough that the pass does not walk the whole
 # ~10k-story table every run.
 STALE_HEADLINE_LOOKBACK_DAYS = 7
+
+# Short headlines (the iOS small widget): only headlines longer than
+# SHORT_HEADLINE_TRIGGER get one, written to SHORT_HEADLINE_MAX characters. A
+# rewrite more than SHORT_HEADLINE_SLACK over the target is rejected rather
+# than trimmed, since cutting a sentence mid-thought reads worse than the
+# widget's own truncation. SHORT_HEADLINE_BATCH caps one run's extra calls.
+SHORT_HEADLINE_TRIGGER = 55
+SHORT_HEADLINE_MAX = 50
+SHORT_HEADLINE_SLACK = 6
+SHORT_HEADLINE_BATCH = 60
 
 langfuse = Langfuse(
     public_key=os.environ.get("LANGFUSE_PUBLIC_KEY", ""),
@@ -180,6 +190,84 @@ def generate_story_headline(story):
 
     logger.warning(f"Headline too long or empty: '{headline}'")
     return None
+
+
+def shorten_headline(headline):
+    """A shorter rewrite of `headline`, or None when it is already short or the
+    model's answer can't be trusted (failure text, too long, or a number that
+    is not in the original)."""
+    headline = (headline or "").strip()
+    if len(headline) <= SHORT_HEADLINE_TRIGGER:
+        return None
+    if not llm_client.is_configured(HEADLINE_TIER):
+        return None
+
+    prompt = render_prompt("headline_short", headline=headline, max_chars=SHORT_HEADLINE_MAX)
+    if prompt is None:
+        logger.error("No prompt template found for 'headline_short'")
+        return None
+
+    short = llm_client.generate_text(prompt, timeout=90, tier=HEADLINE_TIER)
+    if short is None:
+        return None
+    short = _strip_wrapping_quotes(short).rstrip(".").strip()
+
+    if _looks_like_llm_failure(short):
+        logger.warning(f"Rejected non-headline short output for '{headline}': '{short}'")
+        return None
+    if len(short) > SHORT_HEADLINE_MAX + SHORT_HEADLINE_SLACK or len(short) >= len(headline):
+        logger.info(f"Short headline not short enough ({len(short)} chars): '{short}'")
+        return None
+    if unsupported_numbers(short, [headline], skip_years=False):
+        logger.warning(f"Short headline invents a number: '{headline}' -> '{short}'")
+        return None
+    return fix_acronym_casing(short)
+
+
+def generate_short_headlines(lookback_days=STALE_HEADLINE_LOOKBACK_DAYS, limit=SHORT_HEADLINE_BATCH):
+    """Write a short headline for recent stories whose display headline is long
+    and has none yet (or one written from an earlier headline).
+
+    Runs right after the headline pass so the quality model is already loaded.
+    A story whose rewrite is rejected is stamped with the headline anyway and
+    an empty short_headline, so it is not retried every run until the headline
+    changes.
+    """
+    from aggregator import db
+    from aggregator.models import Article, Story
+
+    cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+    newest = (
+        db.session.query(Article.story_id.label("story_id"), db.func.max(Article.fetched_at).label("at"))
+        .filter(Article.story_id.isnot(None))
+        .group_by(Article.story_id)
+        .subquery()
+    )
+    candidates = [
+        story for story in db.session.query(Story)
+        .join(newest, newest.c.story_id == Story.id)
+        .filter(newest.c.at >= cutoff)
+        .order_by(newest.c.at.desc())
+        .all()
+        if len(story.display_headline or "") > SHORT_HEADLINE_TRIGGER
+        and story.short_headline_source != story.display_headline
+    ][:limit]
+    if not candidates:
+        return {"status": "ok", "candidates": 0, "generated": 0, "failed": 0}
+
+    generated = failed = 0
+    for story in candidates:
+        source = story.display_headline
+        short = shorten_headline(source)
+        story.short_headline = short
+        story.short_headline_source = source
+        if short:
+            generated += 1
+        else:
+            failed += 1
+    db.session.commit()
+    logger.info(f"[Headlines] Short headlines: {generated} written, {failed} left long.")
+    return {"status": "ok", "candidates": len(candidates), "generated": generated, "failed": failed}
 
 
 def _stale_headline_query(lookback_days=None):

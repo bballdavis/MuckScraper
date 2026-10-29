@@ -75,6 +75,9 @@ SCHEMAS = {
         ["id", "section", "headline", "dek", "image_url", "logo_url", "coverage", "source_count", "updated_at",
          "is_summarized", "has_analysis", "has_ai_headline", "has_updates", "breaking"],
         id=_I, section=_S, headline=_S, dek=_NS, image_url=_URL, image_focus=_FOCUS, logo_url=_LOGO, coverage=_ref("Coverage"),
+        short_headline={"type": ["string", "null"], "description": "The headline rewritten to roughly 55 "
+                        "characters or fewer, for tight spots (the iOS small widget). Null when the headline "
+                        "is already short or no rewrite exists: show headline then"},
         source_name={"type": ["string", "null"], "description": "Outlet named on the image fallback: the one "
                      "whose logo_url it is, else the newest. With no logo, draw the name alone as a masthead"},
         source_count=_I, updated_at=_DT, is_summarized=_B, has_analysis=_B, has_ai_headline=_B, has_updates=_B,

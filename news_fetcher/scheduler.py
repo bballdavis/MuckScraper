@@ -8,7 +8,7 @@ from aggregator.workers import Workers
 from aggregator.article_signals import bias_bucket_for_score, is_independent_source
 from aggregator.models import AppSetting, PipelineSchedule
 from news_fetcher.fetch_and_store_articles import cleanup_old_payloads, ingest_payloads, poll_news_apis_if_due, scheduled_fetches, review_ambiguous_grouping_matches, sync_allsides_ratings, publish_edition, retry_unrated_outlets, clear_stale_single_article_headlines
-from news_fetcher.headline_generator import generate_headlines_for_stale_stories
+from news_fetcher.headline_generator import generate_headlines_for_stale_stories, generate_short_headlines
 from news_fetcher.copy_detector import mark_recent_copies
 from news_fetcher.opinion_linker import link_opinion_and_write_roundups
 from news_fetcher.outlet_logos import refresh_card_images
@@ -1117,6 +1117,13 @@ def stage_enrich(run):
         logging.error(f"Error generating headlines: {e}")
         run_metrics["status"] = "partial_error"
         run_metrics["steps"]["headline_generation"] = {"status": "error", "reason": str(e)}
+
+    try:
+        run_metrics["steps"]["short_headlines"] = generate_short_headlines()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error generating short headlines: {e}")
+        run_metrics["steps"]["short_headlines"] = {"status": "error", "reason": str(e)}
 
     # Single ranking pass for the whole run, positioned after all
     # enrichment so publish_edition() below sees a fully fresh,

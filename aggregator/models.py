@@ -140,6 +140,12 @@ class Story(db.Model):
     # stale headline (story gained an article since) from a current one. NULL
     # on every pre-existing row, which the pass treats as stale.
     headline_generated_at = db.Column(db.DateTime, nullable=True)
+    # A shorter rewrite of the display headline for tight spots (the iOS small
+    # widget), written by news_fetcher/headline_generator.py only for long
+    # headlines. short_headline_source records the headline it was written
+    # from, so a rewritten or replaced headline retires it (short_headline_text).
+    short_headline = db.Column(db.String(160), nullable=True)
+    short_headline_source = db.Column(db.Text, nullable=True)
     # A short reader-facing paragraph on what the Op/Ed columns linked to this
     # story argue (news_fetcher/opinion_linker.py). NULL until the story has
     # at least two linked columns; regenerated when a new one is linked.
@@ -200,6 +206,14 @@ class Story(db.Model):
     @property
     def display_headline(self):
         return self.headline if self.has_ai_headline else self.title
+
+    @property
+    def short_headline_text(self):
+        """The short headline, or None when there isn't one or it was written
+        from an earlier headline."""
+        if self.short_headline and self.short_headline_source == self.display_headline:
+            return self.short_headline
+        return None
 
     @property
     def lead_image_url(self):
