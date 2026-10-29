@@ -983,6 +983,19 @@ COLUMN:
 {column}
 """
 
+PROMPT_HEADLINE_SHORT = """You are a wire service editor shortening a headline so it fits a small phone widget.
+
+Rewrite the headline below in at most {max_chars} characters, keeping its meaning.
+
+Rules:
+- Keep names, places and numbers exactly as written. Do not add any fact, number or name that is not in the headline.
+- Drop filler words and secondary detail first; keep who did what.
+- One line, no quotation marks, no trailing period, no label or commentary.
+- Output only the headline.
+
+HEADLINE: {headline}
+"""
+
 SEED_PROMPTS = [
     ('story_summary', "Story executive summary (shown as the story's short summary)", PROMPT_STORY_SUMMARY),
     ('deep_report.politics', 'Deep report — political stories (left/center/right breakdown)', PROMPT_DEEP_REPORT_POLITICS),
@@ -1003,6 +1016,7 @@ SEED_PROMPTS = [
     ('opinion_link_check', 'Is this Op/Ed column about this news story? YES/NO, fast model. Used to link Op/Ed pieces to stories.', PROMPT_OPINION_LINK_CHECK),
     ('opinion_roundup', "The story page's opinion roundup: marks each linked column ON/OFF topic with a one-phrase position, then one paragraph.", PROMPT_OPINION_ROUNDUP),
     ('opinion_stance', "One-phrase position for an Op/Ed column linked to a story, for columns the roundup didn't describe. Shown on the edition's Opinion page.", PROMPT_OPINION_STANCE),
+    ('headline_short', "A shorter rewrite of a long headline for tight spots such as the iOS widget. Names and numbers kept exactly.", PROMPT_HEADLINE_SHORT),
 ]
 
 # --- END GENERATED DATA -----------------------------------------------------

@@ -149,6 +149,7 @@ def story_summary(story, edition_story=None):
         "id": story.id,
         "section": _section(story),
         "headline": story.display_headline,
+        "short_headline": story.short_headline_text,
         "dek": _dek(story.summary),
         "image_url": image_url,
         "image_focus": _story_focus(story, image_url),
