@@ -49,6 +49,42 @@ class DetectionTests(unittest.TestCase):
         self.assertEqual(quake[0].id, 0)
 
 
+class JunkFilterTests(unittest.TestCase):
+    """Breaking drops what ingestion would refuse (Philip, 2026-10-28)."""
+
+    def _blocks(self, titles=(), urls=()):
+        return SimpleNamespace(blocks_title=lambda t, count=True: any(p in (t or "").lower() for p in titles),
+                               blocks_url=lambda u, count=True: any(p in (u or "").lower() for p in urls))
+
+    def test_gambling_and_prediction_market_filler(self):
+        from aggregator.article_signals import is_betting_article
+        for title in ("Kalshi odds: Who will win the 2028 nomination", "Polymarket traders give Fed cut 80% chance",
+                      "Trump approval odds on Kalshi hit new low", "Shutdown to last 3 weeks, according to Polymarket",
+                      "Prediction markets favor Mamdani", "DraftKings promo: Bet $5, get $200",
+                      "Best sweepstakes casinos for October", "Top 10 online casinos", "FanDuel sign-up offer"):
+            self.assertTrue(is_betting_article(title), title)
+        for title in ("Kalshi sues Nevada regulators", "CFTC approves Polymarket return to US",
+                      "Kalshi raises $1 billion at $11 billion valuation", "State senate passes online casino bill",
+                      "Prediction markets face new scrutiny from regulators", "DraftKings stock falls after earnings",
+                      "Top casino executive resigns", "Odds of a recession rise"):
+            self.assertFalse(is_betting_article(title), title)
+
+    def test_is_junk(self):
+        from news_fetcher.breaking_feed import is_junk
+        blocks = self._blocks(titles=("nintendo",), urls=("spam.example",))
+        for title, url in (("Kalshi odds show Fed cut likely", "https://a.example/kalshi"),
+                           ("Nintendo unveils new console", "https://a.example/n"),
+                           ("Storm nears coast", "https://spam.example/storm"),
+                           ("Opinion: The storm we ignored", "https://a.example/s"),
+                           ("Best deals today", "https://www.cnn.com/cnn-underscored/deals")):
+            self.assertTrue(is_junk(title, url, blocks), title)
+        # Live blogs and videos of an event are what Breaking looks for.
+        for title, url in (("Earthquake live updates: aftershocks hit Tokyo", "https://a.example/live/quake"),
+                           ("Watch: Plane lands on the Hudson", "https://a.example/video/plane"),
+                           ("BREAKING: Plane lands on river", "https://a.example/plane")):
+            self.assertFalse(is_junk(title, url, blocks), title)
+
+
 @unittest.skipUnless(TEST_DB, "set API_TEST_DATABASE_URL to run the Breaking News end-to-end tests")
 class BreakingEndToEndTests(unittest.TestCase):
     @classmethod
@@ -124,6 +160,29 @@ class BreakingEndToEndTests(unittest.TestCase):
         self.assertEqual(quake.outlet_count, 3)
         # Outside the window, nothing is breaking.
         self.assertEqual(breaking.bar_entries(now=now + breaking.WINDOW + timedelta(minutes=31)), [])
+
+    def test_poller_skips_junk_already_stored(self):
+        from aggregator import breaking, db
+        from aggregator.models import IngestionBlock
+        from news_fetcher.breaking_feed import mark_breaking
+        now = datetime.utcnow()
+        db.session.execute(db.text("DELETE FROM ingestion_blocks"))
+        db.session.add(IngestionBlock(kind="title_keyword", pattern="starlink", is_active=True))
+        db.session.commit()
+        minutes = lambda m: now - timedelta(minutes=m)  # noqa: E731
+        breaking.store_headlines([
+            {"title": "BREAKING: Kalshi odds put Fed cut at 90%", "url": "https://a.example/kalshi",
+             "source_name": "A", "published_at": minutes(10)},
+            {"title": "Live: Starlink launch lights up the sky", "url": "https://b.example/starlink",
+             "source_name": "B", "published_at": minutes(8)},
+            {"title": "BREAKING: Plane lands safely on the Hudson river", "url": "https://c.example/plane",
+             "source_name": "C", "published_at": minutes(5)},
+        ], "https://feeds.example/rss", now)
+        self.assertEqual(mark_breaking(now), 1)
+        self.assertEqual([e.title for e in breaking.bar_entries(now=now)],
+                         ["BREAKING: Plane lands safely on the Hudson river"])
+        db.session.execute(db.text("DELETE FROM ingestion_blocks"))
+        db.session.commit()
 
     def test_story_from_a_breaking_event_carries_the_chip(self):
         from aggregator import breaking, db

@@ -17,6 +17,7 @@ from aggregator.article_signals import (
     bias_bucket_for_score, is_media_oped, is_off_section_oped, is_roundup_article,
     low_value_article_reason,
 )
+from aggregator.blocklist import BLOCK_KIND_SOURCE, BLOCK_KIND_TITLE, IngestionBlocks
 from aggregator.html_safety import strip_title_tags
 from aggregator.models import Article, OpinionPiece, Outlet, Story, Topic, IngestionBlock
 from aggregator.outlet_origins import is_international, lean_abroad_for, origin_for
@@ -32,10 +33,6 @@ from news_fetcher.workpool import map_in_app
 from .outlets import normalize_source_name, source_name_from_url
 
 logger = logging.getLogger(__name__)
-
-
-BLOCK_KIND_SOURCE = "source"
-BLOCK_KIND_TITLE = "title_keyword"
 
 
 def get_ingestion_blocks():
@@ -59,46 +56,6 @@ def get_ingestion_blocks():
         elif row.kind == BLOCK_KIND_TITLE:
             title_keywords.append(pattern)
     return sources, title_keywords
-
-
-class IngestionBlocks:
-    """The active ingestion blocks for one batch, counting which rule
-    stopped each article so the Blocklist page can say what every rule
-    caught (aggregator/blocklist.py). Patterns are lowercased once here, as
-    in get_ingestion_blocks()."""
-
-    def __init__(self):
-        self.sources, self.title_keywords = [], []
-        for row in IngestionBlock.query.filter_by(is_active=True).all():
-            pattern = (row.pattern or "").strip().lower()
-            if not pattern:
-                continue
-            if row.kind == BLOCK_KIND_SOURCE:
-                self.sources.append((pattern, row.id))
-            elif row.kind == BLOCK_KIND_TITLE:
-                self.title_keywords.append((pattern, row.id))
-        self.hits = {}
-
-    def _match(self, rules, text, count):
-        text = (text or "").lower()
-        for pattern, block_id in rules:
-            if pattern in text:
-                if count:
-                    self.hits[block_id] = self.hits.get(block_id, 0) + 1
-                return True
-        return False
-
-    def blocks_url(self, url, count=True):
-        return self._match(self.sources, url, count)
-
-    def blocks_title(self, title, count=True):
-        return self._match(self.title_keywords, title, count)
-
-    def save_hits(self):
-        """Add this batch's hits to today's counts. Doesn't commit."""
-        from aggregator.blocklist import record_block_hits
-        record_block_hits(self.hits)
-        self.hits = {}
 
 
 GROUPING_LOOKBACK_DAYS = int(os.getenv("MUCKSCRAPER_GROUPING_LOOKBACK_DAYS", "7"))
