@@ -12,7 +12,9 @@ from flask import g, jsonify, request
 from sqlalchemy.orm import joinedload
 
 from aggregator import db, newsbox
+from aggregator.blocklist import IngestionBlocks
 from aggregator.models import NewsBoxItem, Story
+from news_fetcher.breaking_feed import is_junk
 
 from . import api, serializers as ser
 from .auth import require_token
@@ -25,6 +27,14 @@ from .routes import DEFAULT_PAGE_SIZE, _page, _story_load
 def _item_query():
     return NewsBoxItem.query.filter_by(user_id=g.user.id).options(
         joinedload(NewsBoxItem.story).options(*_story_load()), joinedload(NewsBoxItem.feed_entry))
+
+
+def _junk_headline(item, blocks):
+    """A Breaking headline with no story yet that the poller would now refuse
+    (ingestion blocks, gambling, promos; breaking_feed.is_junk). Saved before
+    that filter existed, so NewsBox hides it; the row stays until removed."""
+    return item.story_id is None and item.feed_entry is not None and is_junk(
+        item.feed_entry.title, item.feed_entry.url, blocks)
 
 
 def _flag(value):
@@ -73,8 +83,14 @@ def get_newsbox():
     if args["unread"] is not None:
         query = query.filter(NewsBoxItem.is_unread.is_(args["unread"]))
     rows = query.order_by(NewsBoxItem.added_at.desc(), NewsBoxItem.id.desc()).offset(offset).limit(limit + 1).all()
+    blocks = IngestionBlocks()
+    page = _page(rows, offset, limit)
+    page["items"] = [ser.newsbox_item(i) for i in page["items"] if not _junk_headline(i, blocks)]
     unread = NewsBoxItem.query.filter_by(user_id=g.user.id, is_unread=True).count()
-    return jsonify({**_page([ser.newsbox_item(i) for i in rows], offset, limit), "unread_count": unread})
+    unread_headlines = (NewsBoxItem.query.filter_by(user_id=g.user.id, is_unread=True, story_id=None)
+                        .options(joinedload(NewsBoxItem.feed_entry)).all())
+    unread -= sum(1 for i in unread_headlines if _junk_headline(i, blocks))
+    return jsonify({**page, "unread_count": unread})
 
 
 @api.route("/me/newsbox/<int:story_id>", methods=["PATCH"])
@@ -92,6 +108,19 @@ def update_newsbox_item(story_id):
 @require_token()
 def remove_newsbox_item(story_id):
     item = _own_item(story_id)
+    db.session.delete(item)
+    db.session.commit()
+    return "", 204
+
+
+@api.route("/me/newsbox/items/<int:item_id>", methods=["DELETE"])
+@require_token()
+def remove_newsbox_entry(item_id):
+    """Take out one NewsBox item by its id. A Breaking headline with no story
+    yet has no story id to name, so the app removes it this way."""
+    item = _item_query().filter_by(id=item_id).first()
+    if item is None:
+        raise ApiError(404, "not_found", "That item isn't in your NewsBox.")
     db.session.delete(item)
     db.session.commit()
     return "", 204

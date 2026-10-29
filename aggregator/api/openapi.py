@@ -345,6 +345,11 @@ PATHS = {
         "delete": {"operationId": "removeNewsBoxItem", "parameters": [_path_id("story_id")],
                    "responses": {"204": {"description": "Removed"}, **_ERRORS, **_NOT_FOUND}},
     },
+    "/me/newsbox/items/{item_id}": {"delete": {"operationId": "removeNewsBoxEntry", "parameters": [_path_id("item_id")],
+                                               "description": "Removes an item by its id, including a Breaking "
+                                                              "headline that has no story yet.",
+                                               "responses": {"204": {"description": "Removed"}, **_ERRORS,
+                                                             **_NOT_FOUND}}},
     "/me/newsbox/read": {"post": {"operationId": "markNewsBoxRead",
                                   "responses": {"200": _json(_obj(["updated"], updated=_I)), **_ERRORS}}},
     "/me/read": _get("readItems", _json(_page(_ref("ReadItem"))),
