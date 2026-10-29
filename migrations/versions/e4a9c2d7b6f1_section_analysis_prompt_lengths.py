@@ -7,7 +7,7 @@ Only prompts that were never edited are replaced: an edited prompt keeps its
 text and can still reset to the new default.
 
 Revision ID: e4a9c2d7b6f1
-Revises: d9f2b6a4c1e8
+Revises: e1a7c3d9b5f2
 Create Date: 2026-10-29
 """
 from alembic import op
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 
 revision = 'e4a9c2d7b6f1'
-down_revision = 'd9f2b6a4c1e8'
+down_revision = 'e1a7c3d9b5f2'
 branch_labels = None
 depends_on = None
 
