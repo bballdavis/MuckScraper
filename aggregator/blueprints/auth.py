@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
-from aggregator import appearance_prefs, db, feed_prefs, reading_prefs
+from aggregator import appearance_prefs, db, feed_prefs, reading_prefs, source_priority
 from aggregator.accounts import email_error, password_error
 from aggregator.models import User
 
@@ -81,7 +81,7 @@ def profile():
     # Email and password belong to the identity provider during an OIDC
     # session; feed, appearance and reading preferences stay local.
     if (request.method == "POST" and oidc_managed
-            and request.form.get("action") not in ("feed_defaults", "appearance", "reading")):
+            and request.form.get("action") not in ("feed_defaults", "appearance", "reading", "source_boost")):
         abort(403)
     if request.method == "POST":
         action = request.form.get("action")
@@ -98,6 +98,10 @@ def profile():
         if action == "reading":
             reading_prefs.save(current_user, request.form.to_dict())
             flash("Reading settings saved.", "success")
+            return redirect(url_for("auth.profile"))
+        if action == "source_boost":
+            source_priority.set_boost(current_user.id, request.form.get("name", ""),
+                                      request.form.get("boosted") == "1")
             return redirect(url_for("auth.profile"))
         if not current_user.check_password(request.form.get("current_password", "")):
             flash("Your current password was not correct.", "error")
@@ -132,6 +136,8 @@ def profile():
         analysis_layouts=appearance_prefs.ANALYSIS_LAYOUTS,
         reading=reading_prefs.load(current_user),
         auto_read_delays=reading_prefs.AUTO_READ_DELAYS,
+        boosted=source_priority.effective_names(current_user.id),
+        outlet_suggestions=source_priority.outlet_suggestions(),
     )
 
 

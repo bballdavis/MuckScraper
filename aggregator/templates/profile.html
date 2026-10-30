@@ -143,6 +143,42 @@
                 </div>
                 <noscript><div class="panel-foot"><button type="submit" class="btn">Save</button></div></noscript>
             </form>
+
+            {#- Boosted sources (Philip, 2026-10-30): stories from these outlets show in
+                Trending even when no other outlet has picked them up, and come first in
+                Latest and the Swipe deck (aggregator/source_priority.py). Each row is its
+                own form, since a remove button needs its own name. -#}
+            <section class="panel boost-sources">
+                <div class="panel-head">
+                    <div>
+                        <h2>Boosted sources</h2>
+                        <p>Stories from these outlets show in Trending even when no other outlet has picked them up, and come first in Latest and Swipe.</p>
+                    </div>
+                </div>
+                <form class="row" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="source_boost">
+                    <input type="hidden" name="boosted" value="1">
+                    <span><span class="row-label">Boost an outlet</span></span>
+                    <span class="boost-add">
+                        <input type="text" name="name" list="boost-outlets" placeholder="The Texas Tribune" required>
+                        <button type="submit" class="btn">Boost</button>
+                    </span>
+                </form>
+                <datalist id="boost-outlets">{% for name in outlet_suggestions %}<option value="{{ name }}">{% endfor %}</datalist>
+                {%- for name in boosted %}
+                <form class="row" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="source_boost">
+                    <input type="hidden" name="boosted" value="0">
+                    <input type="hidden" name="name" value="{{ name }}">
+                    <span><span class="row-label">{{ name }}</span></span>
+                    <span><button type="submit" class="btn btn-quiet">Stop boosting</button></span>
+                </form>
+                {%- else %}
+                <div class="row"><span class="row-sub">No outlets boosted yet.</span></div>
+                {%- endfor %}
+            </section>
         </div>
 
         <form class="panel profile-defaults" method="POST">

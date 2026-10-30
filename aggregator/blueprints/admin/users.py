@@ -8,7 +8,7 @@ an action that would leave no active admin is refused.
 from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
-from aggregator import appearance_prefs, db, feed_prefs, oidc_settings, reading_prefs
+from aggregator import appearance_prefs, db, feed_prefs, oidc_settings, reading_prefs, source_priority
 from aggregator.accounts import email_error, other_active_admins, password_error, username_error
 from aggregator.models import ROLE_ADMIN, ROLES, User
 from aggregator.permissions import role_required
@@ -102,6 +102,7 @@ def delete_user(user_id):
     feed_prefs.forget(user.id)
     appearance_prefs.forget(user.id)
     reading_prefs.forget(user.id)
+    source_priority.forget(user.id)
     db.session.delete(user)
     db.session.commit()
     flash(f"Deleted {user.username}.", "success")

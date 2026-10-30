@@ -74,7 +74,7 @@ def _deck(user_id):
     # articles, so a busy week can't push multi-source stories past the limit
     # behind a pile of new one-article ones.
     now = datetime.utcnow()
-    windowed = source_priority.boosted_story_ids(since=now - DECK_WINDOW)
+    windowed = source_priority.boosted_story_ids(since=now - DECK_WINDOW, user_id=user_id)
     priority_first = case((Story.id.in_(list(windowed)), 0), else_=1) if windowed else literal(1)
     newest = db.func.max(Article.date)
     rows = (Story.query.join(Article, Article.story_id == Story.id)
@@ -90,7 +90,7 @@ def _deck(user_id):
             out.append((story, "more"))
             excluded.add(story.id)
     # A stable sort keeps rank and recency order within each tie.
-    priority = source_priority.boosted_story_ids([story.id for story, _ in out])
+    priority = source_priority.boosted_story_ids([story.id for story, _ in out], user_id=user_id)
     out.sort(key=lambda entry: _deck_order(entry[0], entry[1], entry[0].id in priority))
     return out
 

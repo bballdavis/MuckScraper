@@ -282,6 +282,17 @@ PATHS = {
                     "type": "object", "properties": SCHEMAS["Preferences"]["properties"], "additionalProperties": False}}}},
                 "responses": {"200": _json(_ref("Preferences")), **_ERRORS}},
     },
+    "/me/boosted-sources": {
+        **_get("getBoostedSources", _json(_obj(["boosted"], boosted={"type": "array", "items": _S,
+                                              "description": "Outlets this reader boosts"}))),
+        "put": {"operationId": "putBoostedSource",
+                "requestBody": {"required": True, "content": {"application/json": {"schema": {
+                    "type": "object", "required": ["name", "boosted"],
+                    "properties": {"name": {"type": "string", "description": "Outlet name, as on its stories"},
+                                   "boosted": {"type": "boolean"}},
+                    "additionalProperties": False}}}},
+                "responses": {"200": _json(_obj(["boosted"], boosted={"type": "array", "items": _S})), **_ERRORS}},
+    },
     "/topics": _get("topics", _json(_obj(["items"], items={"type": "array", "items": _ref("Topic")}))),
     "/editions": _get("editions", _json(_page(_ref("EditionBrief"))), [_CURSOR, _LIMIT]),
     "/editions/latest": _get("latestEdition", _json(_ref("Edition")), extra=_NOT_FOUND),

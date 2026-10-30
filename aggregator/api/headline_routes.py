@@ -53,7 +53,7 @@ def headlines():
         topic_id = topic.id
 
     now = datetime.utcnow()
-    built = headline_views.build(now=now, topic_id=topic_id)
+    built = headline_views.build(now=now, topic_id=topic_id, user_id=g.user.id)
     shown = {key: [e for e in entries if e.story_id not in read_ids] for key, entries in built.items()}
     stories = headline_views.load_stories(shown[view][offset:offset + limit + 1])
     return jsonify({

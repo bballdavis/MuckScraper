@@ -149,5 +149,66 @@ class PriorityEndToEndTests(unittest.TestCase):
         self.assertIn(tribune.id, ids)
 
 
+    def test_each_reader_boosts_their_own_outlets(self):
+        from aggregator import source_priority
+        from aggregator.headline_views import build
+        source_priority.save([])
+        npr = self._story("Science desk story", ["NPR"])
+        source_priority.set_boost(1, "npr", True)
+        self.assertEqual({e.story_id for e in build(user_id=1)["trending"]}, {npr.id})
+        self.assertEqual({e.story_id for e in build(user_id=2)["trending"]}, set())
+        self.assertEqual({e.story_id for e in build()["trending"]}, set())
+
+    def test_a_reader_can_drop_an_admin_default_without_touching_others(self):
+        from aggregator import source_priority
+        from aggregator.headline_views import build
+        tribune = self._story("Texas water board votes", ["The Texas Tribune"])
+        self.assertEqual(source_priority.set_boost(1, "The Texas Tribune", False), [])
+        self.assertEqual({e.story_id for e in build(user_id=1)["trending"]}, set())
+        self.assertEqual({e.story_id for e in build(user_id=2)["trending"]}, {tribune.id})
+        # Boosting it again drops the removal rather than adding a duplicate.
+        self.assertEqual(source_priority.set_boost(1, "the texas tribune", True), ["The Texas Tribune"])
+        self.assertEqual(source_priority.user_changes(1), {"add": [], "remove": []})
+
+    def test_latest_puts_a_readers_boosted_stories_first(self):
+        from aggregator import source_priority
+        from aggregator.headline_views import build
+        source_priority.save([])
+        older = self._story("Older local story", ["Fox News"], hours_old=5)
+        newer = self._story("Newer wire story", ["Reuters"], hours_old=1)
+        self.assertEqual([e.story_id for e in build()["latest"]], [newer.id, older.id])
+        source_priority.set_boost(1, "Fox News", True)
+        self.assertEqual([e.story_id for e in build(user_id=1)["latest"]], [older.id, newer.id])
+        self.assertEqual([e.story_id for e in build(user_id=2)["latest"]], [newer.id, older.id])
+
+    def test_forget_drops_a_deleted_readers_changes(self):
+        from aggregator import db, source_priority
+        source_priority.set_boost(7, "NPR", True)
+        source_priority.forget(7)
+        db.session.commit()
+        self.assertEqual(source_priority.user_changes(7), {"add": [], "remove": []})
+
+
+    def test_profile_page_boosts_and_stops_boosting(self):
+        from aggregator import db, source_priority
+        from aggregator.models import User
+        user = User(username="reader", email="reader@example.com", role="reader")
+        user.set_password("password123")
+        db.session.add(user)
+        db.session.commit()
+        source_priority.save([])
+        client = self.app.test_client()
+        with client.session_transaction() as session:
+            session["_user_id"] = str(user.id)
+        self.app.config.update(WTF_CSRF_ENABLED=False)
+        page = client.get("/auth/profile")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b"Boosted sources", page.data)
+        client.post("/auth/profile", data={"action": "source_boost", "name": "NPR", "boosted": "1"})
+        self.assertEqual(source_priority.effective_names(user.id), ["NPR"])
+        client.post("/auth/profile", data={"action": "source_boost", "name": "NPR", "boosted": "0"})
+        self.assertEqual(source_priority.effective_names(user.id), [])
+
+
 if __name__ == "__main__":
     unittest.main()

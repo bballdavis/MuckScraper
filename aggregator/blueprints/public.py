@@ -63,7 +63,7 @@ def headlines_feed():
     read_story_ids = reads.read_ids(current_user.id, "story") if current_user.is_authenticated else set()
 
     now = datetime.utcnow()
-    built = headline_views.build(now=now)
+    built = headline_views.build(now=now, user_id=current_user.id if current_user.is_authenticated else None)
     entries = [e for e in built[view] if e.story_id not in read_story_ids]
     hidden_read = len(built[view]) - len(entries)
     total_stories = len(entries)

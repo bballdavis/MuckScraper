@@ -10,7 +10,7 @@ from flask import g, jsonify, request
 from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload, selectinload
 
-from aggregator import article_jobs, article_lean, db, feed_prefs, headline_views, reads, skips
+from aggregator import article_jobs, article_lean, db, feed_prefs, headline_views, reads, skips, source_priority
 from aggregator.models import Article, Edition, EditionStory, OpinionPiece, Story, Topic
 from aggregator.opinion import published_edition_opinion_cards
 from aggregator.search import SearchUnavailableError, search_article_ids, search_story_ids
@@ -128,6 +128,35 @@ def put_preferences():
     prefs.update({k: v for k, v in body.items() if v is not None})
     feed_prefs.save(g.user, prefs)
     return jsonify(_preferences(feed_prefs.load(g.user)))
+
+
+@api.route("/me/boosted-sources")
+@require_token()
+def get_boosted_sources():
+    """The outlets this reader boosts (aggregator/source_priority.py): their
+    stories show in Trending alone, and first in Latest and the Swipe deck."""
+    return jsonify({"boosted": source_priority.effective_names(g.user.id)})
+
+
+@api.route("/me/boosted-sources", methods=["PUT"])
+@require_token()
+def put_boosted_source():
+    """Boost (or stop boosting) one outlet for this reader: {"name", "boosted"}."""
+    def outlet(value):
+        if not isinstance(value, str) or not value.strip():
+            raise bad("Must be an outlet name.")
+        return value.strip()[:120]
+
+    def flag(value):
+        if not isinstance(value, bool):
+            raise bad("Must be true or false.")
+        return value
+
+    body = json_body(name=outlet, boosted=flag)
+    if body["name"] is None or body["boosted"] is None:
+        raise bad("Send name and boosted.")
+    names = source_priority.set_boost(g.user.id, body["name"], body["boosted"])
+    return jsonify({"boosted": names})
 
 
 @api.route("/topics")

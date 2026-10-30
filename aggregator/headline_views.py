@@ -4,10 +4,11 @@ edition, which still drives automatic summaries and stays under Past editions.
 
 - Trending: 3+ outlets with an article in the last 24 hours, ranked by
   story_rank's headline score (outlets, both-sides bonus, recent outlets,
-  12-hour half-life). A story from a priority outlet (aggregator/
-  source_priority.py) qualifies with one outlet and gets PRIORITY_BONUS.
+  12-hour half-life). A story from an outlet the reader boosts
+  (aggregator/source_priority.py) qualifies with one outlet and gets
+  PRIORITY_BONUS.
 - Latest: every story with an article in the last 24 hours, single-source
-  included, newest article first.
+  included, boosted outlets' stories first, then newest article first.
 - Controversial: 2+ left- and 2+ right-leaning outlets in the last 48 hours,
   ranked by how differently the two sides write it up (the distance between
   the mean embeddings of their articles, the framing gap) plus linked op-eds,
@@ -132,10 +133,11 @@ def controversy_score(row, gap, opeds, now):
     return base * 0.5 ** (age_hours / CONTROVERSY_HALF_LIFE_HOURS)
 
 
-def build(now=None, hidden_ids=frozenset(), topic_id=None):
+def build(now=None, hidden_ids=frozenset(), topic_id=None, user_id=None):
     """{view: [Entry]} for all three views, in display order, leaving out
     `hidden_ids` (stories the reader marked read). With topic_id, only that
-    section's stories."""
+    section's stories. user_id picks whose boosted outlets count (None: the
+    admin's list)."""
     now = now or datetime.utcnow()
     rows = [r for r in _signal_rows(active_since=now - timedelta(hours=CONTROVERSIAL_WINDOW_HOURS), now=now)
             if r.story_id not in hidden_ids]
@@ -145,7 +147,7 @@ def build(now=None, hidden_ids=frozenset(), topic_id=None):
     day = now - timedelta(hours=WINDOW_HOURS)
     recent = [r for r in rows if r.newest and r.newest >= day]
 
-    priority = boosted_story_ids([r.story_id for r in recent])
+    priority = boosted_story_ids([r.story_id for r in recent], user_id=user_id)
     trending = []
     for r in recent:
         boosted = r.story_id in priority
@@ -155,7 +157,7 @@ def build(now=None, hidden_ids=frozenset(), topic_id=None):
     trending.sort(key=lambda e: e.score, reverse=True)
 
     latest = [Entry(r.story_id, r, None, None, None) for r in recent]
-    latest.sort(key=lambda e: e.signals.newest, reverse=True)
+    latest.sort(key=lambda e: (e.story_id in priority, e.signals.newest), reverse=True)
 
     both = [r for r in rows if r.left >= CONTROVERSIAL_MIN_PER_SIDE and r.right >= CONTROVERSIAL_MIN_PER_SIDE]
     ids = [r.story_id for r in both]

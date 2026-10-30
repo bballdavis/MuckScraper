@@ -98,7 +98,7 @@
 <section class="panel src-priority">
     <div class="panel-head">
         <h2>Priority outlets</h2>
-        <span class="muted">Their stories show in Trending even when no other outlet has picked them up, and come first in the Swipe deck.</span>
+        <span class="muted">The default for everyone. Stories from these outlets show in Trending even when no other outlet has picked them up, and come first in Latest and the Swipe deck. Readers can add or drop outlets on their profile.</span>
     </div>
     <form method="POST" action="{{ url_for('admin.save_priority_sources') }}" class="src-priority-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
