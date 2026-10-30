@@ -60,16 +60,30 @@
 }
 .sa-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sa-side); flex: 0 0 auto; opacity: 0.7; }
 
-.sa-callouts {
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px;
-    margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);
+/* Long sections stack full width, each with an icon tile and a rule in its
+   tone, as the coverage buckets have one in their side's colour. */
+.sa-longs { display: flex; flex-direction: column; gap: 18px; }
+.sa-longs:not(:first-child) { margin-top: 22px; }
+.sa-long, .sa-callout { --sa-tone: var(--accent-text); --sa-tone-tint: var(--sa-acc-tint); }
+.sa-long.sa-icon-scale, .sa-callout.sa-icon-scale { --sa-tone: var(--sa-contest); --sa-tone-tint: var(--sa-contest-tint); }
+.sa-long.sa-icon-eye-off, .sa-callout.sa-icon-eye-off { --sa-tone: var(--text-muted); --sa-tone-tint: var(--sa-c-tint); }
+.sa-long-head, .sa-callout-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.sa-long .sa-tile, .sa-callout .sa-tile {
+    width: 28px; height: 28px; border-radius: 8px; font-size: 15px;
+    background: var(--sa-tone-tint); color: var(--sa-tone);
 }
-.sa-callouts:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.sa-long h3, .sa-callout h3 { margin: 0; color: var(--sa-tone); }
+.sa-long-body { border-left: 3px solid var(--sa-tone); padding-left: 16px; margin-left: 13px; }
+.sa-long-body p { font-size: 16px; line-height: 1.65; }
+
+.sa-callouts {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;
+    margin-top: 24px;
+}
+.sa-callouts:first-child { margin-top: 0; }
 .sa-callout.is-wide { grid-column: 1 / -1; }
-.sa-callout { display: flex; gap: 12px; }
-.sa-callout .sa-ico { font-size: 18px; margin-top: 1px; color: var(--accent-text); }
-.sa-callout.sa-icon-scale .sa-ico, .sa-callout.sa-icon-scale h3 { color: var(--sa-contest); }
-.sa-callout.sa-icon-eye-off .sa-ico, .sa-callout.sa-icon-eye-off h3 { color: var(--text-muted); }
+.sa-callout { border-radius: 12px; background: var(--sa-tone-tint); padding: 14px 16px; }
+.sa-callout p { font-size: 15px; }
 
 .sa-cards .sa-next {
     display: flex; align-items: baseline; gap: 12px;

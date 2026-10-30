@@ -537,15 +537,16 @@ How the center is covering it: [Only describe center coverage if center sources 
 
 How the right is covering it: [Only describe right-leaning coverage if right-leaning sources are listed above. If no right-leaning sources are listed, write exactly: "No right-leaning sources were found in the current coverage."]
 
-What's contested: [Where the different sides disagree most sharply, what facts or framings are in dispute]
+What's contested: [One or two sentences on where the different sides disagree most sharply, what facts or framings are in dispute]
 
-What's missing: [What angles or perspectives seem absent from the coverage, what questions aren't being asked]
+What's missing: [One or two sentences on what angles or perspectives seem absent from the coverage, what questions aren't being asked]
 
 What's next: [One sentence on what to watch for]
 
 Rules:
 - Use EXACTLY the labels shown above including the colon
 - Be specific about framing differences, not just topic differences
+- Keep the three coverage sections to 2-4 sentences each, and the other sections after them to one or two sentences
 - Do not infer, invent, or speculate about how a missing source bucket would cover the story
 - If a source bucket has no listed articles, use the exact "No ... sources were found" sentence for that section
 - Stay neutral and analytical in your own voice
@@ -568,15 +569,16 @@ What the research shows: [Key findings, data points, or technical details from t
 
 Real world impact: [How this affects people, industries, or society in practical terms]
 
-What experts are saying: [Notable quotes or expert opinions from the coverage. If none available, say "Expert commentary not available in current coverage."]
+What experts are saying: [One or two sentences of notable quotes or expert opinions from the coverage. If none available, say "Expert commentary not available in current coverage."]
 
-What's still unknown: [Open questions, limitations of the research, or what needs further study]
+What's still unknown: [One or two sentences on open questions, limitations of the research, or what needs further study]
 
 What's next: [One sentence on upcoming developments or what to watch for]
 
 Rules:
 - Use EXACTLY the labels shown above including the colon
 - Focus on accuracy and significance over drama
+- Keep the sections from "Why it matters" to "Real world impact" to 2-4 sentences each, and the sections after them to one or two sentences
 - Stay neutral and factual
 - No markdown, no extra formatting
 - Do not add any text before or after the structure above"""
@@ -619,6 +621,7 @@ Rules:
 - Use EXACTLY the labels of the format you chose, including the colon
 - Do not say which format you chose
 - For OTHER, do not describe a game result, score, or performance unless the coverage reports one
+- Keep each section to 2-4 sentences, except "By the numbers", which is one or two sentences
 - Never invent scores, statistics, or results; use only figures that appear in the coverage
 - Focus on facts and context over opinion
 - No markdown, no extra formatting
@@ -639,17 +642,18 @@ Market impact: [How markets, stocks, or prices have reacted based on the coverag
 
 What companies or sectors are affected: [Key players, industries, or markets involved and how they are impacted]
 
-What analysts are saying: [Expert or analyst opinions from the coverage. If none available, say "Analyst commentary not available in current coverage."]
-
 The broader economic picture: [How this fits into wider economic trends, policy, or conditions]
 
-Risks and opportunities: [Key risks or opportunities this creates for investors, businesses, or consumers]
+What analysts are saying: [One or two sentences of expert or analyst opinions from the coverage. If none available, say "Analyst commentary not available in current coverage."]
+
+Risks and opportunities: [One or two sentences on the key risks or opportunities this creates for investors, businesses, or consumers]
 
 What's next: [One sentence on key dates, decisions, or developments to watch]
 
 Rules:
 - Use EXACTLY the labels shown above including the colon
 - Focus on market and economic significance
+- Keep the sections from "Market impact" to "The broader economic picture" to 2-4 sentences each, and the sections after them to one or two sentences
 - Stay neutral and factual
 - No markdown, no extra formatting
 - Do not add any text before or after the structure above"""
@@ -670,12 +674,13 @@ Key details: [The most important facts, figures, or developments from the covera
 
 Different perspectives: [How different outlets or sources are framing this story. If coverage is uniform, say what angle is being emphasized.]
 
-What's missing: [What angles or questions seem absent from the coverage]
+What's missing: [One or two sentences on what angles or questions seem absent from the coverage]
 
 What's next: [One sentence on what to watch for]
 
 Rules:
 - Use EXACTLY the labels shown above including the colon
+- Keep the sections from "Why it matters" to "Different perspectives" to 2-4 sentences each, and "What's missing" to one or two sentences
 - Stay neutral and analytical
 - Compare only the outlets and perspectives actually present in the article list
 - Do not use left/right political framing unless the story is explicitly about politics, government, law, elections, or policy

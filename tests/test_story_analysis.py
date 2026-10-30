@@ -55,6 +55,26 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(a["buckets"], [])
         self.assertEqual([s["icon"] for s in a["others"]], ["zap", "message-square"])
 
+    def test_long_sections_stack_and_short_ones_pair(self):
+        long_text = "Stocks rose after the decision. " * 12
+        report = (
+            "The story: Rates held.\n"
+            "What analysts are saying: Split on timing.\n"
+            f"Market impact: {long_text}\n"
+            "What companies or sectors are affected: Homebuilders led, exporters lagged.\n"
+            f"The broader economic picture: {long_text}\n"
+            "Risks and opportunities: Faster cuts would squeeze bank margins.\n"
+            "What's next: The December meeting."
+        )
+        a = story_analysis.layout(report)
+        # The 38-character label is its own section, not part of Market impact.
+        self.assertEqual([s["label"] for s in a["longs"]], ["Market impact", "The broader economic picture"])
+        self.assertEqual([s["label"] for s in a["shorts"]],
+                         ["What analysts are saying", "What companies or sectors are affected",
+                          "Risks and opportunities"])
+        self.assertEqual([s["icon"] for s in a["shorts"]], ["message-square", "building-2", "circle-alert"])
+        self.assertEqual(a["next"]["label"], "What's next")
+
     def test_unlabelled_text_still_renders(self):
         a = story_analysis.layout("Just one plain paragraph, no labels at all.")
         self.assertEqual(len(a["sections"]), 1)
@@ -72,6 +92,7 @@ class ApiSectionsTests(unittest.TestCase):
         self.assertEqual([s["kind"] for s in sections],
                          ["lead", "left", "center", "right", "other", "other", "next"])
         self.assertEqual(sections[1], {"label": "How the left is covering it", "kind": "left",
+                                       "size": "short",
                                        "paragraphs": ["The Guardian leads with the bystander video."],
                                        "empty": False})
         self.assertTrue(sections[3]["empty"])

@@ -8,15 +8,22 @@ on their profile), so the text is parsed once here instead of in Jinja.
 Each section gets a `kind`, which decides where it goes and how it looks:
 "lead" (the first section), "left" / "center" / "right" (the politics
 prompt's coverage buckets), "next" (What's next) or "other", plus an icon
-name from icons.html. Text that doesn't follow the format still renders:
+name from icons.html. Every "other" section also has a `size`: "long" ones
+stack full width and "short" ones sit side by side below them, so each
+section type reads the same way (Philip, 2026-10-29). Text that doesn't follow the format still renders:
 a line with no label continues the section before it, or starts an
 unlabelled one.
 """
 import re
 
-# The same cutoff the template used: a colon further in than this is part of
-# a sentence, not a label.
-MAX_LABEL = 35
+# A colon further in than this is part of a sentence, not a label. Business's
+# "What companies or sectors are affected" is 38 characters, so it was folded
+# into the section above it at the old cutoff of 35.
+MAX_LABEL = 45
+
+# An "other" section with more text than this is long: it stacks full width.
+# The prompts ask for one or two sentences in the short ones.
+LONG_CHARS = 300
 
 _BUCKETS = (
     ("left", re.compile(r"\bthe left\b|\bleft[- ]leaning\b")),
@@ -39,14 +46,16 @@ _ICONS = (
     ("experts", "message-square"),
     ("analysts", "message-square"),
     ("numbers", "table"),
-    ("research shows", "list"),
+    ("research shows", "flask-conical"),
     ("key details", "list"),
     ("market", "gauge"),
+    ("companies", "building-2"),
+    ("sectors", "building-2"),
     ("risks", "circle-alert"),
     ("picture", "layers"),
     ("impact", "users"),
     ("involved", "users"),
-    ("performances", "zap"),
+    ("performances", "trophy"),
 )
 
 
@@ -100,6 +109,7 @@ def parse(text):
             "label": label,
             "paragraphs": paras,
             "kind": kind,
+            "size": "long" if len(" ".join(paras)) > LONG_CHARS else "short",
             "icon": "newspaper" if kind == "lead" else _icon_for(label or ""),
             "empty": kind in ("left", "center", "right") and bool(_EMPTY_BUCKET.match(paras[0])),
         })
@@ -114,6 +124,8 @@ def layout(text):
     buckets   the L/C/R sections that have coverage, left to right
     empty     the L/C/R sections whose bucket had no sources
     others    every other section but What's next, in order
+    longs     the long ones of those, stacked full width, in order
+    shorts    the short ones, side by side below them, in order
     next      the What's next section, if any
     """
     sections = parse(text)
@@ -129,5 +141,7 @@ def layout(text):
         "buckets": buckets,
         "empty": [s for s in lcr if s["empty"]],
         "others": others,
+        "longs": [s for s in others if s["size"] == "long"],
+        "shorts": [s for s in others if s["size"] == "short"],
         "next": nxt,
     }

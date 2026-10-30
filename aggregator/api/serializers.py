@@ -42,9 +42,11 @@ def _paragraphs(text):
 
 def analysis_sections(text):
     """The deep report split into its labelled sections, as the story page
-    lays them out: kind is lead, left, center, right, next or other, and
-    empty marks an L/C/R bucket that had no sources."""
-    return [{"label": s["label"], "kind": s["kind"], "paragraphs": s["paragraphs"], "empty": s["empty"]}
+    lays them out: kind is lead, left, center, right, next or other, empty
+    marks an L/C/R bucket that had no sources, and size is long (stacked
+    full width) or short (side by side below the long ones)."""
+    return [{"label": s["label"], "kind": s["kind"], "size": s["size"],
+             "paragraphs": s["paragraphs"], "empty": s["empty"]}
             for s in parse_analysis(text)]
 
 

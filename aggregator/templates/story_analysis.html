@@ -54,12 +54,26 @@
     {%- endfor %}
     {%- endif %}
 
-    {%- if a.others %}
+    {#- Long sections stack full width, each under its icon, like the
+        coverage buckets; the short ones pair up below on a tint (Philip,
+        2026-10-29). -#}
+    {%- if a.longs %}
+    <div class="sa-longs">
+        {%- for s in a.longs %}
+        <section class="sa-long sa-icon-{{ s.icon }}">
+            <div class="sa-long-head"><span class="sa-tile">{{ icon(s.icon) }}</span><h3>{{ s.label }}</h3></div>
+            <div class="sa-long-body">{{ _paras(s) }}</div>
+        </section>
+        {%- endfor %}
+    </div>
+    {%- endif %}
+
+    {%- if a.shorts %}
     <div class="sa-callouts">
-        {%- for s in a.others %}
+        {%- for s in a.shorts %}
         <section class="sa-callout sa-icon-{{ s.icon }}{% if loop.last and loop.length is odd %} is-wide{% endif %}">
-            <span class="sa-ico">{{ icon(s.icon) }}</span>
-            <div>{% if s.label %}<h3>{{ s.label }}</h3>{% endif %}{{ _paras(s) }}</div>
+            <div class="sa-callout-head"><span class="sa-tile">{{ icon(s.icon) }}</span><h3>{{ s.label }}</h3></div>
+            {{ _paras(s) }}
         </section>
         {%- endfor %}
     </div>
