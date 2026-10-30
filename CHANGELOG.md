@@ -7,6 +7,13 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **Priority outlets.** Settings › Sources has a Priority outlets list
+  (comma-separated outlet names, The Texas Tribune by default until it's
+  saved). A priority outlet's stories show in Trending even when no other
+  outlet has picked them up, with a score bonus, and come first in the
+  Swipe deck. The Texas Tribune's stories mostly reached one outlet, so
+  they never made Trending's three-outlet cut and sank in the deck
+  (`aggregator/source_priority.py`).
 - **NewsAPI live topics and story follow-ups.** NewsAPI's free plan returns
   search results a day late, so the default US Politics, Science & Health
   and World News fetches now use its live top headlines (US general, US

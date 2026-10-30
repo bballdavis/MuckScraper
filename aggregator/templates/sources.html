@@ -30,6 +30,9 @@
     .src-filters input[type="search"] { flex: 1 1 200px; min-width: 0; }
     .src-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 600; }
     .src-order { margin-left: auto; }
+    .src-priority-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; }
+    .src-priority-form label { display: flex; flex: 1 1 320px; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
+    .app-page .page-body .src-priority-form input { flex: 1; height: 30px; font-size: 13px; }
     .src-order label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
     .app-page .page-body .src-order select { height: 30px; font-size: 13px; }
     .src-url { font-size: 12px; color: var(--text-faint); overflow-wrap: anywhere; }
@@ -89,6 +92,21 @@
             <button type="button" class="btn btn-quiet" id="src-add-cancel">Cancel</button>
             <button type="submit" class="btn">{{ icon('plus') }} Add feed</button>
         </div>
+    </form>
+</section>
+
+<section class="panel src-priority">
+    <div class="panel-head">
+        <h2>Priority outlets</h2>
+        <span class="muted">Their stories show in Trending even when no other outlet has picked them up, and come first in the Swipe deck.</span>
+    </div>
+    <form method="POST" action="{{ url_for('admin.save_priority_sources') }}" class="src-priority-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label><span>Outlet names, separated by commas</span>
+            <input type="text" name="names" value="{{ priority_names|join(', ') }}" list="priority-outlets" placeholder="The Texas Tribune">
+        </label>
+        <datalist id="priority-outlets">{% for name in outlet_suggestions %}<option value="{{ name }}">{% endfor %}</datalist>
+        <button type="submit" class="btn">Save</button>
     </form>
 </section>
 

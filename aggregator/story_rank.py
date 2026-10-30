@@ -84,10 +84,11 @@ def _signal_rows(story_ids=None, created_since=None, active_since=None, now=None
     return query.all()
 
 
-def score_signals(row, now=None):
-    """The headline score for one _signal_rows() row."""
+def score_signals(row, now=None, boost=0.0):
+    """The headline score for one _signal_rows() row. `boost` is added before
+    the decay: a priority outlet's bonus (aggregator/source_priority.py)."""
     now = now or datetime.utcnow()
-    base = row.outlets or 0
+    base = (row.outlets or 0) + boost
     if row.left and row.right:
         base += BOTH_SIDES_BONUS
     base += MOMENTUM_WEIGHT * (row.recent or 0)

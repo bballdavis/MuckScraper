@@ -4,7 +4,8 @@ edition, which still drives automatic summaries and stays under Past editions.
 
 - Trending: 3+ outlets with an article in the last 24 hours, ranked by
   story_rank's headline score (outlets, both-sides bonus, recent outlets,
-  12-hour half-life).
+  12-hour half-life). A story from a priority outlet (aggregator/
+  source_priority.py) qualifies with one outlet and gets PRIORITY_BONUS.
 - Latest: every story with an article in the last 24 hours, single-source
   included, newest article first.
 - Controversial: 2+ left- and 2+ right-leaning outlets in the last 48 hours,
@@ -30,6 +31,7 @@ from aggregator.article_signals import bias_bucket_for_score
 from aggregator.models import Article, OpinionPiece, Story
 from aggregator.opinion import leaning
 from aggregator.sections import in_section
+from aggregator.source_priority import PRIORITY_BONUS, boosted_story_ids
 from aggregator.story_rank import _signal_rows, score_signals
 
 VIEWS = ("trending", "latest", "controversial")
@@ -143,8 +145,13 @@ def build(now=None, hidden_ids=frozenset(), topic_id=None):
     day = now - timedelta(hours=WINDOW_HOURS)
     recent = [r for r in rows if r.newest and r.newest >= day]
 
-    trending = [Entry(r.story_id, r, score_signals(r, now), None, None)
-                for r in recent if r.outlets >= TRENDING_MIN_OUTLETS]
+    priority = boosted_story_ids([r.story_id for r in recent])
+    trending = []
+    for r in recent:
+        boosted = r.story_id in priority
+        if r.outlets >= TRENDING_MIN_OUTLETS or boosted:
+            score = score_signals(r, now, PRIORITY_BONUS if boosted else 0.0)
+            trending.append(Entry(r.story_id, r, score, None, None))
     trending.sort(key=lambda e: e.score, reverse=True)
 
     latest = [Entry(r.story_id, r, None, None, None) for r in recent]

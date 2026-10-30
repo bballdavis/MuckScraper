@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from flask import abort, jsonify, redirect, render_template, request, url_for
 from sqlalchemy import func
 
-from aggregator import db, feed_order
+from aggregator import db, feed_order, source_priority
 from aggregator.blocklist import CAUGHT_DAYS, EFFECT_NO_SCRAPE, EFFECT_SKIP, blocklist_rows
 from aggregator.feed_health import health_note, health_of
 from aggregator.models import (
@@ -206,7 +206,15 @@ def rss_feeds_page():
         "sources.html", feeds=feeds, searches=searches, topics=_ordered_topics(),
         roles=ROLES, role_hints=ROLE_HINTS, health_counts=health_counts,
         scan_order=scan_order, scan_orders=feed_order.CHOICES,
+        priority_names=source_priority.names(), outlet_suggestions=source_priority.outlet_suggestions(),
     )
+
+
+@admin.route("/sources/priority", methods=["POST"])
+@role_required(ROLE_ADMIN)
+def save_priority_sources():
+    source_priority.save(request.form.get("names", ""))
+    return redirect(url_for("admin.rss_feeds_page"))
 
 
 @admin.route("/sources/order", methods=["POST"])
