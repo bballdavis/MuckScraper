@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func
 
-from aggregator import jobs, skips
+from aggregator import article_text, jobs, skips
 from aggregator.models import (Article, Edition, EditionStory, NewsBoxItem, Story, SummarySchedule, Topic, db)
 from aggregator.sections import in_section
 
@@ -68,6 +68,13 @@ _TIME = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 
 
 # Queueing ---------------------------------------------------------------
+
+# Why a summary failed when no article in the story has enough text: every
+# source is paywalled or headline-only (a lone WSJ article, a Reuters
+# headline before a carrier's copy arrives). It can be asked again later.
+NO_TEXT_MESSAGE = ("No article in this story has readable text yet (its sources are paywalled or "
+                   "headline-only), so there was nothing to summarize.")
+
 
 def can_analyze(story):
     """Whether the story has the two or more sources a multi-source analysis
@@ -271,6 +278,8 @@ def run_summary_job(payload):
             _set_step(story.id, "summary")
             summary = summarize_story(story)
             if not summary:
+                if not article_text.can_summarize(story):
+                    raise RuntimeError(NO_TEXT_MESSAGE)
                 raise RuntimeError("No summary was written.")
             story.summary = summary
             story.summary_generated_at = datetime.utcnow()  # even when the text came back the same
@@ -481,6 +490,11 @@ def pick_stories(user_id, settings, now=None):
             if settings["skip_already_summarized"] and _has(story, settings["depth"]):
                 continue
             if settings["minimum_sources"] and _source_count(story) < settings["minimum_sources"]:
+                continue
+            # No summary and no article text to write one from (every source
+            # paywalled or headline-only): it would only fail. By hand it can
+            # still be asked for.
+            if not (story.summary or "").strip() and not article_text.can_summarize(story):
                 continue
             picked.append(story)
             seen.add(story.id)
