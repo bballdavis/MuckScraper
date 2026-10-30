@@ -184,6 +184,35 @@ class BreakingEndToEndTests(unittest.TestCase):
         db.session.execute(db.text("DELETE FROM ingestion_blocks"))
         db.session.commit()
 
+    def test_junk_headline_saved_before_the_filter_is_hidden_and_removable(self):
+        from aggregator import db
+        from aggregator.models import FeedEntry, NewsBoxItem
+        now = datetime.utcnow()
+
+        def headline(title, url):
+            entry = FeedEntry(url=url, link=url, title=title, source_name="A", published_at=now)
+            db.session.add(entry)
+            db.session.flush()
+            item = NewsBoxItem(user_id=self.user_id, feed_entry_id=entry.id, origin="breaking", state="failed",
+                               error="The scrape was refused.")
+            db.session.add(item)
+            db.session.flush()
+            return item
+        promo = headline("BREAKING: Kalshi odds put Fed cut at 90%", "https://a.example/kalshi")
+        news = headline("City council approves new bike lanes downtown", "https://local.example/bikes")
+        db.session.commit()
+        auth = {"Authorization": f"Bearer {self._token()}"}
+
+        box = self.client.get("/api/v1/me/newsbox", headers=auth).get_json()
+        self.assertEqual([i["id"] for i in box["items"]], [news.id])
+        self.assertEqual(box["unread_count"], 1)
+
+        self.assertEqual(self.client.delete(f"/api/v1/me/newsbox/items/{promo.id}", headers=auth).status_code, 204)
+        self.assertEqual(self.client.delete(f"/api/v1/me/newsbox/items/{promo.id}", headers=auth).status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/v1/me/newsbox/items/{news.id}", headers=auth).status_code, 204)
+        box = self.client.get("/api/v1/me/newsbox", headers=auth).get_json()
+        self.assertEqual((box["items"], box["unread_count"]), ([], 0))
+
     def test_story_from_a_breaking_event_carries_the_chip(self):
         from aggregator import breaking, db
         from aggregator.api import serializers as ser
