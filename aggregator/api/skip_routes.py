@@ -6,9 +6,9 @@ the story page. /stories/{id} carries `is_skipped`.
 from datetime import datetime, timedelta
 
 from flask import g, jsonify
-from sqlalchemy import or_
+from sqlalchemy import case, literal, or_
 
-from aggregator import db, newsbox, skips
+from aggregator import db, newsbox, skips, source_priority
 from aggregator.models import Article, Edition, EditionStory, NewsBoxItem, Story
 from aggregator.outlet_reporting import HIGH, LEVELS, VERY_HIGH, reporting_for
 
@@ -39,18 +39,20 @@ def _outlets(story):
     return {a.outlet.name if a.outlet else a.source for a in story.site_articles}
 
 
-def _deck_order(story, tier):
-    """Sort key: most sources first (Philip, 2026-10-26), then the best
-    reporting grade among them (aggregator/outlet_reporting.py), then how
-    many outlets grade High or better, then the edition's headlines."""
+def _deck_order(story, tier, priority=False):
+    """Sort key: priority outlets' stories first (aggregator/source_priority.py),
+    then most sources (Philip, 2026-10-26), then the best reporting grade among
+    them (aggregator/outlet_reporting.py), then how many outlets grade High or
+    better, then the edition's headlines."""
     grades = [reporting_for(name) for name in _outlets(story)]
     best = min((LEVELS.index(g) for g in grades if g), default=len(LEVELS))
     strong = sum(g in (VERY_HIGH, HIGH) for g in grades)
-    return (-len(grades), best, -strong, tier != "headlines")
+    return (not priority, -len(grades), best, -strong, tier != "headlines")
 
 
 def _deck(user_id):
-    """[(story, tier)] in deck order: stories with the most outlets first,
+    """[(story, tier)] in deck order: priority outlets' stories first
+    (aggregator/source_priority.py), then stories with the most outlets,
     better-graded outlets breaking ties. Within a tie the latest edition's
     headlines come first by rank, then other recent stories, newest first."""
     excluded = {sid for (sid,) in db.session.query(NewsBoxItem.story_id).filter_by(user_id=user_id)}
@@ -68,14 +70,18 @@ def _deck(user_id):
                 out.append((story, "headlines"))
                 excluded.add(story.id)
 
-    # Most articles first, so a busy week can't push multi-source stories
-    # past the limit behind a pile of new one-article ones.
+    # Priority outlets' stories first, so the limit can't cut them; then most
+    # articles, so a busy week can't push multi-source stories past the limit
+    # behind a pile of new one-article ones.
+    now = datetime.utcnow()
+    windowed = source_priority.boosted_story_ids(since=now - DECK_WINDOW, user_id=user_id)
+    priority_first = case((Story.id.in_(list(windowed)), 0), else_=1) if windowed else literal(1)
     newest = db.func.max(Article.date)
     rows = (Story.query.join(Article, Article.story_id == Story.id)
             .filter(missing).group_by(Story.id)
-            .having(newest >= datetime.utcnow() - DECK_WINDOW)
+            .having(newest >= now - DECK_WINDOW)
             .options(*_story_load())
-            .order_by(db.func.count(Article.id).desc(), newest.desc(), Story.id.desc())
+            .order_by(priority_first, db.func.count(Article.id).desc(), newest.desc(), Story.id.desc())
             .limit(DECK_MORE_LIMIT).all())
     rows.sort(key=lambda s: (max((a.date for a in s.articles if a.date), default=datetime.min), s.id),
               reverse=True)
@@ -84,7 +90,8 @@ def _deck(user_id):
             out.append((story, "more"))
             excluded.add(story.id)
     # A stable sort keeps rank and recency order within each tie.
-    out.sort(key=lambda entry: _deck_order(*entry))
+    priority = source_priority.boosted_story_ids([story.id for story, _ in out], user_id=user_id)
+    out.sort(key=lambda entry: _deck_order(entry[0], entry[1], entry[0].id in priority))
     return out
 
 
@@ -94,7 +101,8 @@ def get_deck():
     """The Swipe deck: stories without a summary or analysis that the user
     hasn't queued or skipped, from the latest edition's headlines (tier
     "headlines") and the past week's other stories (tier "more"). Stories
-    with the most outlets come first, better-graded outlets breaking ties."""
+    from priority outlets come first, then stories with the most outlets,
+    better-graded outlets breaking ties."""
     args = query_args(cursor=cursor, limit=integer(1, MAX_PAGE_SIZE))
     offset, limit = args["cursor"] or 0, args["limit"] or DEFAULT_PAGE_SIZE
     cards = []
