@@ -540,6 +540,21 @@ class ApiEndToEndTests(unittest.TestCase):
         self.assertEqual(self._send("DELETE", f"/api/v1/me/newsbox/{self.ids['story']}", token).status_code, 204)
         self.assertEqual(self._get("/api/v1/me/newsbox", token).get_json()["items"], [])
 
+    def test_read_story_leaves_newsbox_until_marked_unread(self):
+        self._clear_newsbox()
+        token = self._pair(scopes=("read", "summarize"))
+        story_id = self.ids["story"]
+        self._send("POST", f"/api/v1/stories/{story_id}/summarize", token, json={"depth": "summary"})
+        self.assertEqual([i["story"]["id"] for i in self._get("/api/v1/me/newsbox", token).get_json()["items"]],
+                         [story_id])
+        self.assertEqual(self._send("PUT", f"/api/v1/me/read/stories/{story_id}", token).status_code, 200)
+        box = self._get("/api/v1/me/newsbox", token).get_json()
+        self.assertEqual((box["items"], box["unread_count"]), ([], 0))
+        self.assertEqual(self._send("DELETE", f"/api/v1/me/read/stories/{story_id}", token).status_code, 204)
+        self.assertEqual([i["story"]["id"] for i in self._get("/api/v1/me/newsbox", token).get_json()["items"]],
+                         [story_id])
+        self._clear_newsbox()
+
     def _restore_summary(self, story_id, summary):
         from aggregator import db
         from aggregator.models import Story

@@ -9,9 +9,10 @@ the per-user daily limits in Settings › API.
 from datetime import datetime
 
 from flask import g, jsonify, request
+from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
-from aggregator import db, newsbox
+from aggregator import db, newsbox, reads
 from aggregator.blocklist import IngestionBlocks
 from aggregator.models import NewsBoxItem, Story
 from news_fetcher.breaking_feed import is_junk
@@ -35,6 +36,18 @@ def _junk_headline(item, blocks):
     that filter existed, so NewsBox hides it; the row stays until removed."""
     return item.story_id is None and item.feed_entry is not None and is_junk(
         item.feed_entry.title, item.feed_entry.url, blocks)
+
+
+def _not_read(query, user_id):
+    """Leaves out the stories the user has marked read. Marking one read takes
+    it out of NewsBox (Recent keeps it, and Unread or Undo brings it back), so
+    the list doesn't depend on each phone's copy of the read list, which only
+    holds its first page after a refresh. A Breaking headline has no story to
+    read and stays."""
+    read = reads.read_ids(user_id, "story")
+    if not read:
+        return query
+    return query.filter(or_(NewsBoxItem.story_id.is_(None), NewsBoxItem.story_id.notin_(read)))
 
 
 def _flag(value):
@@ -76,7 +89,7 @@ def get_newsbox():
     args = query_args(state=enum(*newsbox.STATES), origin=enum(*newsbox.ORIGINS), unread=boolean,
                       cursor=cursor, limit=integer(1, MAX_PAGE_SIZE))
     offset, limit = args["cursor"] or 0, args["limit"] or DEFAULT_PAGE_SIZE
-    query = _item_query()
+    query = _not_read(_item_query(), g.user.id)
     for name in ("state", "origin"):
         if args[name]:
             query = query.filter(getattr(NewsBoxItem, name) == args[name])
@@ -86,7 +99,7 @@ def get_newsbox():
     blocks = IngestionBlocks()
     page = _page(rows, offset, limit)
     page["items"] = [ser.newsbox_item(i) for i in page["items"] if not _junk_headline(i, blocks)]
-    unread = NewsBoxItem.query.filter_by(user_id=g.user.id, is_unread=True).count()
+    unread = _not_read(NewsBoxItem.query.filter_by(user_id=g.user.id, is_unread=True), g.user.id).count()
     unread_headlines = (NewsBoxItem.query.filter_by(user_id=g.user.id, is_unread=True, story_id=None)
                         .options(joinedload(NewsBoxItem.feed_entry)).all())
     unread -= sum(1 for i in unread_headlines if _junk_headline(i, blocks))
