@@ -117,13 +117,18 @@ def link_scraped(now=None):
 
 
 def prune(now=None):
-    """Delete entries older than KEEP that no unfinished NewsBox item needs."""
+    """Delete entries older than KEEP that no unfinished NewsBox item needs,
+    then the NewsBox items left with neither a story nor an entry: a failed
+    Breaking headline whose entry is gone has nothing to show (the API leaves
+    it out too; me_routes._listed)."""
     now = now or datetime.utcnow()
     result = db.session.execute(db.text(
         "DELETE FROM feed_entries WHERE first_seen_at < :cutoff AND id NOT IN ("
         "SELECT feed_entry_id FROM newsbox_items WHERE feed_entry_id IS NOT NULL "
         "AND state IN ('pending', 'in_progress'))"
     ), {"cutoff": now - KEEP})
+    db.session.execute(db.text(
+        "DELETE FROM newsbox_items WHERE story_id IS NULL AND feed_entry_id IS NULL"))
     db.session.commit()
     return result.rowcount
 
