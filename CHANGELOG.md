@@ -101,6 +101,12 @@ All notable changes to MuckScraper are documented here.
   & Arts, The Guardian Culture, Variety. Migration `f3c8a1e6d2b9` only
   inserts feeds that are missing.
 
+### Fixed
+- **Stories marked read leave NewsBox for good.** `GET /api/v1/me/newsbox`
+  now leaves out stories the reader has marked read, and their unread count,
+  so the app no longer brings them back when its copy of the read list (only
+  its first page after a refresh) forgets them. Unread or Undo puts them back.
+
 ### Changed
 - **Mobile API: Trending, Latest and Controversial for each section.**
   `GET /api/v1/headlines` takes `topic=`, giving that section's own stories
