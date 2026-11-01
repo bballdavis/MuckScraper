@@ -1,4 +1,4 @@
-"""The story page's analysis layouts (Philip, 2026-10-23): the report is
+"""The story page's analysis layouts: the report is
 split into its labelled sections (aggregator/story_analysis.py) and shown as
 Cards (default) or Sections, picked under Appearance on the profile page.
 
@@ -102,7 +102,7 @@ class ApiSectionsTests(unittest.TestCase):
 class DeepReportTypeTests(unittest.TestCase):
     """Which prompt writes the analysis (news_fetcher.summarizer.deep_report_type):
     general stories with rated sources get the left/center/right breakdown
-    (Philip, 2026-10-25), the specialist types keep their own."""
+, the specialist types keep their own."""
 
     def _story(self, title, topics, scores):
         from types import SimpleNamespace as NS
@@ -127,7 +127,7 @@ class DeepReportTypeTests(unittest.TestCase):
 
 class RegenerateTests(unittest.TestCase):
     """A generated summary or analysis can be run again only once sources
-    have arrived since it was written (Philip, 2026-10-25)."""
+    have arrived since it was written."""
 
     def _render(self, story, new_sources):
         from jinja2 import Environment, FileSystemLoader

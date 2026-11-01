@@ -1,0 +1,247 @@
+{
+  "entrypoints": [
+    "main"
+  ],
+  "origins": {
+    "237": [
+      237
+    ],
+    "17896441": [
+      869,
+      401
+    ],
+    "main": [
+      354,
+      869,
+      792
+    ],
+    "runtime~main": [
+      792,
+      869,
+      354
+    ],
+    "03a88bad": [
+      78
+    ],
+    "066c5ef3": [
+      567
+    ],
+    "23c664e3": [
+      755
+    ],
+    "2bbf879d": [
+      555
+    ],
+    "5e95c892": [
+      647
+    ],
+    "60a977b1": [
+      906
+    ],
+    "8d0344ba": [
+      599
+    ],
+    "9dcd1ba3": [
+      168
+    ],
+    "9eaa546a": [
+      711
+    ],
+    "a7bd4aaa": [
+      98
+    ],
+    "a94703ab": [
+      869,
+      48
+    ],
+    "aba21aa0": [
+      742
+    ],
+    "cce2b423": [
+      111
+    ],
+    "fc1f0afe": [
+      101
+    ],
+    "styles": [
+      48,
+      354,
+      401,
+      792,
+      869
+    ]
+  },
+  "assets": {
+    "48": {
+      "js": [
+        {
+          "file": "assets/js/a94703ab.c55ba191.js",
+          "hash": "7d91eb90c54f828a",
+          "publicPath": "/MuckScraper/assets/js/a94703ab.c55ba191.js"
+        }
+      ]
+    },
+    "78": {
+      "js": [
+        {
+          "file": "assets/js/03a88bad.0f01366e.js",
+          "hash": "96bdece464c3910b",
+          "publicPath": "/MuckScraper/assets/js/03a88bad.0f01366e.js"
+        }
+      ]
+    },
+    "98": {
+      "js": [
+        {
+          "file": "assets/js/a7bd4aaa.6e0868ea.js",
+          "hash": "a4fa67871f15422d",
+          "publicPath": "/MuckScraper/assets/js/a7bd4aaa.6e0868ea.js"
+        }
+      ]
+    },
+    "101": {
+      "js": [
+        {
+          "file": "assets/js/fc1f0afe.3bba044d.js",
+          "hash": "a68b065a40d0de26",
+          "publicPath": "/MuckScraper/assets/js/fc1f0afe.3bba044d.js"
+        }
+      ]
+    },
+    "111": {
+      "js": [
+        {
+          "file": "assets/js/cce2b423.d82c7fd6.js",
+          "hash": "15b4117c599d4ed9",
+          "publicPath": "/MuckScraper/assets/js/cce2b423.d82c7fd6.js"
+        }
+      ]
+    },
+    "168": {
+      "js": [
+        {
+          "file": "assets/js/9dcd1ba3.c63e65af.js",
+          "hash": "0aef2e66c2f8eeeb",
+          "publicPath": "/MuckScraper/assets/js/9dcd1ba3.c63e65af.js"
+        }
+      ]
+    },
+    "237": {
+      "js": [
+        {
+          "file": "assets/js/237.2a7a530c.js",
+          "hash": "4c9f105a73123daf",
+          "publicPath": "/MuckScraper/assets/js/237.2a7a530c.js"
+        }
+      ]
+    },
+    "354": {
+      "js": [
+        {
+          "file": "assets/js/runtime~main.518d7848.js",
+          "hash": "bab7f7e38df918be",
+          "publicPath": "/MuckScraper/assets/js/runtime~main.518d7848.js"
+        }
+      ]
+    },
+    "401": {
+      "js": [
+        {
+          "file": "assets/js/17896441.c2003192.js",
+          "hash": "c0ef75a5a281a7e9",
+          "publicPath": "/MuckScraper/assets/js/17896441.c2003192.js"
+        }
+      ]
+    },
+    "555": {
+      "js": [
+        {
+          "file": "assets/js/2bbf879d.425909c6.js",
+          "hash": "24700fe8784a9aa8",
+          "publicPath": "/MuckScraper/assets/js/2bbf879d.425909c6.js"
+        }
+      ]
+    },
+    "567": {
+      "js": [
+        {
+          "file": "assets/js/066c5ef3.c390ba51.js",
+          "hash": "462c94c57117c43a",
+          "publicPath": "/MuckScraper/assets/js/066c5ef3.c390ba51.js"
+        }
+      ]
+    },
+    "599": {
+      "js": [
+        {
+          "file": "assets/js/8d0344ba.bb42ebea.js",
+          "hash": "e32202d5a0291644",
+          "publicPath": "/MuckScraper/assets/js/8d0344ba.bb42ebea.js"
+        }
+      ]
+    },
+    "647": {
+      "js": [
+        {
+          "file": "assets/js/5e95c892.43aaa642.js",
+          "hash": "b8d1da004c341cb2",
+          "publicPath": "/MuckScraper/assets/js/5e95c892.43aaa642.js"
+        }
+      ]
+    },
+    "711": {
+      "js": [
+        {
+          "file": "assets/js/9eaa546a.22b7b161.js",
+          "hash": "7a157db20296d852",
+          "publicPath": "/MuckScraper/assets/js/9eaa546a.22b7b161.js"
+        }
+      ]
+    },
+    "742": {
+      "js": [
+        {
+          "file": "assets/js/aba21aa0.37a43113.js",
+          "hash": "05171f8d2d7adcb1",
+          "publicPath": "/MuckScraper/assets/js/aba21aa0.37a43113.js"
+        }
+      ]
+    },
+    "755": {
+      "js": [
+        {
+          "file": "assets/js/23c664e3.6642e354.js",
+          "hash": "1e62bb603ee78d2d",
+          "publicPath": "/MuckScraper/assets/js/23c664e3.6642e354.js"
+        }
+      ]
+    },
+    "792": {
+      "js": [
+        {
+          "file": "assets/js/main.3927f322.js",
+          "hash": "e15989f476c6560d",
+          "publicPath": "/MuckScraper/assets/js/main.3927f322.js"
+        }
+      ]
+    },
+    "869": {
+      "css": [
+        {
+          "file": "assets/css/styles.8541d05e.css",
+          "hash": "1abd771f72d6c358",
+          "publicPath": "/MuckScraper/assets/css/styles.8541d05e.css"
+        }
+      ]
+    },
+    "906": {
+      "js": [
+        {
+          "file": "assets/js/60a977b1.3996b698.js",
+          "hash": "9f984200c8415603",
+          "publicPath": "/MuckScraper/assets/js/60a977b1.3996b698.js"
+        }
+      ]
+    }
+  }
+}

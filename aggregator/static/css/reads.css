@@ -13,8 +13,7 @@
 .hl-item { position: relative; margin-bottom: 28px; }
 .hl-item > .story { margin-bottom: 0; }
 /* .hl-side holds the round buttons in one column, centred on the card:
-   the glasses, then the scales for a story with no summary yet (Philip,
-   2026-10-25). */
+   the glasses, then the scales for a story with no summary yet. */
 .hl-side {
     position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
     display: flex; flex-direction: column; align-items: center; gap: 10px;
@@ -86,8 +85,7 @@
 }
 
 /* ── Undo toast ──
-   Amber, larger and up for 12 seconds so it gets noticed (Philip,
-   2026-10-25); the same in light and dark themes. */
+   Amber, larger and up for 12 seconds so it gets noticed; the same in light and dark themes. */
 .read-toast {
     position: fixed; left: 50%; bottom: 28px; z-index: 1000;
     transform: translate(-50%, 16px); opacity: 0; visibility: hidden;
@@ -99,7 +97,7 @@
     transition: transform 0.18s ease, opacity 0.18s ease, visibility 0s linear 0.18s;
 }
 .read-toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; transition-delay: 0s; }
-/* Undo is a round icon button (Philip, 2026-10-25). */
+/* Undo is a round icon button. */
 .read-toast-undo {
     width: 40px; height: 40px; flex: 0 0 auto; padding: 0; border: 2px solid rgba(31, 20, 0, 0.55); border-radius: 50%;
     display: flex; align-items: center; justify-content: center;

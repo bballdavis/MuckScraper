@@ -3,7 +3,7 @@
 {% from 'pagination.html' import pager %}
 {% from 'icons.html' import icon %}
 {#- Opinion & Editorials (admin.oped_list, blueprints/admin/oped.py), built
-    like the section pages in articles.html (Philip, 2026-10-27): the top
+    like the section pages in articles.html: the top
     bar's search (live results are columns) and Filters popover, the filter
     chips, the page title and the Headlines-style Columns / By story switch,
     then compact story cards. Latest draws each column as a
@@ -25,7 +25,7 @@
             margin: 0 auto;
             position: relative;
         }
-        /* The page title and view switch as on Headlines (Philip, 2026-10-27). */
+        /* The page title and view switch as on Headlines. */
         .page-title { font-size: var(--fs-page-title); font-weight: 800; color: var(--accent-text); letter-spacing: -0.5px; padding: 4px 0 16px; }
         .view-switch.two { grid-template-columns: repeat(2, 1fr); }
         .bias-none { background-color: #ddd; color: #666; }
@@ -71,7 +71,7 @@
     {% include '_flashes.html' %}
     <h1 class="page-title">{{ section_title }}</h1>
     {#- Columns / By story as the Headlines view switch (headline_views.css),
-        not a Filters option (Philip, 2026-10-27). -#}
+        not a Filters option. -#}
     <nav class="view-switch two" aria-label="{{ section_title }} views">
         {%- for key, label, view_icon, rule, count in [
             ('latest', 'Columns', 'message-square', 'Newest columns first', total),

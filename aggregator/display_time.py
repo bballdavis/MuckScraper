@@ -48,7 +48,7 @@ def local_datetime(value: datetime | None, fmt: str = "%Y-%m-%d %H:%M") -> str:
 
 
 # One short date format for the feed's story cards and search suggestions,
-# e.g. "Oct 19, 9:39 PM" (Philip, 2026-10-22: every date the same format).
+# e.g. "Oct 19, 9:39 PM".
 SHORT_DATETIME_FORMAT = "%b %-d, %-I:%M %p"
 
 
@@ -61,7 +61,7 @@ def relative_time(value: datetime | None, now: datetime | None = None) -> str:
     """Template filter: "3 hours ago", the text static/js/local_time.js puts in
     a .local-date span. Rendered on the server too, so the line already reads
     the same at first paint instead of swapping from a timestamp once the
-    script runs (Philip, 2026-10-27). Older than a week: "Oct 19, 2026"."""
+    script runs. Older than a week: "Oct 19, 2026"."""
     if value is None:
         return ""
     ago = (now or datetime.utcnow()) - value

@@ -1,0 +1,23 @@
+{
+  "id": "API",
+  "title": "API",
+  "description": "An optional JSON API under /api/v1. The MuckScroller iPhone app reads it,",
+  "source": "@site/../docs/API.md",
+  "sourceDirName": ".",
+  "slug": "/API",
+  "permalink": "/MuckScraper/API",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "Security",
+    "permalink": "/MuckScraper/security"
+  },
+  "next": {
+    "title": "MCP server (read-only health checks)",
+    "permalink": "/MuckScraper/MCP"
+  }
+}

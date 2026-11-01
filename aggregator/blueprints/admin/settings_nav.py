@@ -1,6 +1,6 @@
 """The Settings section list (templates/settings_base.html).
 
-Grouped as in the settings mock (Philip, 2026-10-22): General, Sources, AI
+Grouped as in the settings mock: General, Sources, AI
 and Pipeline; the Sources group was cut to sections, sources and one
 blocklist on 2026-10-27, each link with a count where one helps. A page names its own
 entry by key; everything else is built here so the order and labels live in

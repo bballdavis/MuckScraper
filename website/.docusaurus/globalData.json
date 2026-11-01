@@ -1,0 +1,73 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/MuckScraper/",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/MuckScraper/",
+          "mainDocId": "index",
+          "docs": [
+            {
+              "id": "API",
+              "path": "/MuckScraper/API",
+              "sidebar": "docs"
+            },
+            {
+              "id": "architecture",
+              "path": "/MuckScraper/architecture",
+              "sidebar": "docs"
+            },
+            {
+              "id": "configuration",
+              "path": "/MuckScraper/configuration",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features",
+              "path": "/MuckScraper/features",
+              "sidebar": "docs"
+            },
+            {
+              "id": "getting-started",
+              "path": "/MuckScraper/getting-started",
+              "sidebar": "docs"
+            },
+            {
+              "id": "index",
+              "path": "/MuckScraper/",
+              "sidebar": "docs"
+            },
+            {
+              "id": "MCP",
+              "path": "/MuckScraper/MCP",
+              "sidebar": "docs"
+            },
+            {
+              "id": "OIDC",
+              "path": "/MuckScraper/OIDC",
+              "sidebar": "docs"
+            },
+            {
+              "id": "security",
+              "path": "/MuckScraper/security",
+              "sidebar": "docs"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "docs": {
+              "link": {
+                "path": "/MuckScraper/",
+                "label": "index"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

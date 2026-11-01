@@ -104,7 +104,7 @@ def stories_published_by(edition, story_ids):
 
 def published_edition_opinion_cards(edition):
     """edition_opinion_cards() limited to stories that ran in this edition or
-    an earlier one (Regis, 2026-10-17: columns about stories that never made
+    an earlier one (columns about stories that never made
     an edition stay off the edition's Opinion page)."""
     cards = edition_opinion_cards(edition)
     published = stories_published_by(edition, {story.id for story, _ in cards})
@@ -114,8 +114,7 @@ def published_edition_opinion_cards(edition):
 class OpinionCard:
     """An OpinionPiece shaped like a one-article Story, so the Op/Ed page's
     Latest list draws it with the same compact story_card as a single-article
-    story on All Stories (Philip, 2026-10-27: "structurally we don't want to
-    be doing that much different here"). The card leaves out the Breaking
+    story on All Stories. The card leaves out the Breaking
     tag and the AI actions for it (`is_opinion`)."""
 
     is_opinion = True

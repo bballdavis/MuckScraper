@@ -1,0 +1,23 @@
+{
+  "id": "MCP",
+  "title": "MCP server (read-only health checks)",
+  "description": "MuckScraper ships an optional Model Context Protocol",
+  "source": "@site/../docs/MCP.md",
+  "sourceDirName": ".",
+  "slug": "/MCP",
+  "permalink": "/MuckScraper/MCP",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "API",
+    "permalink": "/MuckScraper/API"
+  },
+  "next": {
+    "title": "Optional OpenID Connect login",
+    "permalink": "/MuckScraper/OIDC"
+  }
+}

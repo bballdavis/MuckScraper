@@ -1,0 +1,19 @@
+{
+  "id": "OIDC",
+  "title": "Optional OpenID Connect login",
+  "description": "OIDC adds identity-provider sign-in to the existing MuckScraper accounts and",
+  "source": "@site/../docs/OIDC.md",
+  "sourceDirName": ".",
+  "slug": "/OIDC",
+  "permalink": "/MuckScraper/OIDC",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "docs",
+  "previous": {
+    "title": "MCP server (read-only health checks)",
+    "permalink": "/MuckScraper/MCP"
+  }
+}

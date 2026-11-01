@@ -1,7 +1,7 @@
 """Headlines' Trending / Latest / Controversial views for the app
 (aggregator/headline_views.py), read live like the web page. Stories the
 user marked read are left out and counted in `hidden_read`, as the web page
-does. ?topic= gives a section's own three views (Philip, 2026-10-27).
+does. ?topic= gives a section's own three views.
 """
 from datetime import datetime
 

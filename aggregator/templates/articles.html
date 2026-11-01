@@ -144,7 +144,7 @@
     <div class="page-body">
     <div class="main">
         {% include '_flashes.html' %}
-        {#- A pinned source's page (Philip, 2026-11-01): its logo where a section shows its
+        {#- A pinned source's page: its logo where a section shows its
             title, or its name set as a masthead when it has none (the web card fallback). #}
         {%- if active_outlet %}
         <header class="outlet-head">
@@ -213,7 +213,7 @@
                 <p>No {{ active_outlet.name }} stories {% if active_range != 'all' %}in the last {{ range_label }}{% else %}yet{% endif %}.</p>
                 {% if active_range != 'all' %}<p><a href="{{ url_for(list_endpoint, outlet=active_outlet_id, scrape_status=scrape_param, show_single=show_single|string|lower, range='all') }}">Show all time</a></p>{% endif %}
                 {% elif active_label and not active_search_query %}
-                {#- A section with nothing of its own says so; it never stands in other stories (Philip, 2026-10-27). #}
+                {#- A section with nothing of its own says so; it never stands in other stories. #}
                 <p>No {{ active_label|section_name }} stories {% if active_range != 'all' %}in the last {{ range_label }}{% else %}yet{% endif %}.</p>
                 {% if active_range != 'all' %}<p><a href="{{ url_for(list_endpoint, topic=active_label, scrape_status=scrape_param, show_single=show_single|string|lower, range='all') }}">Show all time</a></p>{% endif %}
                 {% else %}
