@@ -76,6 +76,15 @@ def create_app(engine_options=None):
         from aggregator.models import Topic
         return Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all()
 
+    def _sidebar_pinned():
+        # The reader's pinned sources, for the sidebar's Sources group
+        # (aggregator/pinned_sources.py). Signed-out visitors have none.
+        from flask_login import current_user
+        if not current_user.is_authenticated:
+            return []
+        from aggregator import pinned_sources
+        return pinned_sources.outlets(current_user.id)
+
     @app.context_processor
     def inject_permissions():
         from aggregator.models import ROLE_LABELS
@@ -87,7 +96,7 @@ def create_app(engine_options=None):
                 "current_back": navigation.current_back, "incoming_back": navigation.incoming_back,
                 "feed_back_url": navigation.feed_back_url,
                 "article_back_anchor": navigation.article_back_anchor, "menu_back": navigation.menu_back,
-                "sidebar_topics": _sidebar_topics}
+                "sidebar_topics": _sidebar_topics, "sidebar_pinned": _sidebar_pinned}
 
     @app.url_defaults
     def static_version(endpoint, values):

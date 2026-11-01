@@ -293,6 +293,21 @@ PATHS = {
                     "additionalProperties": False}}}},
                 "responses": {"200": _json(_obj(["boosted"], boosted={"type": "array", "items": _S})), **_ERRORS}},
     },
+    "/me/pinned-sources": {
+        **_get("getPinnedSources", _json(_obj(["items"], items={"type": "array", "items": _ref("Outlet"),
+                                             "description": "Outlets this reader keeps in the menu, in pin order"}))),
+        "put": {"operationId": "putPinnedSource",
+                "requestBody": {"required": True, "content": {"application/json": {"schema": {
+                    "type": "object", "required": ["outlet_id", "pinned"],
+                    "properties": {"outlet_id": {"type": "integer", "description": "An outlet's id"},
+                                   "pinned": {"type": "boolean"}},
+                    "additionalProperties": False}}}},
+                "responses": {"200": _json(_obj(["items"], items={"type": "array", "items": _ref("Outlet")})),
+                              **_NOT_FOUND, **_ERRORS}},
+    },
+    "/outlets": _get("outlets", _json(_obj(["items"], items={"type": "array", "items": {
+        "allOf": [_ref("Outlet"), _obj(["pinned"], pinned=_B)]}})),
+        [_q("q", _S, "Part of the outlet's name"), _LIMIT]),
     "/topics": _get("topics", _json(_obj(["items"], items={"type": "array", "items": _ref("Topic")}))),
     "/editions": _get("editions", _json(_page(_ref("EditionBrief"))), [_CURSOR, _LIMIT]),
     "/editions/latest": _get("latestEdition", _json(_ref("Edition")), extra=_NOT_FOUND),
@@ -301,8 +316,13 @@ PATHS = {
         "type": "array", "items": _obj(["story", "columns"], story=_ref("StorySummary"),
                                        columns=_by_leaning(_ref("OpinionPiece")))})),
         [_q("edition", _I)], _NOT_FOUND),
-    "/stories": _get("stories", _json(_page(_ref("SectionCard"))),
-                     [_q("topic", _S), _RANGE, _q("single", _B, "Include single-article stories"), _CURSOR, _LIMIT],
+    "/stories": _get("stories", _json({**_page(_ref("SectionCard")), "properties": {
+                         **_page(_ref("SectionCard"))["properties"],
+                         "outlet": {"allOf": [_ref("Outlet"), _obj(["pinned"], pinned=_B)],
+                                    "description": "Only with ?outlet=: the outlet, and whether this reader pinned it"}}}),
+                     [_q("topic", _S), _q("outlet", _I, "An outlet's id: stories it reported, newest first, "
+                                                        "single-article stories included unless single=false"),
+                      _RANGE, _q("single", _B, "Include single-article stories"), _CURSOR, _LIMIT],
                      _NOT_FOUND),
     "/headlines": _get("headlines", _json(_obj(
         ["view", "views", "hidden_read", "items", "next_cursor"],

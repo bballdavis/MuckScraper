@@ -179,6 +179,38 @@
                 <div class="row"><span class="row-sub">No outlets boosted yet.</span></div>
                 {%- endfor %}
             </section>
+
+            {#- Pinned sources (Philip, 2026-11-01): each gets a row in the menu's Sources group
+                and a page of its own stories (aggregator/pinned_sources.py). -#}
+            <section class="panel boost-sources">
+                <div class="panel-head">
+                    <div>
+                        <h2>Pinned sources</h2>
+                        <p>Each one gets a row under Sources in the menu, with a page of its own stories. Up to {{ pinned_max }}.</p>
+                    </div>
+                </div>
+                <form class="row" method="POST" action="{{ url_for('auth.pin_source') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="pinned" value="1">
+                    <span><span class="row-label">Pin a source</span></span>
+                    <span class="boost-add">
+                        <input type="text" name="name" list="pin-outlets" placeholder="The Texas Tribune" required>
+                        <button type="submit" class="btn">Pin</button>
+                    </span>
+                </form>
+                <datalist id="pin-outlets">{% for name in pin_candidates %}<option value="{{ name }}">{% endfor %}</datalist>
+                {%- for outlet in pinned %}
+                <form class="row" method="POST" action="{{ url_for('auth.pin_source') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="pinned" value="0">
+                    <input type="hidden" name="outlet_id" value="{{ outlet.id }}">
+                    <span><a class="row-label" href="{{ url_for('admin.list_articles', outlet=outlet.id) }}">{{ outlet.name }}</a></span>
+                    <span><button type="submit" class="btn btn-quiet">Unpin</button></span>
+                </form>
+                {%- else %}
+                <div class="row"><span class="row-sub">No sources pinned yet.</span></div>
+                {%- endfor %}
+            </section>
         </div>
 
         <form class="panel profile-defaults" method="POST">

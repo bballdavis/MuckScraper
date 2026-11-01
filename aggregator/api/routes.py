@@ -8,10 +8,11 @@ from datetime import datetime, timedelta
 
 from flask import g, jsonify, request
 from sqlalchemy import func, text
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import aliased, joinedload, selectinload
 
-from aggregator import article_jobs, article_lean, db, feed_prefs, headline_views, reads, skips, source_priority
-from aggregator.models import Article, Edition, EditionStory, OpinionPiece, Story, Topic
+from aggregator import (article_jobs, article_lean, db, feed_prefs, headline_views, pinned_sources, reads, skips,
+                        source_priority)
+from aggregator.models import Article, Edition, EditionStory, OpinionPiece, Outlet, Story, Topic
 from aggregator.opinion import published_edition_opinion_cards
 from aggregator.search import SearchUnavailableError, search_article_ids, search_story_ids
 from aggregator.sections import in_section
@@ -159,6 +160,53 @@ def put_boosted_source():
     return jsonify({"boosted": names})
 
 
+@api.route("/me/pinned-sources")
+@require_token()
+def get_pinned_sources():
+    """The outlets this reader keeps in the menu (aggregator/pinned_sources.py),
+    in the order they pinned them. Each has a page of its own stories:
+    /stories?outlet=<id>."""
+    return jsonify({"items": [ser.outlet(o) for o in pinned_sources.outlets(g.user.id)]})
+
+
+@api.route("/me/pinned-sources", methods=["PUT"])
+@require_token()
+def put_pinned_source():
+    """Pin (or unpin) one outlet for this reader: {"outlet_id", "pinned"}."""
+    def outlet_id(value):
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            raise bad("Must be an outlet id.")
+        return value
+
+    def flag(value):
+        if not isinstance(value, bool):
+            raise bad("Must be true or false.")
+        return value
+
+    body = json_body(outlet_id=outlet_id, pinned=flag)
+    if body["outlet_id"] is None or body["pinned"] is None:
+        raise bad("Send outlet_id and pinned.")
+    try:
+        rows = pinned_sources.set_pinned(g.user.id, body["outlet_id"], body["pinned"])
+    except LookupError:
+        raise ApiError(404, "not_found", "No such outlet.")
+    except ValueError as e:
+        raise bad(str(e))
+    return jsonify({"items": [ser.outlet(o) for o in rows]})
+
+
+@api.route("/outlets")
+@require_token()
+def outlets():
+    """Outlets with recent articles, most first, for choosing a source to pin;
+    q narrows to names containing it. `pinned` says whether this reader has
+    pinned the outlet already."""
+    args = query_args(q=text_param(80), limit=integer(1, MAX_PAGE_SIZE))
+    rows = pinned_sources.candidates(args["q"], args["limit"] or DEFAULT_PAGE_SIZE)
+    pinned = set(pinned_sources.ids(g.user.id))
+    return jsonify({"items": [{**ser.outlet(o), "pinned": o.id in pinned} for o in rows]})
+
+
 @api.route("/topics")
 @require_token()
 def topics():
@@ -238,18 +286,40 @@ def stories():
     """The story feed, filtered like All Stories: stories with an article
     published in the range, newest article first. A parameter left out
     falls back to the user's feed defaults."""
-    args = query_args(topic=text_param(80), range=enum(*RANGES), single=boolean,
+    args = query_args(topic=text_param(80), outlet=integer(1, 2**31 - 1), range=enum(*RANGES), single=boolean,
                       cursor=cursor, limit=integer(1, MAX_PAGE_SIZE))
     prefs = feed_prefs.load(g.user)
     range_key = args["range"] or prefs["range"]
     show_single = args["single"] if args["single"] is not None else not prefs["hide_single"]
     offset, limit = args["cursor"] or 0, args["limit"] or DEFAULT_PAGE_SIZE
 
+    outlet = None
+    if args["outlet"]:
+        outlet = Outlet.query.get(args["outlet"])
+        if outlet is None:
+            raise ApiError(404, "not_found", "No such outlet.")
+        # A source's page lists what that outlet reported (never a copy of
+        # another outlet's article), newest of its own articles first. Most
+        # of its stories have no other outlet, so single-article stories stay
+        # whatever the reader's feed default says, unless they ask with single=false.
+        if args["single"] is None:
+            show_single = True
+
     query = Story.query.join(Article).group_by(Story.id)
     cutoff = _cutoff(range_key)
-    if cutoff is not None:
+    if outlet is not None:
+        query = query.filter(Article.outlet_id == outlet.id, Article.copy_of_id.is_(None))
+        if cutoff is not None:
+            query = query.filter(Article.date >= cutoff)
+    elif cutoff is not None:
         query = query.filter(Story.articles.any(Article.date >= cutoff))
-    if not show_single:
+    if not show_single and outlet is not None:
+        # The join above keeps only the outlet's articles, so count the story's own.
+        every = aliased(Article)
+        total = (db.session.query(func.count(every.id)).filter(every.story_id == Story.id)
+                 .correlate(Story).scalar_subquery())
+        query = query.filter(total > 1)
+    elif not show_single:
         query = query.having(func.count(Article.id) > 1)
     if args["topic"]:
         topic = Topic.query.filter_by(name=args["topic"]).first()
@@ -264,7 +334,10 @@ def stories():
     for story, card in zip(rows, cards):
         card["why"] = whys.get(card["id"])
         card["arrivals"] = ser.arrivals(story, now) if card["why"] else None
-    return jsonify(_page(cards, offset, limit))
+    page = _page(cards, offset, limit)
+    if outlet is not None:
+        page["outlet"] = {**ser.outlet(outlet), "pinned": pinned_sources.is_pinned(g.user.id, outlet.id)}
+    return jsonify(page)
 
 
 @api.route("/stories/<int:story_id>")

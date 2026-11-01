@@ -4,7 +4,8 @@ from flask import flash, render_template, request, redirect, url_for, jsonify
 from flask_login import current_user
 from aggregator.permissions import ROLE_ADMIN, ROLE_SCRAPER, public_or_login, role_required
 from sqlalchemy import case, func, or_
-from aggregator import article_lean, db, feed_prefs
+from sqlalchemy.orm import aliased
+from aggregator import article_lean, db, feed_prefs, pinned_sources
 from aggregator.models import Article, Outlet, Story, Topic
 from aggregator.search import SearchUnavailableError, search_story_ids
 from aggregator.sections import in_section
@@ -55,7 +56,14 @@ def list_articles(per_page=25, force_multi=False):
     page = max(1, request.args.get("page", 1, type=int) or 1)
     # "All Stories" includes single-article stories unless the reader's
     # default hides them; show_single=false hides them, true shows them.
-    show_single = request.args.get("show_single", "false" if prefs["hide_single"] else "true") != "false"
+    # A source's own page (?outlet=<id>, pinned in the sidebar) lists what that
+    # outlet reported. Most of its stories have no other outlet, so they show
+    # whatever the reader's default says, unless show_single=false asks.
+    outlet_id = request.args.get("outlet", type=int)
+    active_outlet = Outlet.query.get(outlet_id) if outlet_id else None
+    outlet_missing = bool(outlet_id) and active_outlet is None
+    show_single = request.args.get(
+        "show_single", "true" if active_outlet else ("false" if prefs["hide_single"] else "true")) != "false"
     story_id = request.args.get("story_id", type=int)
     active_range = request.args.get("range", prefs["range"])
     if active_range not in TIME_RANGES:
@@ -78,12 +86,26 @@ def list_articles(per_page=25, force_multi=False):
     # but its displayed articles are never filtered, so older ones still show.
     window = TIME_RANGES[active_range]
     cutoff = datetime.utcnow() - window if window is not None else None
-    if cutoff is not None:
+    if active_outlet is not None:
+        # The join keeps only the outlet's own articles (never a copy of
+        # another outlet's), so the window and the order are about them.
+        query = query.filter(Article.outlet_id == active_outlet.id, Article.copy_of_id.is_(None))
+        if cutoff is not None:
+            query = query.filter(Article.date >= cutoff)
+    elif outlet_missing:
+        query = query.filter(False)
+    elif cutoff is not None:
         query = query.filter(Story.articles.any(Article.date >= cutoff))
 
     # Grouped Stories always hides single-article stories; show_single stays
     # the reader's All Stories choice, so links back to All Stories keep it.
-    if force_multi or not show_single:
+    if (force_multi or not show_single) and active_outlet is not None:
+        # Count the story's own articles, not just the outlet's.
+        every = aliased(Article)
+        total = (db.session.query(func.count(every.id)).filter(every.story_id == Story.id)
+                 .correlate(Story).scalar_subquery())
+        query = query.filter(total > 1)
+    elif force_multi or not show_single:
         query = query.having(func.count(Article.id) > 1)
 
     if active_label:
@@ -154,7 +176,7 @@ def list_articles(per_page=25, force_multi=False):
 
     if force_multi:
         active_nav = "grouped"
-    elif active_label:
+    elif active_label or active_outlet or outlet_missing:
         active_nav = None
     else:
         active_nav = "all"
@@ -164,6 +186,10 @@ def list_articles(per_page=25, force_multi=False):
         stories=stories,
         topics=Topic.query.filter_by(is_active=True).order_by(Topic.sort_order).all(),
         active_label=active_label,
+        active_outlet=active_outlet,
+        active_outlet_id=active_outlet.id if active_outlet else None,
+        outlet_pinned=bool(active_outlet) and current_user.is_authenticated
+                      and pinned_sources.is_pinned(current_user.id, active_outlet.id),
         active_scrape_status=active_scrape_status,
         scrape_param=scrape_param,
         feed_defaults=prefs,

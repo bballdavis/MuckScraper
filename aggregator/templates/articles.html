@@ -72,20 +72,30 @@
 
         .empty { text-align: center; padding: 80px 0; color: var(--text-faint); font-style: italic; }
 
+        .outlet-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 0 14px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+        .outlet-mast { margin: 0; display: flex; align-items: center; min-width: 0; }
+        .outlet-logo { display: block; height: 48px; max-width: min(320px, 60vw); object-fit: contain; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; }
+        /* The name stays for screen readers behind a logo; with no logo it is the masthead. */
+        .outlet-mast:not(.no-logo) .outlet-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        .outlet-mast.no-logo .outlet-logo { display: none; }
+        .outlet-mast.no-logo .outlet-name { font-family: 'Playfair Display', Georgia, serif; font-size: 28px; font-weight: 700; letter-spacing: 0.01em; border-top: 1px solid var(--text); border-bottom: 3px double var(--text); padding: 4px 14px; }
+        .outlet-pin { margin: 0; flex-shrink: 0; }
+        @media (max-width: 900px) { .outlet-logo { height: 40px; } .outlet-mast.no-logo .outlet-name { font-size: 22px; } }
+
         @media (max-width: 900px) {
             .main { padding: 16px 16px 0; }
         }
     </style>
 </head>
 <body>
-{%- set section_title = (active_label|section_name if active_label else none) or ('Grouped Stories' if is_multi_view else 'All Stories') -%}
+{%- set section_title = (active_label|section_name if active_label else none) or (active_outlet.name if active_outlet else none) or ('Grouped Stories' if is_multi_view else 'All Stories') -%}
 {#- Every filter link keeps the others; scrape_param (not active_scrape_status)
     so an explicit "All" survives a saved scrape default. -#}
-{%- set base = {'topic': active_label, 'scrape_status': scrape_param, 'show_single': show_single|string|lower, 'q': active_search_query, 'range': active_range} -%}
+{%- set base = {'topic': active_label, 'outlet': active_outlet_id, 'scrape_status': scrape_param, 'show_single': show_single|string|lower, 'q': active_search_query, 'range': active_range} -%}
 {%- set range_short = {'24h': '24h', '7d': '7 days', '30d': '30 days', 'all': 'All'} -%}
 {%- set sidebar_toggle_in_topbar = true -%}
     {% call feed_topbar(section_title, url_for(list_endpoint), active_search_query,
-                        {'topic': active_label, 'scrape_status': scrape_param, 'show_single': show_single|string|lower, 'range': active_range}) %}
+                        {'topic': active_label, 'outlet': active_outlet_id, 'scrape_status': scrape_param, 'show_single': show_single|string|lower, 'range': active_range}) %}
         <div>
             <span class="fp-label">Time range</span>
             <div class="fp-segment">
@@ -116,7 +126,7 @@
         </a>
         {% endif %}
         <div class="fp-foot">
-            <a href="{{ url_for(list_endpoint, topic=active_label, q=active_search_query) }}">Reset to my defaults</a>
+            <a href="{{ url_for(list_endpoint, topic=active_label, outlet=active_outlet_id, q=active_search_query) }}">Reset to my defaults</a>
             {% if current_user.is_authenticated %}
             <form method="POST" action="{{ url_for('auth.save_feed_defaults') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -134,6 +144,25 @@
     <div class="page-body">
     <div class="main">
         {% include '_flashes.html' %}
+        {#- A pinned source's page (Philip, 2026-11-01): its logo where a section shows its
+            title, or its name set as a masthead when it has none (the web card fallback). #}
+        {%- if active_outlet %}
+        <header class="outlet-head">
+            <h1 class="outlet-mast{{ '' if active_outlet.logo_url else ' no-logo' }}">
+                {%- if active_outlet.logo_url %}<img class="outlet-logo" src="{{ active_outlet.logo_url }}" alt="" onerror="this.parentNode.classList.add('no-logo')">{% endif -%}
+                <span class="outlet-name">{{ active_outlet.name }}</span>
+            </h1>
+            {%- if current_user.is_authenticated %}
+            <form method="POST" action="{{ url_for('auth.pin_source') }}" class="outlet-pin">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="outlet_id" value="{{ active_outlet.id }}">
+                <input type="hidden" name="pinned" value="{{ '0' if outlet_pinned else '1' }}">
+                <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+                <button type="submit" class="btn btn-quiet">{{ 'Unpin from menu' if outlet_pinned else 'Pin to menu' }}</button>
+            </form>
+            {%- endif %}
+        </header>
+        {%- endif %}
         <div class="active-filters">
             <p>{{ total_stories }} stor{{ 'y' if total_stories == 1 else 'ies' }}{% if active_search_query %} matching “{{ active_search_query }}”{% endif %}</p>
             <div class="filter-chips">
@@ -155,7 +184,7 @@
             {% for story in stories %}
             {% call story_card(story, compact=true) %}
                 {#- The card's ⋯ menu actions (story_card_macros.html). #}
-                {%- set next_url = url_for(list_endpoint, topic=active_label, scrape_status=scrape_param, show_single=show_single|string|lower, page=page, q=active_search_query or '', range=active_range) %}
+                {%- set next_url = url_for(list_endpoint, topic=active_label, outlet=active_outlet_id, scrape_status=scrape_param, show_single=show_single|string|lower, page=page, q=active_search_query or '', range=active_range) %}
                 {%- if story.articles|length > 1 %}
                     <a class="card-menu-item" role="menuitem" href="{{ url_for('public.view_story', story_id=story.id, back=current_back()) }}">Open full coverage</a>
                     {% if story.enrichment_direction and story.bias_gap >= 2 and can('scraper') %}
@@ -180,7 +209,10 @@
         {% else %}
             <div class="empty">
                 {%- set range_label = (time_ranges|selectattr(0, 'equalto', active_range)|map(attribute=1)|first) or '' %}
-                {% if active_label and not active_search_query %}
+                {% if active_outlet and not active_search_query %}
+                <p>No {{ active_outlet.name }} stories {% if active_range != 'all' %}in the last {{ range_label }}{% else %}yet{% endif %}.</p>
+                {% if active_range != 'all' %}<p><a href="{{ url_for(list_endpoint, outlet=active_outlet_id, scrape_status=scrape_param, show_single=show_single|string|lower, range='all') }}">Show all time</a></p>{% endif %}
+                {% elif active_label and not active_search_query %}
                 {#- A section with nothing of its own says so; it never stands in other stories (Philip, 2026-10-27). #}
                 <p>No {{ active_label|section_name }} stories {% if active_range != 'all' %}in the last {{ range_label }}{% else %}yet{% endif %}.</p>
                 {% if active_range != 'all' %}<p><a href="{{ url_for(list_endpoint, topic=active_label, scrape_status=scrape_param, show_single=show_single|string|lower, range='all') }}">Show all time</a></p>{% endif %}

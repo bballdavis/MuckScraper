@@ -7,6 +7,14 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **Pinned sources.** A reader can pin an outlet (their profile's Pinned
+  sources, or the Pin to menu button on its page), starting with The Texas
+  Tribune. It gets a row under a Sources group in the sidebar, with its logo,
+  and a page of the stories that outlet reported, with its logo at the top
+  (its name as a masthead when it has none). Pins are per reader and separate
+  from the boosted sources, which only change ranking. API:
+  `GET`/`PUT /api/v1/me/pinned-sources`, `GET /api/v1/outlets`, and
+  `/api/v1/stories?outlet=` (`aggregator/pinned_sources.py`).
 - **Boosted sources.** Every reader can boost an outlet on their profile
   (Boosted sources): its stories show in Trending even when no other outlet
   has picked them up, come first in Latest, and come first in the Swipe

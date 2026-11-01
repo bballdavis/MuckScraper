@@ -39,6 +39,25 @@
                     {% endfor %}
                 </div>
 
+                {#- Pinned sources (Philip, 2026-11-01): outlets this reader keeps in the menu,
+                    each with a page of its own stories. A group of its own so an outlet
+                    never reads as a topic. -#}
+                {%- set pinned_outlets = sidebar_pinned() %}
+                {%- if pinned_outlets %}
+                <div class="nav-group">
+                    <h2 class="nav-heading">Sources</h2>
+                    {%- for outlet in pinned_outlets %}
+                    {%- set is_active = active_outlet_id|default(none) == outlet.id %}
+                    <a class="nav-link nav-source {% if is_active %}active{% endif %}" href="{{ url_for('admin.list_articles', outlet=outlet.id, range=active_range|default(none)) }}"{% if is_active %} aria-current="page"{% endif %}>
+                        <span class="nav-logo{{ '' if outlet.logo_url else ' no-logo' }}" aria-hidden="true">
+                            {%- if outlet.logo_url %}<img src="{{ outlet.logo_url }}" alt="" loading="lazy" onerror="this.parentNode.classList.add('no-logo')">{% endif %}<span>{{ outlet.name[:1] }}</span>
+                        </span>
+                        <span class="full-text">{{ outlet.name }}</span>
+                    </a>
+                    {%- endfor %}
+                </div>
+                {%- endif %}
+
                 {#- Op/Ed sits below the topics: it is not a topic and not part of the news (Regis, 2026-10-09). #}
                 <div class="nav-group">
                     <h2 class="nav-heading">More</h2>
