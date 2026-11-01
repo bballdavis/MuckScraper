@@ -112,7 +112,7 @@ BETTING_TITLE_PATTERNS = (
     re.compile(r"\bfaab\b", re.IGNORECASE),
 )
 
-# Prediction-market and gambling filler (Philip, 2026-10-28): "Kalshi odds"
+# Prediction-market and gambling filler: "Kalshi odds"
 # and "Polymarket traders say" pieces that restate a market's prices as news,
 # sportsbook and casino affiliate promos, and sweepstakes-casino roundups.
 # These reached the Breaking bar and headline-only stories. Same rule as the
@@ -228,14 +228,13 @@ OPINION_URL_HINTS = (
 # Seeking Alpha: /article/ is contributor stock-pick commentary ("Why I Am
 # Buying REITs Hand Over Fist", "Micron: The Market Is In Disbelief"); its
 # reporting is under /news/ and is kept. Kept as Op/Ed for a day, then dropped
-# from it too (Regis, 2026-10-09): stock tips, not op-eds.
+# from it too: stock tips, not op-eds.
 LOW_VALUE_URL_PREFIXES = (
     "seekingalpha.com/article/",
     # AP section index pages ("MLB | Latest News, Stats, and Scores"), which its
     # Google News feed lists alongside articles (2026-10-16).
     "apnews.com/hub/",
-    # CNN Underscored: shopping reviews with affiliate links, not news (Regis,
-    # 2026-10-21). Its pages also answer 403, and one 403 put all of cnn.com
+    # CNN Underscored: shopping reviews with affiliate links, not news. Its pages also answer 403, and one 403 put all of cnn.com
     # on a 6-hour scrape hold.
     "cnn.com/cnn-underscored/",
     "edition.cnn.com/cnn-underscored/",
@@ -244,7 +243,7 @@ LOW_VALUE_URL_PREFIXES = (
 # Host + path prefixes for outlets that are opinion throughout. National
 # Review is an opinion magazine and its URLs carry no /opinion/ (all 799 stored
 # rows were /2026/...): 243 pieces and 42 edition slots in 30 days as news
-# before this (Regis, 2026-10-09).
+# before this.
 OPINION_URL_PREFIXES = (
     "nationalreview.com/",
 )
@@ -252,7 +251,7 @@ OPINION_URL_PREFIXES = (
 # Op/Ed feeds whose outlet keeps every column under one path. The NYT Opinion
 # feed also carries some news reports (/us/elections/..., /us/...-takeaways),
 # and the op_ed bucket stores every entry as opinion, so one reached a
-# published Opinion page as a "column" (2026-10-17, Regis). An entry from
+# published Opinion page as a "column" (2026-10-17). An entry from
 # these hosts outside the path is not stored. WaPo's /opinions/ is here for
 # its Google News fallback feed.
 OPED_FEED_SECTION_PATHS = {
@@ -365,7 +364,7 @@ def is_advice_column(title=None):
 
 def is_cartoon(title=None, url=None):
     """Editorial/political cartoons: an image with a title, not reporting, and
-    not something to republish (Regis, 2026-10-09)."""
+    not something to republish."""
     normalized_title = (title or "").strip()
     if any(pattern.search(normalized_title) for pattern in CARTOON_TITLE_PATTERNS):
         return True

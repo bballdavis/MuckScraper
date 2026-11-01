@@ -2,7 +2,7 @@
  * queues the task, polls it with the bottom toast (ai_toast.js) and reloads
  * the page when it is done. While it runs, a shimmering skeleton stands in
  * the section the text will fill ([data-ai-slot="<task type>"]); if it fails
- * or times out, the section says so and offers Retry (Philip, 2026-10-27).
+ * or times out, the section says so and offers Retry.
  *
  * Each task polls on its own, so Generate summary and Generate analysis can
  * run together. A task this tab started is remembered in sessionStorage:
@@ -50,7 +50,7 @@
 
     // Every control that starts this task: the round rail button and the
     // one beside the section heading run the same task, so they go busy and
-    // come back together (Philip, 2026-10-25: one consistent behaviour).
+    // come back together.
     function taskButtons(taskType, resourceId, button) {
         const call = "startAiTask('" + taskType + "', " + resourceId + ",";
         const found = [...document.querySelectorAll('button[onclick]')]

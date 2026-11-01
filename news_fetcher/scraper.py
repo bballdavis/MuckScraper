@@ -27,8 +27,7 @@ from news_fetcher import nyt_api  # noqa: E402
 from news_fetcher.bylines import author_from_html  # noqa: E402
 from news_fetcher import wire_carriers  # noqa: E402
 
-# No crawler user agent and no headless browser for paywalled sites (Regis,
-# 2026-10-21). Posing as Googlebot is how 12ft.io got past paywalls before
+# No crawler user agent and no headless browser for paywalled sites. Posing as Googlebot is how 12ft.io got past paywalls before
 # publishers had it taken down; MuckScraper reads what an ordinary browser can
 # read, and a paywalled article stays headline-only. The Playwright path for
 # NYT/WSJ/WaPo/FT/Bloomberg hadn't succeeded once in 30 days anyway.

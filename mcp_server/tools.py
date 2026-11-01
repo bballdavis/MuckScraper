@@ -171,7 +171,7 @@ LOG_KINDS = {
     "search": ("[Search]",),
     "runs": ("=== Starting scheduled fetch run", "fetch run complete", "Scheduler starting", "missed scheduled run"),
 }
-# Known noise that is not an error (CLAUDE.md / review notes).
+# Known noise that is not an error.
 LOG_NOISE = ("error getting summary:", "Document is empty")
 
 
@@ -598,7 +598,7 @@ def code_live_check():
 # Runbook
 # ---------------------------------------------------------------------------
 
-DEFAULT_RUNBOOK_FILES = "docs/MCP.md,TROUBLESHOOTING.md,TROUBLESHOOTINGHL.md,CLAUDE.md,README.md"
+DEFAULT_RUNBOOK_FILES = "docs/MCP.md,docs/API.md,README.md"
 
 
 def _runbook_sections():

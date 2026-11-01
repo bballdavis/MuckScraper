@@ -50,7 +50,7 @@ def upgrade():
             conn.execute(topics.insert().values(name=name, icon=icon, sort_order=sort_order))
 
     # Any pre-existing Topic rows outside the seed list (e.g. orphaned legacy
-    # topics per TODO.md) keep is_active=true from the column default and no
+    # topics) keep is_active=true from the column default and no
     # icon/sort_order — admin UI can fill those in or deactivate them.
 
 

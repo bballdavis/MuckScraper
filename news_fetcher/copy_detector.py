@@ -12,7 +12,7 @@ In a group of copies the original is the article the others credit by
 outlet name ("Fox News Digital" in the Post's copy), else the earliest
 published. Every other member gets copy_of_id = the original.
 
-Regis, 2026-10-11: muckscraper.news leaves the copy out of the story; the
+muckscraper.news leaves the copy out of the story; the
 aggregator keeps it (see aggregator/article_copies.py).
 """
 import html
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 COPY_MIN_OVERLAP = 0.5   # share of the shorter text's 8-word shingles
 SHINGLE_WORDS = 8
-MIN_TEXT_CHARS = 500     # same floor as has_good_original / CLAUDE.md
+MIN_TEXT_CHARS = 500     # same floor as has_good_original
 MIN_SHINGLES = 30
 LOOKBACK_HOURS = 48
 

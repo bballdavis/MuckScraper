@@ -14,8 +14,8 @@ goes through the Op/Ed bucket only. The `op_ed` bucket (2026-10-09) never had
 default rows, so a fresh install had none.
 
 upgrade() only INSERTS the rows below where (url, bucket) is missing. It
-never disables, deletes or edits a feed an install already has (CLAUDE.md: no
-breaking config changes within a major version), so RETIRED_FEEDS stay as
+never disables, deletes or edits a feed an install already has (config is never
+broken by a change within a major version), so RETIRED_FEEDS stay as
 they are on an existing install; disable them on /admin/rss-feeds. A fresh
 install (aggregator/seed_defaults.py) leaves them out.
 """

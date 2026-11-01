@@ -1,4 +1,4 @@
-"""The article page's top controls (Philip, 2026-10-22): the Source
+"""The article page's top controls: the Source
 button, the round summary button that goes once a summary exists, and
 the lean rating, which now returns to the page and shows its result.
 

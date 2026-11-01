@@ -19,7 +19,7 @@ _BULLET_RE = re.compile(r"^(?:[•\-*]|\d+[.)])\s+")
 
 def summary_paragraph(summary):
     """An article summary as one plain paragraph: section labels and bullet
-    markers dropped, the parts joined with spaces (Regis, 2026-10-18)."""
+    markers dropped, the parts joined with spaces."""
     if not summary:
         return ""
     parts = []

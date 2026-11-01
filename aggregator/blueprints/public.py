@@ -27,7 +27,7 @@ public = Blueprint("public", __name__)
 
 @public.route("/")
 def index():
-    # Land on Headlines (Regis, 2026-10-04: the more natural starting page).
+    # Land on Headlines.
     if current_user.is_authenticated:
         # The start page the reader chose on their profile (feed_prefs.py).
         start = feed_prefs.load(current_user)["start_page"]
@@ -46,10 +46,10 @@ def index():
 def headlines_feed():
     """
     Headlines: Trending, Latest or Controversial (?view=, headline_views.py),
-    read live (Philip, 2026-10-24). Before that it showed the newest edition
+    read live. Before that it showed the newest edition
     in its stored rank, which without a ranker was selection order.
 
-    ?edition=<id> shows a published edition (Regis, 2026-10-18), its stories
+    ?edition=<id> shows a published edition, its stories
     read live so articles and op-eds added since it was published show up.
     """
     if request.args.get("edition", type=int):

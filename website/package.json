@@ -1,0 +1,27 @@
+{
+  "name": "muckscraper-docs",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The MuckScraper documentation site, built from the docs/ folder.",
+  "scripts": {
+    "start": "docusaurus start",
+    "build": "docusaurus build",
+    "clear": "docusaurus clear",
+    "serve": "docusaurus serve"
+  },
+  "dependencies": {
+    "@docusaurus/core": "3.6.3",
+    "@docusaurus/preset-classic": "3.6.3",
+    "@mdx-js/react": "3.0.1",
+    "clsx": "2.1.1",
+    "prism-react-renderer": "2.4.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "engines": {
+    "node": ">=18.0"
+  },
+  "overrides": {
+    "webpack": "5.95.0"
+  }
+}

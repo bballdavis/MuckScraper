@@ -67,7 +67,7 @@
 
 /* Groups: the story lists, Sections, More (sidebar_nav.html). A heading is a
    small muted label with room above it and never highlights, so it can't be
-   mistaken for a link (Philip, 2026-10-22). Links are plain text rows; the
+   mistaken for a link. Links are plain text rows; the
    current one is filled across the whole width of the menu, with no side
    border or inset. */
 .nav-group { display: flex; flex-direction: column; }
@@ -172,10 +172,9 @@
 }
 
 /* Phones: the menu starts closed and slides over the page instead of
-   squeezing it; the button opens it (Regis, 2026-10-06: on a phone the
-   button was unreachable and the open menu took most of the screen). The
+   squeezing it; the button opens it. The
    rest of the phone layout is the mobile pass. Short, wide windows (a phone
-   in landscape, under 500px tall) count as phones too (Regis, 2026-10-06). */
+   in landscape, under 500px tall) count as phones too. */
 @media (max-width: 768px), (max-height: 500px) {
     .sidebar {
         position: fixed;

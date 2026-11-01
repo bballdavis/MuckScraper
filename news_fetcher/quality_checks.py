@@ -29,7 +29,7 @@ import unicodedata
 #
 # Labels are derived from the prompt body at runtime rather than hardcoded here.
 # Prompt bodies are DB-backed and go live within 60s of an edit with no deploy
-# (see CLAUDE.md, "Updating LLM Prompts"), so a hardcoded table here would drift
+# so a hardcoded table here would drift
 # silently the first time someone edited a prompt in the admin UI.
 
 # Everything between an "EXACT format" instruction and the trailing rules block

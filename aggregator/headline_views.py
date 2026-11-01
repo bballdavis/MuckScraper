@@ -1,5 +1,4 @@
-"""Headlines' three views: Trending, Latest and Controversial (Philip,
-2026-10-24). Read live from the database rather than from the twice-daily
+"""Headlines' three views: Trending, Latest and Controversial. Read live from the database rather than from the twice-daily
 edition, which still drives automatic summaries and stays under Past editions.
 
 - Trending: 3+ outlets with an article in the last 24 hours, ranked by
@@ -17,8 +16,7 @@ edition, which still drives automatic summaries and stays under Past editions.
 Outlets are counted without copies (aggregator/article_copies.py), and lean
 is the article's score, else its outlet's, like story_rank.
 
-Each section (topic) has the same three views of its own stories (Philip,
-2026-10-27): build(topic_id=) keeps the stories tagged with that topic.
+Each section (topic) has the same three views of its own stories: build(topic_id=) keeps the stories tagged with that topic.
 """
 from collections import namedtuple
 from datetime import datetime, timedelta
@@ -208,7 +206,7 @@ def short_why(view, entry):
     on a phone row or in a web card's meta row: "4 outlets in 6h",
     "High gap · 2 op-eds", "Both sides". The web's longer pills ("N
     reporting in the last 6h", "Framing gap: high · 6 op-eds") gave way to
-    these (Philip, 2026-10-26). Trending's count shows beside the Breaking
+    these. Trending's count shows beside the Breaking
     chip, not in place of it."""
     if view == "trending":
         return recent_why(entry.signals.recent)
@@ -238,7 +236,7 @@ def arrivals(story, now=None):
     """Trending's tap-for-detail chart on the phone: one entry per article the
     story picked up in the last ARRIVALS_HOURS, oldest first, by when we
     fetched it, with `first` set on the article that brought its outlet into
-    the story (Philip, 2026-10-27). Copies of another article in the story
+    the story. Copies of another article in the story
     are left out, as in the outlet counts."""
     now = now or datetime.utcnow()
     since = now - timedelta(hours=ARRIVALS_HOURS)

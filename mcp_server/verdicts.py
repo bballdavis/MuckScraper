@@ -108,7 +108,7 @@ def run_status_verdict(running, stale, status_payload, last_fetch, latest_slot, 
         notes.append(
             "fetch_run_status_v1 says 'running' but started over 3 hours ago: the process "
             "probably died (restart or crash) and the flag was never cleared. Nothing is "
-            "actually running; correct the flag by hand (TROUBLESHOOTING: 'Run status out of sync')."
+            "actually running; correct the flag by hand."
         )
     if latest_slot and (last_fetch is None or last_fetch < latest_slot):
         level = WARNING
@@ -309,7 +309,7 @@ _STOP = {"the", "a", "an", "is", "to", "of", "and", "or", "in", "on", "for", "ho
 
 def split_sections(text, source):
     """Split markdown into sections at headings and at top-level bold bullets
-    (CLAUDE.md keeps most guides as '- **Title:** ...' paragraphs)."""
+    (most guides are written as '- **Title:** ...' paragraphs)."""
     sections, title, lines = [], None, []
 
     def flush():

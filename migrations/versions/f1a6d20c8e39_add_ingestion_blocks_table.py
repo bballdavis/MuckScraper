@@ -21,8 +21,7 @@ depends_on = None
 #
 # The `note` on each row is new -- the old lists carried their rationale in
 # block comments covering a whole group, which the table has nowhere to put.
-# The long-form reasoning stays in TODO.md; these are the one-line versions
-# that show in the admin UI.
+# These are the one-line versions that show in the admin UI.
 
 SEED_SOURCES = [
     ('github.com', 'Developer/repo noise, not news'),

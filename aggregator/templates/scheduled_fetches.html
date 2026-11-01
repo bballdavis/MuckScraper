@@ -36,7 +36,7 @@
 {% block styles %}
 <style>
     /* One fetch per row, top to bottom in run order, so dragging reads as
-       moving it up or down the run (Philip, 2026-10-22). */
+       moving it up or down the run. */
     .fetch-grid { list-style: none; display: flex; flex-direction: column; gap: 8px; }
     .fetch-card { display: flex; flex-direction: column; gap: 4px; padding: 9px 10px 10px 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-frame); min-width: 0; }
     .fetch-card.is-off .fetch-top .fetch-label, .fetch-card.is-off .fetch-line { opacity: 0.5; }

@@ -78,14 +78,14 @@
             <a href="{{ url_for('public.editions_archive') }}" class="btn btn-muted">{{ icon('calendar') }} Past editions</a>
         </div>
     </div>
-    {#- Breaking News sits under the edition line (Philip, 2026-10-22). -#}
+    {#- Breaking News sits under the edition line. -#}
     {% if breaking_rows %}{% include '_breaking_bar.html' %}{% endif %}
     {% if is_past_edition %}
     <p class="past-note">A published edition, shown as its stories stand now: articles and opinion added since it was published are included.</p>
     {% endif %}
     {#- Trending / Latest / Controversial (aggregator/headline_views.py): one
         chip as wide as the column, each segment with its own one-line rule
-        (Philip picked layout B, 2026-10-24). -#}
+. -#}
     {% if views %}
     <nav class="view-switch" aria-label="Headline views">
         {%- for key, label, rule, count in views %}
@@ -133,11 +133,10 @@
         {% call story_card(story, why=story.why_label, why_hot=(view == 'controversial'), why_icon=view_icons[view]) %}
             {{ bias_balance(story) }}
 
-            {#- No placeholder line while a story has no summary (Philip,
-                2026-10-25): the scales button beside the card starts it,
+            {#- No placeholder line while a story has no summary: the scales button beside the card starts it,
                 and a skeleton holds this spot while it is written. -#}
             {#- The Big Picture in the story page's card (story_analysis.css
-                .sa-lead): icon, heading, the summary (Philip, 2026-10-25). -#}
+                .sa-lead): icon, heading, the summary. -#}
             {% if story.summary %}
                 <div class="sa sa-cards hl-big-picture">
                     <div class="sa-lead">
@@ -161,7 +160,7 @@
         {% if can_mark_read %}
         {#- Beside the card on hover: mark as read, and under it, centred
             with it, the scales to analyze a story nobody has summarized yet
-            (Philip, 2026-10-25). -#}
+. -#}
         <div class="hl-side">
             <button type="button" class="hl-read" data-mark-read aria-label="Mark as read"><span class="hl-read-icon">{{ icon('glasses') }}<span class="tip" role="tooltip"><strong>Mark as read</strong> Hides it from Headlines. Find it again under Recently Read.</span></span></button>
             {% if can_analyze and not story.summary %}
@@ -191,7 +190,7 @@
     {% include 'sidebar_script.html' %}
 
     {% if current_user.is_authenticated and can('scraper') %}
-    // The scales beside a card with no summary (Philip, 2026-10-25): starts
+    // The scales beside a card with no summary: starts
     // the story summary (and the multi-source analysis when the story can
     // have one), holds a skeleton where The Big Picture goes, then swaps in
     // the card as the server now renders it.

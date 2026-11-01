@@ -30,7 +30,7 @@ on every install, new or old:
 
   - On an existing install every row is already present, so it is a no-op.
   - It can never clobber a prompt, feed or blocklist entry a self-hoster has
-    edited -- required by CLAUDE.md's rule that a `1.x` -> `1.y` upgrade must
+    edited -- required because a `1.x` -> `1.y` upgrade must
     not discard a user's customizations.
 
 The data below duplicates what the migrations hold. That duplication is

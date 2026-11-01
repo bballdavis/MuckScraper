@@ -1,6 +1,6 @@
 # news_fetcher/bylines.py
 #
-# Article bylines (Regis, 2026-10-24). The author comes from the feed or API
+# Article bylines. The author comes from the feed or API
 # entry at ingestion; when that has none, from the publisher's own page
 # (JSON-LD, then author meta tags) if the scraper fetched it. Pure functions:
 # nothing here fetches or writes.

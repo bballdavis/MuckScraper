@@ -42,7 +42,7 @@ def fetch_page():
 
 
 # All Stories and Grouped Stories are open to signed-out visitors when
-# PUBLIC_READ_ACCESS is on (Regis, 2026-10-04), like Headlines. They get no
+# PUBLIC_READ_ACCESS is on, like Headlines. They get no
 # scrape-status filter and no scrape details (see articles.html).
 @admin.route("/articles")
 @public_or_login

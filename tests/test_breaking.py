@@ -50,7 +50,7 @@ class DetectionTests(unittest.TestCase):
 
 
 class JunkFilterTests(unittest.TestCase):
-    """Breaking drops what ingestion would refuse (Philip, 2026-10-28)."""
+    """Breaking drops what ingestion would refuse."""
 
     def _blocks(self, titles=(), urls=()):
         return SimpleNamespace(blocks_title=lambda t, count=True: any(p in (t or "").lower() for p in titles),

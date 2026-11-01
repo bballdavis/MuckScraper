@@ -283,7 +283,6 @@ def extract_countries(title, extra_titles=None):
 # precisely because they are specific boilerplate, so rarity measures the wrong
 # thing. This has to stay a curated list of generic event language; keep it
 # small, and only add a token after seeing it cause a wrong suppression.
-# TODO.md -> "Recurring Checks" has a runnable method for surfacing candidates
 # (and records the two statistical approaches that do NOT work, so they don't
 # get retried).
 VETO_GENERIC_TOKENS = frozenset({

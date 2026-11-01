@@ -62,3 +62,8 @@ SoakReports/
 reviewer/
 quality_check.py
 QualityReports/
+
+# Documentation site build output and dependencies
+website/node_modules/
+website/build/
+website/.docusaurus/

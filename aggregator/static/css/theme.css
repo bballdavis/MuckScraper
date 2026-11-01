@@ -26,7 +26,7 @@
 
     /* Accent: --accent is for backgrounds and borders (white text on it);
        --accent-text is for text in the accent colour. Indigo, matching the
-       sidebar (Regis, 2026-10-06; was olive #5a5f52). Blue is avoided on
+       sidebar. Blue is avoided on
        purpose: it would read as Left. */
     --accent:         #4c4c8f;
     --accent-light:   #7474b8;
@@ -56,7 +56,7 @@
     --sidebar-hover:       #ffffff;
     --sidebar-active-bg:   #3a3a5a;
 
-    /* Bias, 1 = Left ... 5 = Right (blue / grey / red, see CLAUDE.md).
+    /* Bias, 1 = Left ... 5 = Right (blue / grey / red).
        Chips: same in both themes; -fg is the text colour on that chip. */
     --bias-1-bg: #1a6bb5;  --bias-1-fg: #ffffff;
     --bias-2-bg: #6aaee0;  --bias-2-fg: #1a1a1a;
@@ -122,7 +122,7 @@
 
 /* Reporting grade (story_card_macros.html reporting_tag, 2026-10-23): the
    word, then five bars filled up to the grade in its colour.
-   The word uses the lean chip's type exactly, caps and all (Philip, 2026-10-25). */
+   The word uses the lean chip's type exactly, caps and all. */
 .reporting-tag {
     --rep: #2f9e5b; display: inline-flex; align-items: center; gap: 6px;
     font-size: 11px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; color: var(--text); white-space: nowrap;
@@ -135,10 +135,9 @@
 .reporting-dots i { width: 4px; height: 10px; border-radius: 1px; background: var(--input-border); }
 .reporting-dots i.on { background: var(--rep); }
 /* Grade and lean as one split pill (story_card_macros.html grade_pill;
-   Philip, 2026-10-25): the grade on the left in an outlined half, the lean
+   the grade on the left in an outlined half, the lean
    chip as the whole right half, its colour running to the pill's outer
-   edge. One tip for the whole pill, like the iOS app's popover (Philip,
-   2026-10-27), above it and right-aligned by default; story cards open it
+   edge. One tip for the whole pill, like the iOS app's popover, above it and right-aligned by default; story cards open it
    left-aligned, since the pill starts their bottom row. A tap focuses the
    pill, so :focus opens it too on touch screens. It sits above a compact
    card's stretched headline link. */
@@ -161,7 +160,7 @@
 .grade-pill .tip .gp-line { display: block; margin-top: 3px; }
 .grade-pill .tip .gp-muted { color: #b8bccc; }
 .grade-pill .tip .gp-small { color: #b8bccc; font-size: 11px; margin-top: 6px; }
-/* Phones: chips shrink rather than wrap their row (Philip, 2026-10-23). The
+/* Phones: chips shrink rather than wrap their row. The
    lean chip switches to its short form (story_card_macros.html bias_short)
    and the reporting grade to its dots alone; tap one for its meaning. */
 .bt-short { display: none; }
@@ -273,7 +272,7 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
 .title-meta > :not(.tm-item) { margin-left: auto; }
 /* Chips that sit together at the right end (reporting grade, then lean). */
 .tm-chips { display: inline-flex; align-items: center; gap: 12px; }
-/* Phones keep the article page's line on one row (Philip, 2026-10-23):
+/* Phones keep the article page's line on one row:
    no SOURCE: / PUBLISHED: labels, only the outlet and date, and the outlet
    name gives way first. Scoped to lines that carry chips (article.html), so
    the story page's "Sources: 7" keeps its label. */
@@ -298,12 +297,12 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
 .act-ready { color: var(--accent-text); cursor: pointer; }
 .act-ready:hover, .act-ready:focus-visible { background: var(--accent); border-color: var(--accent); color: #fff; outline: none; }
 /* Dim the icon, not the box: opacity on the box carried into its .tip and
-   let the card show through it (Philip, 2026-10-25). */
+   let the card show through it. */
 .act-off { color: var(--text-faint); cursor: default; }
 .act-off > .icon { opacity: 0.6; }
 .act.busy { cursor: progress; }
 /* Running: filled like a hover, so the rail button and the one by the
-   heading both read as working (Philip, 2026-10-25). */
+   heading both read as working. */
 .act-ready.busy { background: var(--accent); border-color: var(--accent); color: #fff; }
 .act.busy .icon { animation: act-pulse 1s ease-in-out infinite; }
 @keyframes act-pulse { 50% { opacity: 0.3; } }
@@ -354,7 +353,7 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
 
 /* AI task progress (static/js/ai_toast.js): a toast at the bottom like the
    read Undo toast in reads.css, same size and type, in the theme's dark bar
-   colour; amber when something went wrong (Philip, 2026-10-25). */
+   colour; amber when something went wrong. */
 .ai-toast {
     position: fixed; left: 50%; bottom: 28px; z-index: 1000;
     transform: translate(-50%, 16px); opacity: 0; visibility: hidden;
@@ -473,7 +472,7 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
     body .topbar .theme-toggle, body .topbar .account-signin { padding-left: 10px; padding-right: 10px; }
 }
 
-/* Phones: pages give the width to their content (Philip, 2026-10-25). Every
+/* Phones: pages give the width to their content. Every
    list page's column, and the app pages', keeps a 10px gutter; body-scoped
    to win over each page's own .main padding. */
 @media (max-width: 600px) {
@@ -483,8 +482,7 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
 }
 
 /* Touch screens: iOS Safari zooms the page in when a field under 16px takes
-   focus and leaves it zoomed, so the page no longer fits the screen (Philip,
-   2026-10-25). Fields go to 16px there instead of turning pinch-zoom off.
+   focus and leaves it zoomed, so the page no longer fits the screen. Fields go to 16px there instead of turning pinch-zoom off.
    !important so it wins over each page's own smaller field sizes. */
 @media (hover: none) and (pointer: coarse) {
     input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),

@@ -1,0 +1,85 @@
+/*
+ * The docs use the web app's colours (aggregator/static/css/theme.css): the
+ * indigo accent, the dark top bar and the page greys. The masthead face is
+ * Playfair Display, as the app's masthead is.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&display=swap');
+
+:root {
+  --ifm-color-primary: #4c4c8f;
+  --ifm-color-primary-dark: #3a3a72;
+  --ifm-color-primary-darker: #35356a;
+  --ifm-color-primary-darkest: #2b2b57;
+  --ifm-color-primary-light: #7474b8;
+  --ifm-color-primary-lighter: #8585c2;
+  --ifm-color-primary-lightest: #a8abf0;
+
+  --ifm-background-color: #f8f9fa;
+  --ifm-background-surface-color: #ffffff;
+  --ifm-font-color-base: #1a1a1a;
+  --ifm-font-color-secondary: #555;
+
+  --ifm-font-family-base: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --ifm-heading-font-family: 'Playfair Display', 'Bodoni 72', Didot, Georgia, 'Times New Roman', serif;
+  --ifm-heading-font-weight: 800;
+  --ifm-code-font-size: 92%;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #a8abf0;
+  --ifm-color-primary-dark: #9598e6;
+  --ifm-color-primary-darker: #8f92e2;
+  --ifm-color-primary-darkest: #7d80d6;
+  --ifm-color-primary-light: #bcbef4;
+  --ifm-color-primary-lighter: #c4c6f6;
+  --ifm-color-primary-lightest: #d6d7fa;
+
+  --ifm-background-color: #0f0f17;
+  --ifm-background-surface-color: #1a1a26;
+  --ifm-font-color-base: #e2e8f0;
+  --ifm-font-color-secondary: #a0aec0;
+}
+
+/* The app's top bar. */
+.navbar {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  box-shadow: none;
+}
+
+.navbar__title,
+.navbar__link {
+  color: #cdd6f4;
+}
+
+.navbar__link:hover,
+.navbar__brand:hover {
+  color: #ffffff;
+}
+
+[data-theme='dark'] .navbar {
+  background: #161622;
+}
+
+.footer--dark {
+  background: #1e1e2e;
+}
+
+/* Hero line under the title on the front page. */
+.hero {
+  background: linear-gradient(180deg, #25253a 0%, #1e1e2e 100%);
+  color: #cdd6f4;
+}
+
+.hero__title {
+  font-family: var(--ifm-heading-font-family);
+  color: #ffffff;
+}
+
+.hero__subtitle {
+  color: #c3c8dc;
+}
+
+.menu__link--active:not(.menu__link--sublist) {
+  font-weight: 600;
+}

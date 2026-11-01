@@ -9,7 +9,7 @@ from aggregator.display_time import relative_time
 class RelativeTimeTests(unittest.TestCase):
     """The server writes the same "3 hours ago" text that
     static/js/local_time.js would, so the line doesn't change once the script
-    runs (Philip, 2026-10-27: the jump from login to Headlines)."""
+    runs."""
 
     def test_matches_local_time_js(self):
         now = datetime(2026, 10, 27, 14, 0)
