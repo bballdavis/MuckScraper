@@ -44,7 +44,7 @@
 
 
         /* Wider than other reading pages so the analysis cards get three real
-           columns (Philip, 2026-10-25), leaving room on the left for the
+           columns, leaving room on the left for the
            round rail buttons where they float beside the card. */
         .container { max-width: min(1060px, calc(100% - 128px)); margin: 28px auto; padding: 0 20px; }
         @media (max-width: 1280px) { .container { max-width: 1060px; } }
@@ -59,7 +59,7 @@
 
         h1 { font-size: 34px; font-weight: 800; margin-bottom: 12px; letter-spacing: -1px; line-height: 1.2; }
 
-        /* Section headings sit above their callouts (Philip, 2026-10-22). */
+        /* Section headings sit above their callouts. */
         .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 10px; }
         .section-label {
             font-size: var(--fs-label);
@@ -102,7 +102,7 @@
         .article-meta { display: flex; align-items: baseline; gap: 10px; font-size: 12px; font-weight: 500; color: var(--text-faint); }
         .article-outlet { font-size: 14px; font-weight: 700; color: var(--text-muted); }
         /* The grade and lean pill (or the lean chip alone) sits at the right
-           (Philip, 2026-10-25). */
+. */
         .article-meta > .bias-tag, .article-meta > .grade-pill { margin-left: auto; align-self: center; }
         .article-meta .outlet-flag { margin-left: -4px; }
 
@@ -154,7 +154,7 @@
             height: 30px; min-width: 104px; padding: 0 12px;
             display: inline-flex; align-items: center; justify-content: center; gap: 6px;
             /* --border was near invisible on the Source button; a grey that
-               reads in both themes (Philip, 2026-10-25). */
+               reads in both themes. */
             border: 1px solid var(--pill-border); border-radius: 8px; background: transparent;
             color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 700;
             text-decoration: none; cursor: pointer; white-space: nowrap;
@@ -179,7 +179,7 @@
 
         /* Each source row is a card like the story cards on the list pages
            (story_card.css .story): rounded, bordered, a light shadow and a
-           small lift on hover (Philip, 2026-10-22). The content, then a rail
+           small lift on hover. The content, then a rail
            of summary and analysis icons down the right side. */
         .article-item {
             flex-direction: row; gap: 0; padding: 0; margin-bottom: 14px;
@@ -246,7 +246,7 @@
             color: var(--text-muted);
         }
 
-        /* Phones (Philip, 2026-10-23): less padding on the nested boxes, and
+        /* Phones: less padding on the nested boxes, and
            every source row stays on one line. The outlet name gives way
            first (ellipsis), the chips shrink (theme.css .bt-short), and the
            buttons narrow so the read chip stays beside them. */
@@ -281,7 +281,7 @@
 <div class="container">
 {#- Round buttons under the back button: read, then (scrapers) the executive
     summary and the multi-source analysis while each is still to be
-    generated (Philip, 2026-10-23), as on the article page, or can be
+    generated, as on the article page, or can be
     regenerated because sources have arrived since (2026-10-25). -#}
 {%- set summary_new = story.new_sources_for_summary if can('scraper') else 0 -%}
 {%- set analysis_new = story.new_sources_for_analysis if can('scraper') else 0 -%}
@@ -307,7 +307,7 @@
 
         {% if story.scrape_quality and story.scrape_quality.total > 0 %}
         {#- One header row (label, then the read counts as chips at the right),
-            the full note below (Philip, 2026-10-22: option B, modified). -#}
+            the full note below. -#}
         <div class="editors-note">
             <div class="editors-note-head">
                 <span class="editors-note-label">Editor's Note</span>
@@ -339,7 +339,7 @@
         <div data-ai-slot="story_summary">
             {% if story.summary and analysis_layout != 'sections' %}
             {#- In the Cards layout the summary is plain paragraphs, flat like the
-                analysis below it (Philip, 2026-10-25). -#}
+                analysis below it. -#}
             <div class="sa sa-cards sa-summary">
                 {% for line in story.summary.split('\n') if line.strip() %}<p>{{ line.strip() }}</p>{% endfor %}
             </div>
@@ -368,7 +368,7 @@
         </div>
 
         {#- A one-source story has nothing to compare, so no analysis section
-            or button (Philip, 2026-10-27). -#}
+            or button. -#}
         {% if story.deep_report or story.can_analyze %}
         <div class="section-head">
             <h2 class="section-label">Multi-Source Analysis</h2>
@@ -410,7 +410,7 @@
                 icon-only read-status chip whose tooltip explains it. The
                 article's summary sits in a rail on the right, as on the story
                 cards; multi-source analysis belongs to the story, so it has
-                no icon here (Philip, 2026-10-22). -#}
+                no icon here. -#}
             {% set read_states = {
                 'success':  ('circle-check', 'Full read', 'MuckScraper read the whole article, so the summary and analysis draw on its full text.'),
                 'fallback': ('circle-alert', 'Partial read', "Only the publisher's excerpt or a partial copy could be read, so some detail or quotes may be missing."),

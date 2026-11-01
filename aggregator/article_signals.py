@@ -112,7 +112,7 @@ BETTING_TITLE_PATTERNS = (
     re.compile(r"\bfaab\b", re.IGNORECASE),
 )
 
-# Prediction-market and gambling filler (Philip, 2026-10-28): "Kalshi odds"
+# Prediction-market and gambling filler: "Kalshi odds"
 # and "Polymarket traders say" pieces that restate a market's prices as news,
 # sportsbook and casino affiliate promos, and sweepstakes-casino roundups.
 # These reached the Breaking bar and headline-only stories. Same rule as the

@@ -1,6 +1,6 @@
 """The order RSS feeds are fetched in, chosen on Settings › RSS feeds.
 
-Most reliable first by default (Philip, 2026-10-27), so when a run is cut
+Most reliable first by default, so when a run is cut
 short or the classifier budget runs out, the better-sourced feeds are already
 in. The grade is the outlet's reporting level from aggregator/
 outlet_reporting.py, looked up by the feed's label or, without one, the outlet

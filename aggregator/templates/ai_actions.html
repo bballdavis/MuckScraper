@@ -1,5 +1,5 @@
 {#- Summary and multi-source analysis as one icon each, both a button and a
-    status (Philip, 2026-10-22): filled in the theme colour once it has run
+    status: filled in the theme colour once it has run
     (no longer a button), the icon in the theme colour while it can be run
     (a button that starts the AI task), grey when it can't. Hover or focus
     shows a tooltip; titles share one wording: "Generate …" when it can
@@ -30,7 +30,7 @@
 {#- The story's two actions, for a story card or the story page. Once one
     has run it can be run again only when `new_sources` (sources fetched into
     the story since; the story page passes Story.new_sources_for_*) is above
-    zero (Philip, 2026-10-25). Cards leave it at 0. The analysis icon is
+    zero. Cards leave it at 0. The analysis icon is
     left out of a story with one source, since it can't be written. -#}
 {%- macro _sources(n) -%}{{ n }} new source{{ '' if n == 1 else 's' }}{%- endmacro -%}
 
@@ -52,7 +52,7 @@
 {%- elif story.deep_report -%}
 {{ ai_action('analysis', 'done', 'Multi-source analysis generated', 'Open the story to see how Left, Center and Right outlets cover it.', extra_class=extra_class) }}
 {%- elif not story.can_analyze -%}
-{#- Nothing to compare in a one-source story: no icon (Philip, 2026-10-27). -#}
+{#- Nothing to compare in a one-source story: no icon. -#}
 {%- elif can_run -%}
 {{ ai_action('analysis', 'ready', 'Generate multi-source analysis', 'Compares how Left, Center and Right outlets cover this story. Runs in the background; the page reloads when it is done.', "startAiTask('story_deep_report', %d, this)" % story.id, extra_class) }}
 {%- else -%}

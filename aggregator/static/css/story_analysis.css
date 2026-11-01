@@ -1,6 +1,6 @@
 /* The story page's multi-source analysis (templates/story_analysis.html):
    Cards (default) and Sections, picked under Appearance on the profile page
-   (Philip, 2026-10-23). Bias colours come from theme.css. */
+. Bias colours come from theme.css. */
 
 .sa {
     --sa-l-tint: rgba(26, 107, 181, 0.07);
@@ -30,7 +30,7 @@
 .sa-right  { --sa-side: var(--bias-5-bg); --sa-side-text: var(--bias-right-text);  --sa-tint: var(--sa-r-tint); }
 
 /* ---- Cards ----
-   Flat (Philip, 2026-10-25: option A of the flat mocks): no boxes inside
+   Flat: no boxes inside
    the story card, only rules and type. The executive summary above uses the
    same plain paragraphs. Left, center and right stack full width with a
    coloured rule; the other sections sit side by side under a hairline. */

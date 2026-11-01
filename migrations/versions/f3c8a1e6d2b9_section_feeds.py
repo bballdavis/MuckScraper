@@ -5,7 +5,7 @@ Revises: a4b42504ce6b
 Create Date: 2026-10-27
 
 Sports, Sci/Tech, Buss/Fin and Other had almost no stories of their own:
-every default feed is a general or politics feed (Philip, 2026-10-27). These
+every default feed is a general or politics feed. These
 are section feeds from outlets already in the list (BBC, NPR, The Guardian)
 plus topic outlets with public RSS.
 

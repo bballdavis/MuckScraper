@@ -1,7 +1,7 @@
 /* The Breaking News bar on Headlines (templates/_breaking_bar.html). A solid
    accent block with a thin label band, then one compact row per headline.
    No left accent border; corners 16px like the story cards below it, and
-   it sits under the edition line (Philip, 2026-10-22). */
+   it sits under the edition line. */
 .breaking-bar {
     background: var(--accent); color: #fff; border-radius: 16px; margin: 4px 0 20px;
     box-shadow: 0 6px 18px rgba(58, 58, 114, 0.22);
@@ -25,7 +25,7 @@
 .bk-meta { flex: 0 0 auto; color: #dcdcf4; font-size: 12px; white-space: nowrap; }
 .bk-meta strong { color: #fff; font-weight: 600; }
 /* The summary icon: no border; outline until the story is summarized, then
-   filled (Philip, 2026-10-22). */
+   filled. */
 .bk-act {
     position: relative; flex: 0 0 auto; width: 30px; height: 30px; padding: 0;
     display: inline-flex; align-items: center; justify-content: center;

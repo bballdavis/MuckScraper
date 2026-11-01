@@ -6,16 +6,14 @@
 <a class="crumb" href="{{ href }}">&larr; {{ label }}</a>
 {%- endmacro %}
 
-{#- The floating back button beside the story and article cards (Philip,
-    2026-10-22): it returns to the previous page when the reader came from
+{#- The floating back button beside the story and article cards: it returns to the previous page when the reader came from
     this site, else follows `href` (the feed or the story, named by `label`
     for screen readers); the tooltip says "Back to previous page". Must be the first child of the page's .container.
     Styles: theme.css .back-rail. -#}
 {#- `below` is markup for more round buttons under the back button, such as
     the story and article pages' read toggle (read_toggle.html) and the
     article page's summary and lean buttons. They stack in .rail-stack. -#}
-{#- `collapse` folds them behind one ⋯ button on narrow screens (Philip,
-    2026-10-22: the article page's three took too much room on a phone). -#}
+{#- `collapse` folds them behind one ⋯ button on narrow screens. -#}
 {% macro float_back(href, label, below='', collapse=false) -%}
 <div class="back-rail{{ ' rail-collapsible' if collapse }}">
     {% if below %}<div class="rail-stack" id="rail-stack">{{ below }}</div>{% endif %}

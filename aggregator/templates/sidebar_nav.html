@@ -1,8 +1,7 @@
 {#- Signed-out visitors (PUBLIC_READ_ACCESS) get Headlines, the two story
     lists, Opinion & Editorials and the topic filters; Search needs an account and Fetch Articles
     the Scraper role.
-    Three groups (Philip, 2026-10-22: headings and links were hard to tell
-    apart): the story lists, Sections, and More. Headings are small muted
+    Three groups: the story lists, Sections, and More. Headings are small muted
     labels that never highlight; every link is a full-width row with a hover
     and a full-width active fill. The story lists and More keep their icons;
     topics are text only. -#}
@@ -39,7 +38,7 @@
                     {% endfor %}
                 </div>
 
-                {#- Pinned sources (Philip, 2026-11-01): outlets this reader keeps in the menu,
+                {#- Pinned sources: outlets this reader keeps in the menu,
                     each with a page of its own stories. A group of its own so an outlet
                     never reads as a topic. -#}
                 {%- set pinned_outlets = sidebar_pinned() %}

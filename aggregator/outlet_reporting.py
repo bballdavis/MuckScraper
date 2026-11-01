@@ -1,7 +1,7 @@
 # aggregator/outlet_reporting.py
 """How reliable an outlet's reporting is, on five levels.
 
-A hand-kept grade, separate from lean (Philip, 2026-10-23). Lean says where
+A hand-kept grade, separate from lean. Lean says where
 an outlet sits left to right; this says how far its reporting can be taken
 at face value, which is the more useful signal for outlets AllSides doesn't
 rate and for the ones abroad.
@@ -10,8 +10,7 @@ Each grade is our own call, set by reading two public ratings side by side.
 We don't copy either dataset:
   - Media Bias/Fact Check's "Factual Reporting" (Very High ... Very Low)
   - Ad Fontes Media's reliability score (0-64; 40+ is "reliable")
-The levels follow MBFC's scale (Philip asked for more than three, since the
-sources spread widely), with its Very Low folded into Low. A grade is MBFC's
+The levels follow MBFC's scale, with its Very Low folded into Low. A grade is MBFC's
 level, moved one step where Ad Fontes clearly disagrees: up when Ad Fontes
 scores the outlet 42 or more (or 40+ against an MBFC Mixed), down when it
 scores under 32. Those moves are marked below. Looked up 2026-10-23 on each

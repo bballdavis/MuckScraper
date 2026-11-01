@@ -1,0 +1,27 @@
+{
+  "id": "features",
+  "title": "Features",
+  "description": "Screenshots",
+  "source": "@site/../docs/features.md",
+  "sourceDirName": ".",
+  "slug": "/features",
+  "permalink": "/MuckScraper/features",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "title": "Features",
+    "sidebar_position": 4
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Configuration",
+    "permalink": "/MuckScraper/configuration"
+  },
+  "next": {
+    "title": "Architecture",
+    "permalink": "/MuckScraper/architecture"
+  }
+}

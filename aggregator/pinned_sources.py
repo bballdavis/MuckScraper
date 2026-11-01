@@ -1,5 +1,5 @@
 """Pinned sources: outlets a reader keeps in the menu, each with a page of its
-own stories (Philip, 2026-11-01). The Texas Tribune is the first one he wants.
+own stories. The Texas Tribune is the first one he wants.
 
 A pin is a per-reader choice, kept separate from the priority outlets in
 aggregator/source_priority.py, which only change how stories rank. One

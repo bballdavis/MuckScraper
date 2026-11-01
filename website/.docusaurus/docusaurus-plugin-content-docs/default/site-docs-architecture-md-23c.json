@@ -1,0 +1,27 @@
+{
+  "id": "architecture",
+  "title": "Architecture",
+  "description": "Tech stack",
+  "source": "@site/../docs/architecture.md",
+  "sourceDirName": ".",
+  "slug": "/architecture",
+  "permalink": "/MuckScraper/architecture",
+  "draft": false,
+  "unlisted": false,
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 5,
+  "frontMatter": {
+    "title": "Architecture",
+    "sidebar_position": 5
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Features",
+    "permalink": "/MuckScraper/features"
+  },
+  "next": {
+    "title": "Security",
+    "permalink": "/MuckScraper/security"
+  }
+}
