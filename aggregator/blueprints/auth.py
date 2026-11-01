@@ -3,10 +3,11 @@ from urllib.parse import urlparse
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
+from sqlalchemy import func
 
-from aggregator import appearance_prefs, db, feed_prefs, reading_prefs, source_priority
+from aggregator import appearance_prefs, db, feed_prefs, pinned_sources, reading_prefs, source_priority
 from aggregator.accounts import email_error, password_error
-from aggregator.models import User
+from aggregator.models import Outlet, User
 
 auth = Blueprint("auth", __name__)
 
@@ -138,6 +139,9 @@ def profile():
         auto_read_delays=reading_prefs.AUTO_READ_DELAYS,
         boosted=source_priority.effective_names(current_user.id),
         outlet_suggestions=source_priority.outlet_suggestions(),
+        pinned=pinned_sources.outlets(current_user.id),
+        pinned_max=pinned_sources.MAX_PINNED,
+        pin_candidates=[o.name for o in pinned_sources.candidates(limit=300)],
     )
 
 
@@ -146,6 +150,32 @@ def _local_next(value, fallback):
     if not value or not value.startswith("/") or value.startswith("//") or urlparse(value).netloc:
         return fallback
     return value
+
+
+@auth.route("/pin-source", methods=["POST"])
+@login_required
+def pin_source():
+    """Pin or unpin a source in the menu (aggregator/pinned_sources.py): from
+    a source's own page, or the profile's list (which names it instead of an
+    id). Goes back to where the reader was."""
+    back = _local_next(request.form.get("next"), url_for("auth.profile"))
+    outlet_id = request.form.get("outlet_id", type=int)
+    name = request.form.get("name", "").strip()
+    if outlet_id is None and name:
+        found = Outlet.query.filter(func.lower(Outlet.name) == name.lower()).first()
+        outlet_id = found.id if found else None
+        if found is None:
+            flash(f"No source called “{name}”.", "error")
+            return redirect(back)
+    if outlet_id is None:
+        return redirect(back)
+    try:
+        pinned_sources.set_pinned(current_user.id, outlet_id, request.form.get("pinned") == "1")
+    except LookupError:
+        flash("No such source.", "error")
+    except ValueError as exc:
+        flash(str(exc), "error")
+    return redirect(back)
 
 
 @auth.route("/feed-defaults", methods=["POST"])
