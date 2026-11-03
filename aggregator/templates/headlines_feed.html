@@ -261,6 +261,9 @@
     async function refreshBreaking() {
         try {
             const response = await fetch(breakingUrl, { headers: { 'Accept': 'text/html' } });
+            // Signed out, e.g. the session timed out: reload the page so the
+            // browser gets the login redirect, rather than inserting a login page here.
+            if (response.status === 401 || response.redirected) { location.reload(); return; }
             if (!response.ok) return;
             const html = (await response.text()).trim();
             const bar = document.getElementById('breaking-bar');

@@ -50,3 +50,16 @@ def public_or_login(view):
             return current_app.login_manager.unauthorized()
         return view(*args, **kwargs)
     return wrapped
+
+
+def public_or_login_fragment(view):
+    """public_or_login for a fragment a page fetches in the background. The login
+    redirect would be followed by fetch() and come back as a 200 login page,
+    which the page would insert as content; a 401 lets the page send the
+    browser to login itself."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not current_user.is_authenticated and not public_read_enabled():
+            abort(401)
+        return view(*args, **kwargs)
+    return wrapped
