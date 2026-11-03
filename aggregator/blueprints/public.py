@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, jsonif
 from flask_login import current_user
 from aggregator import appearance_prefs, breaking, feed_prefs, headline_views, reading_prefs, reads, story_analysis
 from aggregator.models import FeedEntry
-from aggregator.permissions import ROLE_SCRAPER, public_or_login, public_read_enabled, role_required
+from aggregator.permissions import ROLE_SCRAPER, public_or_login, public_or_login_fragment, public_read_enabled, role_required
 from aggregator.models import Article, Story, Topic, RawArticlePayload, Edition, EditionStory
 from aggregator.opinion import opinion_for_story, published_edition_opinion_cards, split_by_leaning
 from aggregator.story_view import apply_aggregator_filter, annotate_edition_story_flags
@@ -168,7 +168,7 @@ def _breaking_context():
 
 
 @public.route("/headlines/breaking")
-@public_or_login
+@public_or_login_fragment
 def breaking_bar():
     """The Breaking News bar alone, for Headlines to refresh in place. Empty
     when nothing is breaking."""
