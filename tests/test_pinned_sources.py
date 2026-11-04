@@ -255,8 +255,132 @@ class WebPinnedSourcesTests(unittest.TestCase):
             url = url_for("admin.list_articles", outlet=outlet.id if outlet else None, range="all")
         return self.client.get(url)
 
-    def test_sidebar_has_no_sources_group_until_something_is_pinned(self):
-        self.assertNotIn(b'class="nav-link nav-source', self._page().data)
+    def test_sidebar_offers_source_discovery_before_anything_is_pinned(self):
+        html = self._page().data
+        self.assertNotIn(b'class="nav-link nav-source', html)
+        self.assertIn(b">Sources<", html)
+        self.assertIn(b'href="/sources"', html)
+        self.assertIn("Find a source…".encode(), html)
+
+    def test_source_browser_lists_recent_outlets_and_empty_pin_guidance(self):
+        html = self.client.get("/sources").data.decode()
+        self.assertIn("Your sources start here", html)
+        self.assertIn("0 of 12 pinned", html)
+        self.assertIn("The Texas Tribune", html)
+        self.assertIn("Plain Gazette", html)
+        self.assertIn('aria-current="page"', html)
+        self.assertIn('aria-label="Pin The Texas Tribune to menu"', html)
+
+    def test_discovery_search_is_literal_and_has_an_empty_state(self):
+        from bs4 import BeautifulSoup
+        html = self.client.get("/sources?q=tribune").data.decode()
+        names = [row.get_text(strip=True) for row in BeautifulSoup(html, "html.parser").select(".source-name")]
+        self.assertEqual(names, ["The Texas Tribune"])
+        for term in ("%", "_", "Nowhere Times"):
+            html = self.client.get("/sources", query_string={"q": term}).data.decode()
+            self.assertIn("No sources match", html)
+            self.assertNotIn('class="source-row"', html)
+
+    def test_pinned_outlets_stay_first_without_duplicates_and_without_recent_articles(self):
+        from aggregator import db, pinned_sources
+        from aggregator.models import Article
+        from bs4 import BeautifulSoup
+        pinned_sources.set_pinned(self.user_id, self.wire.id, True)
+        pinned_sources.set_pinned(self.user_id, self.tribune.id, True)
+        Article.query.filter_by(outlet_id=self.wire.id).update({"fetched_at": datetime.utcnow() - timedelta(days=40)})
+        db.session.commit()
+        soup = BeautifulSoup(self.client.get("/sources").data, "html.parser")
+        names = [row.get_text(strip=True) for row in soup.select(".source-name")]
+        self.assertEqual(names, ["Wire Service", "The Texas Tribune", "Plain Gazette"])
+        soup = BeautifulSoup(self.client.get("/sources?q=wire").data, "html.parser")
+        self.assertEqual([row.get_text(strip=True) for row in soup.select(".source-name")], ["Wire Service"])
+
+    def test_discovery_pin_and_unpin_keep_the_search_and_update_the_menu(self):
+        from aggregator import pinned_sources
+        path = "/sources?q=tribune"
+        for value, label in (("1", "Unpin"), ("0", "Pin to menu")):
+            response = self.client.post("/auth/pin-source", data={
+                "outlet_id": self.tribune.id, "pinned": value, "next": path,
+            })
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.headers["Location"], path)
+            html = self.client.get(path).data.decode()
+            self.assertIn(label, html)
+            self.assertIn("pinned to Sources." if value == "1" else "unpinned from Sources.", html)
+            self.assertEqual(pinned_sources.is_pinned(self.user_id, self.tribune.id), value == "1")
+
+    def test_discovery_pages_candidates_and_keeps_query(self):
+        from aggregator import db
+        from aggregator.models import Article, Outlet
+        from bs4 import BeautifulSoup
+        now = datetime.utcnow()
+        for n in range(55):
+            outlet = Outlet(name=f"Regional Daily {n:02}")
+            db.session.add(outlet)
+            db.session.flush()
+            db.session.add(Article(title="Regional news", url=f"https://regional.example/{n}",
+                                   outlet=outlet, date=now, fetched_at=now))
+        db.session.commit()
+        soup = BeautifulSoup(self.client.get("/sources?q=Regional").data, "html.parser")
+        self.assertEqual(len(soup.select(".source-row")), 50)
+        self.assertIn("q=Regional", soup.select_one('[rel="next"]')["href"])
+        soup = BeautifulSoup(self.client.get("/sources?q=Regional&page=999").data, "html.parser")
+        self.assertEqual(len(soup.select(".source-row")), 5)
+        self.assertIn("Regional Daily 54", soup.get_text())
+
+    def test_full_pin_list_explains_limit_and_still_allows_unpinning(self):
+        from aggregator import db, pinned_sources
+        from aggregator.models import Outlet
+        from bs4 import BeautifulSoup
+        for n in range(pinned_sources.MAX_PINNED):
+            outlet = Outlet(name=f"Pinned Daily {n}")
+            db.session.add(outlet)
+            db.session.commit()
+            pinned_sources.set_pinned(self.user_id, outlet.id, True)
+        soup = BeautifulSoup(self.client.get("/sources").data, "html.parser")
+        self.assertIn("Unpin a source to make room", soup.select_one("#source-limit").get_text())
+        self.assertEqual(len(soup.select('.source-row button[disabled]')), 3)
+        self.assertEqual(len(soup.select('.source-row button:not([disabled])')), 12)
+        response = self.client.post("/auth/pin-source", data={
+            "outlet_id": self.tribune.id, "pinned": "1", "next": "/sources",
+        }, follow_redirects=True)
+        self.assertIn(b"You can pin up to 12 sources.", response.data)
+        self.assertFalse(pinned_sources.is_pinned(self.user_id, self.tribune.id))
+
+    def test_discovery_requires_login_and_is_hidden_from_public_visitors(self):
+        client = self.app.test_client()
+        response = client.get("/sources")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/auth/login", response.headers["Location"])
+        self.app.config["PUBLIC_READ_ACCESS"] = True
+        html = client.get("/admin/articles").data
+        self.assertNotIn(b'href="/sources"', html)
+
+    def test_pin_from_web_is_visible_in_api_and_api_unpin_updates_web(self):
+        from aggregator import db
+        from aggregator.api.auth import create_pairing_code
+        from aggregator.api_app import create_api_app
+        from aggregator.models import User
+        outlet_id = self.tribune.id
+        self.client.post("/auth/pin-source", data={"outlet_id": outlet_id, "pinned": "1"})
+        code, _ = create_pairing_code(User.query.get(self.user_id), ["read"], "test")
+        db.session.commit()
+        with mock.patch.dict(os.environ, {"DATABASE_URL": TEST_DB, "API_PROXY_HOPS": "0"}):
+            api = create_api_app().test_client()
+        paired = api.post("/api/v1/devices/pair", json={"code": code, "device_name": "Test phone"})
+        self.assertEqual(paired.status_code, 201, paired.get_json())
+        headers = {"Authorization": f"Bearer {paired.get_json()['token']}"}
+        items = api.get("/api/v1/me/pinned-sources", headers=headers).get_json()["items"]
+        self.assertEqual([item["id"] for item in items], [outlet_id])
+        response = api.put("/api/v1/me/pinned-sources", headers=headers,
+                           json={"outlet_id": outlet_id, "pinned": False})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Your sources start here", self.client.get("/sources").data)
+
+    def test_source_pin_forms_keep_csrf_protection(self):
+        self.app.config["WTF_CSRF_ENABLED"] = True
+        response = self.client.post("/auth/pin-source", data={"outlet_id": self.tribune.id, "pinned": "1"})
+        self.assertEqual(response.status_code, 400)
 
     def test_pinning_from_the_profile_by_name_adds_a_sidebar_row(self):
         from aggregator import pinned_sources

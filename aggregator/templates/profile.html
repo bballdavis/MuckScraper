@@ -188,6 +188,7 @@
                         <h2>Pinned sources</h2>
                         <p>Each one gets a row under Sources in the menu, with a page of its own stories. Up to {{ pinned_max }}.</p>
                     </div>
+                    <a class="btn btn-quiet" href="{{ url_for('reader_sources.index') }}">Find a source</a>
                 </div>
                 <form class="row" method="POST" action="{{ url_for('auth.pin_source') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

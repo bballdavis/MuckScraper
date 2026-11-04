@@ -42,8 +42,8 @@
                 {#- Pinned sources (Philip, 2026-11-01): outlets this reader keeps in the menu,
                     each with a page of its own stories. A group of its own so an outlet
                     never reads as a topic. -#}
+                {%- if current_user.is_authenticated %}
                 {%- set pinned_outlets = sidebar_pinned() %}
-                {%- if pinned_outlets %}
                 <div class="nav-group">
                     <h2 class="nav-heading">Sources</h2>
                     {%- for outlet in pinned_outlets %}
@@ -55,6 +55,10 @@
                         <span class="full-text">{{ outlet.name }}</span>
                     </a>
                     {%- endfor %}
+                    <a class="nav-link {% if active_nav == 'sources' %}active{% endif %}" href="{{ url_for('reader_sources.index') }}"{% if active_nav == 'sources' %} aria-current="page"{% endif %}>
+                        {{ icon('search') }}
+                        <span class="full-text">Find a source…</span>
+                    </a>
                 </div>
                 {%- endif %}
 

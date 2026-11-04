@@ -122,6 +122,8 @@ def create_app(engine_options=None):
     app.register_blueprint(public)
     from aggregator.blueprints.reading import reading
     app.register_blueprint(reading)
+    from aggregator.blueprints.reader_sources import reader_sources
+    app.register_blueprint(reader_sources)
     from aggregator import app_links
     app_links.register(app)
     app.register_blueprint(admin,  url_prefix='/admin')
