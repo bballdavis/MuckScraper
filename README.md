@@ -17,6 +17,8 @@
 
 MuckScraper gathers and breaks down the news so you don't have to read the same story twelve times, unless you want to. A few times a day it pulls in articles from RSS feeds (and NewsAPI/GNews if you have keys), works out which ones are about the same event, and turns each pile into a single story. Each story gets one headline, a summary, a look at how the left, center and right are covering it, and a link to every source.
 
+Signed-in readers can open **Sources → Find a source…** to search recent outlets and pin up to 12 to the menu. Each outlet opens its own stories, newest first, including single-source stories. Pins are shared with MuckScroller on the same account. Pinning adds a menu shortcut; the separate **Boosted sources** preference controls headline ranking.
+
 ---
 
 ## Why It's Different

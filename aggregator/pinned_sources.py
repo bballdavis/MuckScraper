@@ -91,9 +91,7 @@ def forget(user_id):
         db.session.delete(row)
 
 
-def candidates(query=None, limit=30):
-    """Outlets a reader could pin: those with articles in the last 30 days,
-    most articles first, optionally narrowed to names containing `query`."""
+def _candidates(query=None, exclude_ids=()):
     since = datetime.utcnow() - timedelta(days=30)
     rows = (db.session.query(Outlet)
             .join(Article, Article.outlet_id == Outlet.id)
@@ -101,6 +99,23 @@ def candidates(query=None, limit=30):
     if query:
         like = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
         rows = rows.filter(Outlet.name.ilike(like, escape="\\"))
+    if exclude_ids:
+        rows = rows.filter(Outlet.id.notin_(exclude_ids))
     return (rows.group_by(Outlet.id)
-            .order_by(func.count(Article.id).desc(), Outlet.name.asc())
-            .limit(limit).all())
+            .order_by(func.count(Article.id).desc(), Outlet.name.asc(), Outlet.id.asc()))
+
+
+def candidates(query=None, limit=30):
+    """Outlets with articles in the last 30 days, most articles first,
+    optionally narrowed to names containing `query`."""
+    return _candidates(query).limit(limit).all()
+
+
+def browse(query=None, exclude_ids=(), page=1, per_page=50):
+    """A bounded page of candidates for the web source browser. Pins are
+    displayed separately, including ones with no recent articles."""
+    rows = _candidates(query, exclude_ids)
+    total = rows.count()
+    pages = max(1, (total + per_page - 1) // per_page)
+    page = min(max(1, page), pages)
+    return rows.offset((page - 1) * per_page).limit(per_page).all(), page, pages, total

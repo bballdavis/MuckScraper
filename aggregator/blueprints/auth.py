@@ -175,6 +175,11 @@ def pin_source():
         flash("No such source.", "error")
     except ValueError as exc:
         flash(str(exc), "error")
+    else:
+        outlet = Outlet.query.get(outlet_id)
+        name = outlet.name if outlet else "Source"
+        flash(f"{name} pinned to Sources." if request.form.get("pinned") == "1"
+              else f"{name} unpinned from Sources.", "success")
     return redirect(back)
 
 

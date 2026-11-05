@@ -1,0 +1,97 @@
+{% extends '_app_page.html' %}
+{% from 'icons.html' import icon %}
+{% from 'pagination.html' import pager %}
+{% block title %}Sources{% endblock %}
+{% block section %}Sources{% endblock %}
+{% block nav %}sources{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/reader_sources.css') }}">
+{% endblock %}
+
+{% macro source_row(outlet, is_pinned) %}
+<li class="source-row">
+    <a class="source-link" href="{{ url_for('admin.list_articles', outlet=outlet.id) }}">
+        <span class="source-logo{{ '' if outlet.logo_url else ' no-logo' }}" aria-hidden="true">
+            {% if outlet.logo_url %}<img src="{{ outlet.logo_url }}" alt="" loading="lazy" onerror="this.parentNode.classList.add('no-logo')">{% endif %}
+            <span>{{ outlet.name[:1] }}</span>
+        </span>
+        <span class="source-name">{{ outlet.name }}</span>
+        {{ icon('chevron-right') }}
+    </a>
+    <form method="post" action="{{ url_for('auth.pin_source') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="outlet_id" value="{{ outlet.id }}">
+        <input type="hidden" name="pinned" value="{{ '0' if is_pinned else '1' }}">
+        <input type="hidden" name="next" value="{{ current_back() }}">
+        <button type="submit" class="btn{{ ' btn-quiet' if is_pinned else '' }}"
+                aria-label="{{ 'Unpin ' if is_pinned else 'Pin ' }}{{ outlet.name }}{{ '' if is_pinned else ' to menu' }}"
+                {% if not is_pinned and pinned_count >= pinned_max %}disabled aria-describedby="source-limit"{% endif %}>
+            {{ 'Unpin' if is_pinned else 'Pin to menu' }}
+        </button>
+    </form>
+</li>
+{% endmacro %}
+
+{% block body %}
+<main class="app-main narrow sources-page">
+    {% include '_flashes.html' %}
+    <header class="page-head page-head-row">
+        <div>
+            <h1>Sources</h1>
+            <p>Keep your outlets close. Pin a source to the menu, then open its stories, newest first.</p>
+            <p>Your pins are shared with iOS when you use the same account.</p>
+        </div>
+        <span class="source-count">{{ pinned_count }} of {{ pinned_max }} pinned</span>
+    </header>
+
+    <form class="source-search" method="get" action="{{ url_for('reader_sources.index') }}" role="search" aria-label="Find a source">
+        <label class="visually-hidden" for="source-query">Find an outlet</label>
+        {{ icon('search') }}
+        <input id="source-query" type="search" name="q" value="{{ q }}" maxlength="80" placeholder="Find an outlet" autocomplete="off">
+        {% if q %}<a class="source-clear" href="{{ url_for('reader_sources.index') }}" aria-label="Clear source search">{{ icon('x') }}</a>{% endif %}
+        <button class="btn" type="submit">Search</button>
+    </form>
+
+    {% if pinned_count >= pinned_max %}
+    <p class="source-limit" id="source-limit" role="status">All {{ pinned_max }} places are filled. Unpin a source to make room for another.</p>
+    {% endif %}
+
+    {% if pinned or not q %}
+    <section class="source-section" aria-labelledby="pinned-heading">
+        <h2 id="pinned-heading">Pinned sources</h2>
+        {% if pinned %}
+        <ul class="source-list panel">
+            {% for outlet in pinned %}{{ source_row(outlet, true) }}{% endfor %}
+        </ul>
+        {% else %}
+        <div class="source-empty panel">
+            <h3>Your sources start here</h3>
+            <p>Find an outlet below and choose “Pin to menu”. Each source gets a shortcut to its own story feed.</p>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="source-section" aria-labelledby="found-heading">
+        <h2 id="found-heading">{{ 'Matching outlets' if q else 'Find a source' }}</h2>
+        {% if candidates %}
+        <p class="source-caption">{{ total }} {{ 'outlet' if total == 1 else 'outlets' }}{{ ' matching “' ~ q ~ '”' if q else ' with articles in the last 30 days, most active first' }}.</p>
+        <ul class="source-list panel">
+            {% for outlet in candidates %}{{ source_row(outlet, false) }}{% endfor %}
+        </ul>
+        {{ pager(page, total_pages) }}
+        {% elif q and not pinned %}
+        <div class="source-empty panel">
+            <h3>No sources match “{{ q }}”</h3>
+            <p>Try another outlet name, or <a href="{{ url_for('reader_sources.index') }}">clear the search</a> to browse recent sources.</p>
+        </div>
+        {% elif q %}
+        <p class="source-caption">All matching recent outlets are already pinned above.</p>
+        {% else %}
+        <div class="source-empty panel">
+            <p>{{ 'All available recent outlets are already pinned.' if pinned_count else 'No outlets with articles in the last 30 days yet. Sources will appear here as articles arrive.' }}</p>
+        </div>
+        {% endif %}
+    </section>
+</main>
+{% endblock %}
