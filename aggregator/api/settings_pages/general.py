@@ -220,7 +220,7 @@ def api_page(_=None):
     return s.page("api", "API", [
         s.section("status", facts=[
             s.fact("API", "On" if config["enabled"] else "Off", "ok" if config["enabled"] else "bad"),
-            s.fact("Signed in", f"{len(live)} device{'s' if len(live) != 1 else ''} and keys"),
+            s.fact("Devices and keys signed in", len(live)),
             s.fact("Pairing codes waiting", pending),
             s.fact("Saving page captures", "Ready" if bookmarks.capture_available() else "Not running",
                    None if bookmarks.capture_available() else "warn"),
