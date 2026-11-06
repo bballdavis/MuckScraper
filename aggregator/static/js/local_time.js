@@ -12,7 +12,7 @@
 
     function relative(date, now) {
         const ago = now - date;
-        // Capitalised, since they mostly stand alone in a row (Philip, 2026-10-25).
+        // Capitalised, since they mostly stand alone in a row.
         if (ago < MINUTE) return 'Just now';
         if (ago < HOUR) { const m = Math.floor(ago / MINUTE); return m + (m === 1 ? ' minute ago' : ' minutes ago'); }
         if (ago < DAY) { const h = Math.floor(ago / HOUR); return h + (h === 1 ? ' hour ago' : ' hours ago'); }

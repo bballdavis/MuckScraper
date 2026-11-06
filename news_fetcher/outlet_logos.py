@@ -1,5 +1,5 @@
 # news_fetcher/outlet_logos.py
-"""Images for cards that have none (Philip, 2026-10-22).
+"""Images for cards that have none.
 
 A card shows, in order: its article's image, another article's image in the
 same story, the outlet's logo, then the outlet's name set as a masthead. Two

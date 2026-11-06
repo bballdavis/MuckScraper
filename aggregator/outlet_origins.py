@@ -6,7 +6,7 @@ most outlets based abroad: an LLM asked whether NHK or Deutsche Welle is "Lean
 Left" in American terms will still answer with a number, and that number would
 then move a story's Left/Center/Right counts and its enrichment direction.
 
-Decided with Philip 2026-10-23: every outlet gets a country. A non-US outlet
+Decided: every outlet gets a country. A non-US outlet
 that AllSides rates (BBC, Guardian, Al Jazeera...) keeps that rating, since
 AllSides rates it for US readers. One that Media Bias/Fact Check or Ad Fontes
 rates on the US scale takes that lean from LEANS_ABROAD. Any other non-US
@@ -70,8 +70,7 @@ ORIGINS = {
 }
 
 # US-scale lean (1 Left ... 5 Right) for outlets based abroad that AllSides
-# doesn't rate but Media Bias/Fact Check or Ad Fontes Media do (Philip,
-# 2026-10-23: rated on the US scale anywhere, so count it). MBFC's label
+# doesn't rate but Media Bias/Fact Check or Ad Fontes Media do. MBFC's label
 # maps Left 1, Left-Center 2, Least Biased 3, Right-Center 4, Right 5; Ad
 # Fontes' bias score (-42 ... 42) breaks ties: under -18 is 1, -18 to -6 is
 # 2, -6 to 6 is 3, 6 to 18 is 4, over 18 is 5. Looked up 2026-10-23.

@@ -1,5 +1,5 @@
 """An article's own lean rating: the AI's, with a one-line reason, and a
-reader's override from the Rate lean dialog (Philip, 2026-10-25).
+reader's override from the Rate lean dialog.
 
 Each rating is an ArticleLeanRating row. The one applied last is the
 article's bias_score, with bias_source "ai" or "reader"; until then the

@@ -1,5 +1,4 @@
-{#- The story page's multi-source analysis in one of two layouts (Philip,
-    2026-10-23), picked under Appearance on the profile page:
+{#- The story page's multi-source analysis in one of two layouts, picked under Appearance on the profile page:
 
     cards     (default) Flat: the left/center/right coverage stacked under
               a bar sized by source count, the other sections side by side,
@@ -24,7 +23,7 @@
 {%- macro analysis_cards(a, story) -%}
 <div class="sa sa-cards">
     {#- The lead (The story) restates the executive summary above, so it is
-        left out (Philip, 2026-10-25), unless it is all the report has. -#}
+        left out, unless it is all the report has. -#}
     {%- if a.lead and not (a.buckets or a.empty or a.others or a.next) %}
     <div class="sa-lead">{{ _paras(a.lead) }}</div>
     {%- endif %}
@@ -55,8 +54,7 @@
     {%- endif %}
 
     {#- Long sections stack full width, each under its icon, like the
-        coverage buckets; the short ones pair up below on a tint (Philip,
-        2026-10-29). -#}
+        coverage buckets; the short ones pair up below on a tint. -#}
     {%- if a.longs %}
     <div class="sa-longs">
         {%- for s in a.longs %}

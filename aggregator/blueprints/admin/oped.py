@@ -36,12 +36,12 @@ TIME_RANGE_LABELS = [("24h", "24 hours"), ("7d", "7 days"), ("30d", "30 days"), 
 @admin.route("/oped")
 @public_or_login
 def oped_list():
-    """Built like the section pages (articles.html, Philip 2026-10-27): the
+    """Built like the section pages: the
     top bar's search and Filters, the filter chips, and the same compact
     story_card. Latest draws each column as a one-article story
     (OpinionCard); By story lists the stories the columns are about, as a
     section does. The view is the Headlines-style switch under the page
-    title (Philip, 2026-10-27). Search, time range and leaning apply to both."""
+    title. Search, time range and leaning apply to both."""
     page = max(1, request.args.get("page", 1, type=int) or 1)
     active_range = request.args.get("range", DEFAULT_TIME_RANGE)
     if active_range not in TIME_RANGES:

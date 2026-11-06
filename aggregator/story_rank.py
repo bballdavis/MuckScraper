@@ -5,7 +5,7 @@ of the repository (.gitignore). Without it every score stayed 0, so the
 edition's final sort by score did nothing and Headlines showed stories in
 publish_edition()'s selection-pass order: both-sides stories, then up to five
 right-leaning ones, then center, then left. On 2026-10-23 that put five
-single-outlet right-leaning stories at the top (Philip, 2026-10-24).
+single-outlet right-leaning stories at the top.
 
 The score rewards breadth and freshness, nothing an LLM has to judge:
 

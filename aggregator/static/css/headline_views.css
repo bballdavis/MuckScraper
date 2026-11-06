@@ -1,6 +1,6 @@
 /* Headlines' Trending / Latest / Controversial switcher and the Latest rows
    (templates/headlines_feed.html, aggregator/headline_views.py). Layout B
-   from the mocks (Philip, 2026-10-24): one chip as wide as the column,
+   from the mocks: one chip as wide as the column,
    split three ways, each segment with its own one-line rule. */
 .view-switch {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 0 0 20px;
@@ -24,7 +24,7 @@
 
 /* Why a card is in the view: "4 outlets in 6h", "High gap · 6 op-eds". One more item in the
    meta row, right of the article count, with the view's icon and no pill
-   (Philip, 2026-10-26: mock B). */
+. */
 .why { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-weight: 600; color: var(--accent-text); }
 .why .icon { width: 14px; height: 14px; flex: none; }
 /* Phones: it doesn't fit beside the date and count, so it takes the line

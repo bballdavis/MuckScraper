@@ -41,7 +41,7 @@ def _outlets(story):
 
 def _deck_order(story, tier, priority=False):
     """Sort key: priority outlets' stories first (aggregator/source_priority.py),
-    then most sources (Philip, 2026-10-26), then the best reporting grade among
+    then most sources, then the best reporting grade among
     them (aggregator/outlet_reporting.py), then how many outlets grade High or
     better, then the edition's headlines."""
     grades = [reporting_for(name) for name in _outlets(story)]

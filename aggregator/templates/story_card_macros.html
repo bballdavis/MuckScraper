@@ -9,7 +9,7 @@
 
 {% set bias_names = {1: 'Left', 2: 'Lean Left', 3: 'Center', 4: 'Lean Right', 5: 'Right'} %}
 {#- Phones show these instead, so a chip never pushes its row onto a second
-    line (Philip, 2026-10-23; theme.css .bt-short). -#}
+    line. -#}
 {% set bias_short = {1: 'Left', 2: 'Lean L', 3: 'Center', 4: 'Lean R', 5: 'Right'} %}
 
 {# Bias chip for a 1-5 score. `prefix` labels a second chip ("Article: ");
@@ -25,7 +25,7 @@
 
 {# A small flag after the name of an outlet based outside the US, with the
    country (and "Public broadcaster" / "State-owned") on hover or focus
-   (Philip, 2026-10-23). US outlets show nothing. Countries come from
+. US outlets show nothing. Countries come from
    aggregator/outlet_origins.py; styles: theme.css .outlet-flag. #}
 {% macro outlet_flag(outlet) -%}
 {%- if outlet and outlet.flag -%}
@@ -64,10 +64,9 @@
 {%- endmacro %}
 
 {# The reporting grade and the lean chip as one split pill: the grade on the
-   left, the lean chip (the caller) filling the right end (Philip,
-   2026-10-25). An outlet with no grade gets the lean chip alone.
+   left, the lean chip (the caller) filling the right end. An outlet with no grade gets the lean chip alone.
    Hover, focus or a tap opens one tip for the whole pill, worded like the
-   iOS app's GradePill popover (Philip, 2026-10-27): the grade and what it
+   iOS app's GradePill popover: the grade and what it
    means, which way the outlet leans (or that it is based abroad and not
    rated on the US scale), its country, and where the grade comes from.
    `score` is the lean the chip shows when it isn't the outlet's own (an
@@ -117,11 +116,10 @@
 {%- endfor -%}
 {#- A thin bar split by share, with "● Left 3 · 76%" for each side under it,
     so no text sits inside the bar where a narrow side would clip it
-    (Philip, 2026-10-25: option C, after the solid bar of #63 read as too
-    much). A side with no coverage is left out of the bar and dimmed in the
+. A side with no coverage is left out of the bar and dimmed in the
     legend. The rounding goes to the biggest side so the three add up to
     100. Hovering a segment or its legend key shows that side's count,
-    share and outlets (Philip, 2026-10-25). Styles: story_card.css
+    share and outlets. Styles: story_card.css
     .bias-balance. -#}
 {%- set total = counts.left + counts.center + counts.right -%}
 {%- if total -%}
@@ -149,7 +147,7 @@
 
 {# Left / Center / Right as one rounded bar for the compact cards: each
    segment is as wide as its share of articles and carries its own count,
-   centred in white (Philip, 2026-10-22). Zero segments are left out. Uses
+   centred in white. Zero segments are left out. Uses
    the counts story_bias_totals() set (article rating, else outlet), like
    Search. Styles: story_card.css .card-bias. #}
 {% macro bias_line(story) -%}
@@ -182,7 +180,7 @@
 {%- endfor -%}
 {%- endmacro %}
 
-{# The card's image box, a chain of fallbacks (Philip, 2026-10-22): an
+{# The card's image box, a chain of fallbacks: an
    article image from the story (the article whose title best matches the
    story, aggregator/story_image.py; roundups aside), else
    the newest outlet's logo on a tile with the outlet's name, else the name
@@ -216,7 +214,7 @@
    there the call block holds the ⋯ menu's actions (.card-menu-item). #}
 {# The card's headline. An AI-written one ends in a grey sparkles icon with
    a rich tooltip, in place of the "AI headline" chip in the meta row
-   (Philip, 2026-10-25). The icon is glued to the last word so it never
+. The icon is glued to the last word so it never
    wraps onto a line of its own. Styles: story_card.css .ai-mark. #}
 {% macro headline_text(story) -%}
 {%- set text = story.display_headline or '' -%}
@@ -231,8 +229,7 @@
 
 {# The Breaking tag: a story that grew out of an event the Breaking poller
    flagged (aggregator/breaking.py story_flags), on the image's top-left
-   corner, in place of Trending's "N reporting in the last 6h" (Philip,
-   2026-10-25: mock C). The tip says who had it first, how many outlets
+   corner, in place of Trending's "N reporting in the last 6h". The tip says who had it first, how many outlets
    carried it and which; the card's own L/C/R bar has the lean.
    Styles: story_card.css .breaking-chip. #}
 {% macro breaking_chip(story) -%}
@@ -253,7 +250,7 @@
     (date, counts, flags), then the bottom row: the Left/Center/Right bar for
     a multi-article story, or the article's lean chip on its own. A rail
     down the right side holds the summary and analysis actions and the ⋯
-    menu (Philip, 2026-10-22). The headline link stretches over the whole
+    menu. The headline link stretches over the whole
     card; the ⋯ button sits above it. The page's call block fills the menu's
     actions; the scrape results head the menu for signed-in readers.
     The Op/Ed page draws its columns with it too (opinion.OpinionCard, with
@@ -289,7 +286,7 @@
             </div>
         </div>
         {#- The action rail down the right side, mirroring the image: summary,
-            analysis, then the ⋯ menu (Philip, 2026-10-22). -#}
+            analysis, then the ⋯ menu. -#}
         <div class="card-rail">
             {% if not opinion %}
             {{ story_summary_action(story, can('scraper')) }}
@@ -336,9 +333,8 @@
                 {% endif %}
                 <span class="meta-item">{{ article_count }} article{{ 's' if article_count != 1 else '' }}</span>
                 {#- Headlines: why the card is in the view, on the count's
-                    right rather than a row of its own (Philip, 2026-10-25),
-                    as one more meta item with an icon, not a pill (Philip,
-                    2026-10-26: mock B). -#}
+                    right rather than a row of its own,
+                    as one more meta item with an icon, not a pill. -#}
                 {% if why %}<span class="meta-item why{{ ' why-hot' if why_hot else '' }}">{% if why_icon %}{{ icon(why_icon) }}{% endif %}{{ why }}</span>{% endif %}
                 {% if story.edition_has_updates %}<span class="card-flag flag-new">New updates</span>{% endif %}
             </div>

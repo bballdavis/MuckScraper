@@ -1,4 +1,4 @@
-"""Settings › Sections, Sources and Blocklist (Philip, 2026-10-27).
+"""Settings › Sections, Sources and Blocklist.
 
 Sections are the one list the sidebar, the app, the classifier and the
 sources hang off (aggregator/sources.py). The Sources page lists every feed

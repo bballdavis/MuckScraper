@@ -16,7 +16,7 @@ depends_on = None
 # fableaudit.md 1.1: the auto-blocklist was suppressing whole domains (Fox
 # News, BBC, Toronto Sun, and ~10 others) for months on the strength of one
 # bad scrape, with no way back except the manual Unblock button. This adds
-# the two fixes Regis asked for: a minimum-hit threshold (news_fetcher.scraper
+# the two fixes asked for: a minimum-hit threshold (news_fetcher.scraper
 # .BLOCKLIST_MIN_HIT_THRESHOLD, currently 3 -- kept as a literal here, not
 # imported, so this migration stays runnable after that constant changes)
 # before a domain is actually treated as blocked, and a sliding expiry once

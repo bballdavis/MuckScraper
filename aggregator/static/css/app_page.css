@@ -3,7 +3,7 @@
  * section inside it (templates/settings_base.html). Linked after theme.css
  * and feed_header.css.
  *
- * Compact, per the settings mock (Philip, 2026-10-22): 3px corners on
+ * Compact, per the settings mock: 3px corners on
  * buttons, inputs, chips and bars; panels with a hairline border and a
  * small radius; selected items get a full fill, never a side border.
  */
@@ -132,7 +132,7 @@
 }
 
 /* ── Settings: the content in the same centred column as the feeds, the
-   section list as a card just to its left (Philip, 2026-10-22). The outer
+   section list as a card just to its left. The outer
    columns share the leftover width, so on wide screens the content sits
    exactly where a feed's cards do. ── */
 .settings {
@@ -206,7 +206,7 @@
     .settings { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 14px 16px 40px; }
     /* The section list becomes a dropdown: a bordered button naming the
        current section with a chevron, the full list (counts and all)
-       dropping down over the page (Philip, 2026-10-26). */
+       dropping down over the page. */
     .settings-side { position: relative; justify-self: stretch; width: auto; top: auto; z-index: 20; }
     .settings-picker {
         display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;

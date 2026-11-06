@@ -1,6 +1,6 @@
 /* Settings › Pipeline › Tasks (templates/tasks.html, _tasks_live.html).
    The tables fit the content width with fixed column shares and wrapping
-   text, never a sideways scroll (Philip, 2026-10-27); below 980px each row
+   text, never a sideways scroll; below 980px each row
    stacks into a labelled block. */
 
 .tasks-page .stack > * + *, .tasks-page > .panel { margin-top: 16px; }

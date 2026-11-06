@@ -47,7 +47,7 @@
 }
 
 /* The outlet's name on fallback tiles is set like a newspaper nameplate
-   (Philip, 2026-10-22). Playfair Display, OFL, served from static/fonts. */
+. Playfair Display, OFL, served from static/fonts. */
 @font-face {
     font-family: "Playfair Display";
     src: url("../fonts/playfair-display-latin-800-normal.woff2") format("woff2");
@@ -143,8 +143,7 @@
 .card-flag.flag-new { background: var(--bias-1-bg); color: var(--bias-1-fg); }
 
 /* Left / Center / Right: a thin bar split by share of articles, and a
-   legend under it, the label the size of its percentage (Philip,
-   2026-10-25). */
+   legend under it, the label the size of its percentage. */
 .bias-balance { margin-bottom: 16px; }
 .bias-bar { display: flex; gap: 2px; height: 8px; border-radius: 99px; background: var(--border); }
 /* No overflow clip, so each segment's tip can open: the ends round instead. */
@@ -210,7 +209,7 @@
 /* Summary / analysis indicators beside the Headlines button: square, as
    tall as the button. */
 /* Headlines: the story link and the summary/analysis indicators on one row,
-   all 40px tall, icons filling about half of that (Philip, 2026-10-22). */
+   all 40px tall, icons filling about half of that. */
 .card-actions-row { flex-wrap: nowrap; }
 .card-actions-row > .btn {
     flex: 1 1 auto; height: 40px; padding: 0 12px;
@@ -221,7 +220,7 @@
 
 /* Compact cards (story_card(story, compact=true), All / Grouped Stories):
    image, headline, one meta row, then the bottom row with the bias bar (or
-   an article's lean chip) and the ⋯ menu (Philip, 2026-10-22). The headline
+   an article's lean chip) and the ⋯ menu. The headline
    link stretches over the card, so a click anywhere opens the story. */
 .story.compact { position: relative; overflow: visible; border-radius: 12px; margin-bottom: 10px; scroll-margin-top: 80px; }
 .story.compact.menu-open { z-index: 3; }
@@ -283,7 +282,7 @@
 .card-bias .seg-i { background: var(--bias-unrated-bg); }
 .card-bias .bias-unrated { color: var(--text-muted); font-weight: 600; }
 
-/* The action rail down the card's right side (Philip, 2026-10-22): summary,
+/* The action rail down the card's right side: summary,
    analysis and the ⋯ menu, each cell the whole button, split by dividers.
    It sits above the stretched headline link. The action icons' states are
    in theme.css (.act). */
@@ -294,7 +293,7 @@
 .card-rail > * { flex: 1 1 0; min-height: 0; }
 .card-rail > * + * { border-top: 1px solid var(--border); }
 .card-rail .act { width: 100%; height: auto; border: 0; border-radius: 0; background: transparent; font-size: 18px; }
-/* Icons fill about half of the 39px rail's width (Philip, 2026-10-22). */
+/* Icons fill about half of the 39px rail's width. */
 .card-rail .icon { width: 20px; height: 20px; }
 .card-rail .act-done { background: var(--accent); }
 .card-rail .act-ready:hover, .card-rail .act-ready:focus-visible { background: var(--accent); }

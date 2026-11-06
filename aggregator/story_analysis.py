@@ -2,15 +2,14 @@
 
 The deep_report prompts (seed_defaults.py, deep_report.*) ask for a fixed set
 of "Label: text" paragraphs. The story page lays these out as cards or as
-titled subsections (Philip, 2026-10-23; the reader picks one under Appearance
-on their profile), so the text is parsed once here instead of in Jinja.
+titled subsections, so the text is parsed once here instead of in Jinja.
 
 Each section gets a `kind`, which decides where it goes and how it looks:
 "lead" (the first section), "left" / "center" / "right" (the politics
 prompt's coverage buckets), "next" (What's next) or "other", plus an icon
 name from icons.html. Every "other" section also has a `size`: "long" ones
 stack full width and "short" ones sit side by side below them, so each
-section type reads the same way (Philip, 2026-10-29). Text that doesn't follow the format still renders:
+section type reads the same way. Text that doesn't follow the format still renders:
 a line with no label continues the section before it, or starts an
 unlabelled one.
 """

@@ -163,7 +163,7 @@
 
         /* Under the title: a Source button (the publisher's page) and, at its
            right, the read status as an icon-only chip whose tooltip gives the
-           detail, as on the story page's source rows (Philip, 2026-10-22). */
+           detail, as on the story page's source rows. */
         .source-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; }
         .pill {
             height: 30px; min-width: 104px; padding: 0 12px;
@@ -294,7 +294,7 @@
 
 <div class="container">
 {#- Round buttons under the back button: read, then (scrapers) the article
-    summary while there is none, and the lean rating (Philip, 2026-10-22). -#}
+    summary while there is none, and the lean rating. -#}
 {%- set rail -%}
 {%- if current_user.is_authenticated -%}
 {{ read_toggle('article', article.id, read_item) }}
@@ -333,7 +333,7 @@
         {% endif %}
 
         {#- Plain-language read status. Signed-out visitors see this instead of
-            the telemetry (Regis, 2026-10-08: the technical fields and the
+            the telemetry (the technical fields and the
             scraped text stay signed-in only). -#}
         {% set scrape_status = article.scrape_status or 'pending' %}
         {% set read_status = {
@@ -352,7 +352,7 @@
 
         {#- The Source button, then the read status as an icon chip; its
             tooltip explains it, and signed-in readers also get the scrape
-            telemetry there (Regis, 2026-10-10: technical fields signed-in only). -#}
+            telemetry there (technical fields signed-in only). -#}
         {% set chip = {'success': ('success', 'circle-check'), 'fallback': ('fallback', 'circle-alert'),
                        'blocked': ('blocked', 'ban'), 'failed': ('blocked', 'ban'),
                        'skipped': ('pending', 'ban'), 'pending': ('pending', 'circle-alert')}[scrape_status] %}
