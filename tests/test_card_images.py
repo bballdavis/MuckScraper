@@ -63,12 +63,65 @@ class LogoCandidateTests(unittest.TestCase):
             "https://www.cbsnews.com/brand.png",
             "https://www.cbsnews.com/favicon-32.png",
             "https://www.cbsnews.com/apple-touch-icon.png",
+            "https://www.cbsnews.com/apple-touch-icon-precomposed.png",
             "https://www.cbsnews.com/favicon.ico",
         ])
 
     def test_bare_page_falls_back_to_well_known_paths(self):
         self.assertEqual(outlet_logos.logo_candidates("", "https://apnews.com/"),
-                         ["https://apnews.com/apple-touch-icon.png", "https://apnews.com/favicon.ico"])
+                         ["https://apnews.com/apple-touch-icon.png",
+                          "https://apnews.com/apple-touch-icon-precomposed.png",
+                          "https://apnews.com/favicon.ico"])
+
+    def test_manifest_icons_after_the_page_icons_before_json_ld(self):
+        page = ('<link rel="manifest" href="/site.webmanifest">'
+                '<meta name="msapplication-TileImage" content="/tile-144.png">'
+                '<script type="application/ld+json">{"@type": "NewsMediaOrganization",'
+                ' "logo": "/brand.png"}</script>')
+        icons = ["https://www.texastribune.org/icon-512.png"]
+        self.assertEqual(outlet_logos.logo_candidates(page, "https://www.texastribune.org/", icons)[:4], [
+            "https://www.texastribune.org/tile-144.png",
+            "https://www.texastribune.org/icon-512.png",
+            "https://www.texastribune.org/brand.png",
+            "https://www.texastribune.org/apple-touch-icon.png",
+        ])
+
+    def test_manifest_link_and_its_large_png_icons(self):
+        page = '<head><link rel="manifest" href="site.webmanifest"></head>'
+        self.assertEqual(outlet_logos.manifest_url(page, "https://www.texastribune.org/"),
+                         "https://www.texastribune.org/site.webmanifest")
+        self.assertIsNone(outlet_logos.manifest_url("<p>x</p>", "https://e.com/"))
+        manifest = (
+            '{"icons": ['
+            '{"src": "/icon-48.png", "sizes": "48x48", "type": "image/png"},'
+            '{"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"},'
+            '{"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},'
+            '{"src": "/logo.svg", "sizes": "any", "type": "image/svg+xml"},'
+            '{"src": "/maskable.webp", "sizes": "1024x1024", "type": "image/webp"}]}')
+        self.assertEqual(outlet_logos._manifest_icons(manifest, "https://www.texastribune.org/site.webmanifest"), [
+            "https://www.texastribune.org/maskable.webp",
+            "https://www.texastribune.org/icon-512.png",
+            "https://www.texastribune.org/icon-192.png",
+        ])
+        self.assertEqual(outlet_logos._manifest_icons("not json", "https://e.com/m.json"), [])
+
+    def test_resolve_uses_the_manifest_when_the_page_names_no_icon(self):
+        pages = {
+            "https://www.texastribune.org/": SimpleNamespace(status_code=200, url="https://www.texastribune.org/",
+                                                              text='<link rel="manifest" href="/m.json">'),
+            "https://www.texastribune.org/m.json": SimpleNamespace(
+                status_code=200, text='{"icons": [{"src": "/big.png", "sizes": "512x512", "type": "image/png"}]}'),
+        }
+
+        def get(url, **kwargs):
+            if url in pages:
+                return pages[url]
+            if url.endswith("/big.png"):
+                return SimpleNamespace(status_code=200, headers={"Content-Type": "image/png"}, close=lambda: None)
+            return SimpleNamespace(status_code=404, headers={}, close=lambda: None)
+
+        self.assertEqual(outlet_logos.resolve_logo("https://www.texastribune.org/", session=SimpleNamespace(get=get)),
+                         "https://www.texastribune.org/big.png")
 
     def test_resolve_takes_the_first_real_image(self):
         def get(url, **kwargs):

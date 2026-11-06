@@ -10,10 +10,11 @@ passes here fill the gaps behind that chain, and both run on every fetch run:
   articles get this at ingestion from the page the scraper already fetched;
   this covers the ones whose scrape was deferred, blocked or failed early.
 - `refresh_outlet_logos` resolves each outlet's icon from its home page
-  (apple-touch-icon, a large rel=icon, the JSON-LD publisher logo, then
-  /apple-touch-icon.png and /favicon.ico, then Google's favicon service) and
-  stores the URL on the outlet, so the web cards and /api/v1 serve the same
-  one. SVG is skipped: the iOS app's image views can't draw it.
+  (apple-touch-icon, a large rel=icon, the web app manifest's large PNG icons,
+  the msapplication tile, the JSON-LD publisher logo, then the small icons and
+  well-known paths, then Google's favicon service) and stores the URL on the
+  outlet, so the web cards and /api/v1 serve the same one. SVG is skipped: the
+  iOS app's image views can't draw it.
 """
 
 import json
@@ -33,11 +34,15 @@ MISSING_LOGO_RECHECK_DAYS = 7
 LOGOS_PER_RUN = 40
 # Smallest rel=icon worth showing on a card; apple-touch-icons are always big.
 MIN_ICON_SIZE = 96
+# Icons the manifest lists below this are too small to fit a menu tile well.
+MANIFEST_MIN_ICON_SIZE = 144
 IMAGE_RETRY_DAYS = 3
 IMAGE_RETRIES_PER_RUN = 40
 TIMEOUT = 8
 
 _ORG_TYPES = {"Organization", "NewsMediaOrganization", "Corporation", "WebSite"}
+# Tried when the home page names no icon, or can't be read (bot walls, 403s).
+WELL_KNOWN_ICON_PATHS = ("/apple-touch-icon.png", "/apple-touch-icon-precomposed.png", "/favicon.ico")
 
 
 def site_root(url):
@@ -92,8 +97,43 @@ def _json_ld_logo(soup, base_url):
     return None
 
 
-def logo_candidates(html, page_url):
-    """Icon URLs from a home page, best first, without duplicates."""
+def manifest_url(html, page_url):
+    """The web app manifest the home page links to, or None."""
+    try:
+        soup = BeautifulSoup(html or "", "html.parser")
+    except Exception:
+        return None
+    for tag in soup.find_all("link", href=True):
+        if "manifest" in [r.lower() for r in (tag.get("rel") or [])]:
+            return _absolute(tag["href"], page_url)
+    return None
+
+
+def _manifest_icons(text, base_url):
+    """Large PNG, JPEG or WebP icons from a web app manifest's JSON, best first."""
+    try:
+        payload = json.loads(text or "")
+    except Exception:
+        return []
+    icons = payload.get("icons") if isinstance(payload, dict) else None
+    found = []
+    for icon in icons if isinstance(icons, list) else []:
+        if not isinstance(icon, dict):
+            continue
+        kind = str(icon.get("type") or "").lower()
+        url = _absolute(icon.get("src"), base_url) if isinstance(icon.get("src"), str) else None
+        if not url or _is_svg(url) or (kind and not kind.startswith("image/")) or "svg" in kind:
+            continue
+        size = max((int(s) for s in re.findall(r"(\d+)\s*x\s*\d+", str(icon.get("sizes") or ""), re.I)), default=0)
+        if size >= MANIFEST_MIN_ICON_SIZE:
+            found.append((size, url))
+    return [url for _, url in sorted(found, key=lambda t: -t[0])]
+
+
+def logo_candidates(html, page_url, manifest_icons=()):
+    """Icon URLs from a home page, best first, without duplicates. `manifest_icons`
+    are the web app manifest's icons (see `_manifest_icons`), which the caller
+    fetches because this function only reads the HTML."""
     try:
         soup = BeautifulSoup(html or "", "html.parser")
     except Exception:
@@ -111,15 +151,23 @@ def logo_candidates(html, page_url):
         elif "icon" in rels:
             (large if size >= MIN_ICON_SIZE else small).append((size, url))
 
+    # Windows tile icons are PNGs of 144px or more, usually set for the news
+    # brand, when the page has no touch icon of its own.
+    tile = soup.find("meta", attrs={"name": re.compile(r"^msapplication-TileImage$", re.I)})
+    tile_url = _absolute(tile.get("content"), page_url) if tile and tile.get("content") else None
+    if tile_url and not _is_svg(tile_url):
+        large.append((MANIFEST_MIN_ICON_SIZE, tile_url))
+
     ordered = [url for _, url in sorted(touch, key=lambda t: -t[0])]
     ordered += [url for _, url in sorted(large, key=lambda t: -t[0])]
+    ordered += list(manifest_icons)
     ld_logo = _json_ld_logo(soup, page_url)
     if ld_logo:
         ordered.append(ld_logo)
     ordered += [url for _, url in sorted(small, key=lambda t: -t[0])]
     root = site_root(page_url)
     if root:
-        ordered += [urljoin(root, "/apple-touch-icon.png"), urljoin(root, "/favicon.ico")]
+        ordered += [urljoin(root, path) for path in WELL_KNOWN_ICON_PATHS]
 
     seen, out = set(), []
     for url in ordered:
@@ -146,6 +194,14 @@ def _headers():
     return HEADERS_DEFAULT
 
 
+def _manifest_text(url, session):
+    try:
+        response = session.get(url, headers=_headers(), timeout=TIMEOUT)
+        return response.text if response.status_code == 200 else ""
+    except requests.RequestException:
+        return ""
+
+
 def resolve_logo(site_url, session=None):
     """The first icon of `site_url`'s home page that really is an image."""
     session = session or requests
@@ -159,7 +215,9 @@ def resolve_logo(site_url, session=None):
             html, page_url = response.text, response.url or root
     except requests.RequestException as exc:
         logger.info("  [Logos] Home page failed for %s: %s", root, exc)
-    for candidate in logo_candidates(html, page_url) + [favicon_service_url(root)]:
+    manifest = manifest_url(html, page_url)
+    icons = _manifest_icons(_manifest_text(manifest, session), manifest) if manifest else []
+    for candidate in logo_candidates(html, page_url, icons) + [favicon_service_url(root)]:
         if _is_image(candidate, session):
             return candidate
     return None
