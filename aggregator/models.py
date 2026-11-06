@@ -794,6 +794,10 @@ class ConfigSetting(db.Model):
 # preferences and NewsBox read state; "summarize" lets it queue summaries
 # (POST /stories/{id}/summarize) and edit or run the user's schedule.
 API_SCOPES = ("read", "summarize")
+# Changing the server's settings from the app (aggregator/api/settings_pages/).
+# Never one of API_SCOPES: only given when an admin ticks it for an admin's
+# pairing code.
+ADMIN_SCOPE = "admin"
 
 
 class ApiDevice(db.Model):

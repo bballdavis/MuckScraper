@@ -136,7 +136,9 @@ SCHEMAS = {
     "Preferences": _obj(["start_page", "range", "hide_single"],
                         start_page={"type": "string", "enum": ["headlines", "all", "grouped"]},
                         range={"type": "string", "enum": ["24h", "7d", "30d", "all"]},
-                        hide_single=_B),
+                        hide_single=_B,
+                        auto_read_seconds={"type": "integer", "enum": [0, 30, 45, 60, 120],
+                                           "description": "Seconds a page is in front before it's marked read; 0 is off"}),
     "SearchHit": {"type": "object", "required": ["kind", "id", "title"], "properties": {
         "kind": {"type": "string", "enum": ["story", "article"]}, "id": _I, "story_id": _NI, "title": _S,
         "image_url": _URL, "image_focus": _FOCUS, "logo_url": _LOGO, "source_name": _NS, "source_count": _I, "updated_at": _NDT, "outlet": _ref("Outlet"),
@@ -227,6 +229,42 @@ SCHEMAS["DeckCard"] = {"allOf": [_ref("StorySummary"), _obj(
     ["tier"], tier={"type": "string", "enum": ["headlines", "more"],
                     "description": "headlines: in the latest edition; more: another story from the past week"})]}
 SCHEMAS["StorySkip"] = _obj(["story_id", "skipped_at"], story_id=_I, skipped_at=_DT)
+
+# Settings pages (settings_pages/schema.py): the app draws them with native controls.
+_TONE = {"type": "string", "enum": ["ok", "warn", "bad"]}
+_VALUE = {"description": "bool (toggle), string (choice, text kinds), integer or null (number), "
+                         "array of strings (multichoice); a secret's is never sent"}
+SCHEMAS["SettingsField"] = {"type": "object", "required": ["key", "label", "type"], "properties": {
+    "key": _S, "label": _S,
+    "type": {"type": "string", "enum": ["toggle", "choice", "multichoice", "text", "url", "email", "number",
+                                        "decimal", "secret", "password", "multiline"]},
+    "value": _VALUE, "placeholder": _S, "help": _S, "unit": _S, "required": _B, "min": _I, "max": _I,
+    "choices": {"type": "array", "items": _obj(["value", "label"], value=_S, label=_S, detail=_S)},
+    "secret": _obj(["saved"], saved=_B, hint=_S, note=_S)}}
+SCHEMAS["SettingsAction"] = _obj(["key", "label"], key=_S, label=_S,
+                                 role={"type": "string", "enum": ["destructive"]}, confirm=_S,
+                                 fields={"type": "array", "items": _ref("SettingsField")})
+SCHEMAS["SettingsItem"] = _obj(["id", "title"], id=_S, title=_S, subtitle=_S, detail=_S,
+                               badge=_obj(["text"], text=_S, tone=_TONE),
+                               page={**_S, "description": "The page this row opens"},
+                               active={**_B, "description": "Draw a switch; it saves {active} to `page`"},
+                               remove={**_S, "description": "Action a swipe runs with {id}"}, remove_label=_S)
+SCHEMAS["SettingsSection"] = _obj(["key"], key=_S, title=_S, footer=_S,
+                                  facts={"type": "array", "items": _obj(["label", "value"], label=_S, value=_S,
+                                                                       tone=_TONE)},
+                                  fields={"type": "array", "items": _ref("SettingsField")},
+                                  save={"type": "string", "enum": ["auto", "form"]},
+                                  items={"type": "array", "items": _ref("SettingsItem")}, empty=_S,
+                                  reorder={**_B, "description": "Rows can be dragged; runs the reorder action with {ids}"},
+                                  actions={"type": "array", "items": _ref("SettingsAction")})
+SCHEMAS["SettingsPage"] = _obj(["key", "title", "sections"], key=_S, title=_S,
+                               notice=_obj(["text"], text=_S, tone=_TONE),
+                               sections={"type": "array", "items": _ref("SettingsSection")})
+SCHEMAS["SettingsResult"] = _obj([], page=_ref("SettingsPage"), message=_S,
+                                 close={**_B, "description": "Go back: the page is gone"},
+                                 open={**_S, "description": "A page to open next, such as a row just added"},
+                                 secret=_obj(["title", "value"], title=_S, value=_S, note=_S,
+                                             link={**_S, "description": "A pairing link to show as a QR code"}))
 
 
 def _json(schema, description="OK"):
@@ -444,6 +482,32 @@ PATHS = {
     "/me/schedules/run": {"post": {
         "operationId": "runSchedule", "description": "Needs the summarize scope. Runs the schedule once, now.",
         "responses": {"202": _json(_obj(["run_id", "added"], run_id=_S, added=_I), "Run queued"), **_ERRORS}}},
+    "/settings": _get("settings", _json(_obj(
+        ["groups", "admin", "admin_available"],
+        groups={"type": "array", "items": _obj(["key", "title", "pages"], key=_S, title=_S, pages={
+            "type": "array", "items": _obj(["key", "title", "icon"], key=_S, title=_S, icon=_S, detail=_S)})},
+        admin={**_B, "description": "This device can open the admin pages"},
+        admin_available={**_B, "description": "An admin on a device paired without admin access"}))),
+    "/settings/{key}": {
+        **_get("settingsPage", _json(_ref("SettingsPage")),
+               [{"name": "key", "in": "path", "required": True, "schema": _S,
+                 "description": "A page key, or a key and a row id (users/12)"}], _NOT_FOUND),
+        "patch": {"operationId": "saveSettingsPage",
+                  "description": "Admin pages need the admin scope. 422 names the field that was refused.",
+                  "parameters": [{"name": "key", "in": "path", "required": True, "schema": _S}],
+                  "requestBody": {"required": True, "content": {"application/json": {"schema": _obj(
+                      ["values"], section=_S, values={"type": "object"})}}},
+                  "responses": {"200": _json(_ref("SettingsResult")), **_ERRORS, **_NOT_FOUND,
+                                "422": _json(_ref("Error"), "A value was refused")}},
+    },
+    "/settings/{key}/actions/{name}": {"post": {
+        "operationId": "runSettingsAction",
+        "parameters": [{"name": "key", "in": "path", "required": True, "schema": _S},
+                       {"name": "name", "in": "path", "required": True, "schema": _S}],
+        "requestBody": {"required": True, "content": {"application/json": {"schema": _obj(
+            [], values={"type": "object"})}}},
+        "responses": {"200": _json(_ref("SettingsResult")), **_ERRORS, **_NOT_FOUND,
+                      "422": _json(_ref("Error"), "A value was refused")}}},
 }
 
 SPEC = {

@@ -13,7 +13,7 @@ from sqlalchemy import func
 from aggregator import bookmarks, db
 from aggregator.api import settings as api_settings
 from aggregator.api.auth import CODE_LENGTH, PAIRING_TTL, create_api_key, create_pairing_code
-from aggregator.models import API_SCOPES, ApiDevice, ApiPairingCode, Bookmark, BookmarkSnapshot, User
+from aggregator.models import ADMIN_SCOPE, API_SCOPES, ApiDevice, ApiPairingCode, Bookmark, BookmarkSnapshot, User
 from aggregator.permissions import ROLE_ADMIN, role_required
 
 from . import admin
@@ -182,9 +182,19 @@ def create_api_pairing_code():
     if user is None or not user.is_active:
         flash("Pick an active user.", "error")
         return redirect(url_for("admin.api_page"))
-    code, row = create_pairing_code(user, list(API_SCOPES), current_user.username)
+    scopes = list(API_SCOPES)
+    if request.form.get("admin") == "on":
+        # Admin settings in the app (aggregator/api/settings_pages/): only
+        # for an admin, and only when asked for, so a lost reader's phone
+        # can never reach them.
+        if user.role != ROLE_ADMIN:
+            flash(f"{user.username} isn't an admin, so their phone can't have admin settings.", "error")
+            return redirect(url_for("admin.api_page") + "#pair")
+        scopes.append(ADMIN_SCOPE)
+    code, row = create_pairing_code(user, scopes, current_user.username)
     db.session.commit()
-    session[_NEW_CODE_KEY] = {"code": code, "username": user.username, "expires_at": row.expires_at.isoformat()}
+    session[_NEW_CODE_KEY] = {"code": code, "username": user.username, "expires_at": row.expires_at.isoformat(),
+                              "admin": ADMIN_SCOPE in scopes}
     return redirect(url_for("admin.api_page") + "#pair")
 
 

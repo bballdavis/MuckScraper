@@ -10,8 +10,8 @@ from flask import g, jsonify, request
 from sqlalchemy import func, text
 from sqlalchemy.orm import aliased, joinedload, selectinload
 
-from aggregator import (article_jobs, article_lean, db, feed_prefs, headline_views, pinned_sources, reads, skips,
-                        source_priority)
+from aggregator import (article_jobs, article_lean, db, feed_prefs, headline_views, pinned_sources, reading_prefs,
+                        reads, skips, source_priority)
 from aggregator.models import Article, Edition, EditionStory, OpinionPiece, Outlet, Story, Topic
 from aggregator.opinion import published_edition_opinion_cards
 from aggregator.search import SearchUnavailableError, search_article_ids, search_story_ids
@@ -102,18 +102,22 @@ def sign_out_device():
 
 
 # The feed defaults the profile page edits (aggregator/feed_prefs.py), minus
-# the scrape-status filter, which is an admin's diagnostic.
+# the scrape-status filter, which is an admin's diagnostic, and the reading
+# delay (aggregator/reading_prefs.py), which the app follows too, so the phone
+# and the web mark pages read after the same time.
 PREFERENCE_FIELDS = ("start_page", "range", "hide_single")
 
 
-def _preferences(prefs):
-    return {name: prefs[name] for name in PREFERENCE_FIELDS}
+def _preferences(user):
+    prefs = feed_prefs.load(user)
+    return {**{name: prefs[name] for name in PREFERENCE_FIELDS},
+            "auto_read_seconds": reading_prefs.load(user)["auto_read_seconds"]}
 
 
 @api.route("/me/preferences")
 @require_token()
 def get_preferences():
-    return jsonify(_preferences(feed_prefs.load(g.user)))
+    return jsonify(_preferences(g.user))
 
 
 @api.route("/me/preferences", methods=["PUT"])
@@ -124,11 +128,21 @@ def put_preferences():
             raise bad("Must be true or false.")
         return value
 
-    body = json_body(start_page=enum(*feed_prefs.START_PAGES), range=enum(*feed_prefs.RANGES), hide_single=flag)
-    prefs = feed_prefs.load(g.user)
-    prefs.update({k: v for k, v in body.items() if v is not None})
-    feed_prefs.save(g.user, prefs)
-    return jsonify(_preferences(feed_prefs.load(g.user)))
+    def delay(value):
+        if not isinstance(value, int) or isinstance(value, bool) or value not in reading_prefs.AUTO_READ_DELAYS:
+            raise bad("Must be one of " + ", ".join(str(d) for d in reading_prefs.AUTO_READ_DELAYS) + ".")
+        return value
+
+    body = json_body(start_page=enum(*feed_prefs.START_PAGES), range=enum(*feed_prefs.RANGES), hide_single=flag,
+                     auto_read_seconds=delay)
+    seconds = body.pop("auto_read_seconds")
+    if any(v is not None for v in body.values()):
+        prefs = feed_prefs.load(g.user)
+        prefs.update({k: v for k, v in body.items() if v is not None})
+        feed_prefs.save(g.user, prefs)
+    if seconds is not None:
+        reading_prefs.save(g.user, {**reading_prefs.load(g.user), "auto_read_seconds": seconds})
+    return jsonify(_preferences(g.user))
 
 
 @api.route("/me/boosted-sources")

@@ -7,6 +7,15 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
+- **Settings in the app.** `/api/v1/settings` serves settings pages that
+  MuckScroller draws natively: every reader's profile, email, password, web
+  feed defaults, web appearance and boosted sources, and for a phone paired
+  with **Admin settings** (a new `admin` scope, ticked for an admin's pairing
+  code on Settings › API) everything in the web's Settings: users, the API,
+  sign-in, sections, sources and searches, source API keys, the blocklist,
+  scrape health, LLM providers, prompts, tasks and the run schedule. Keys stay
+  write-only, and the web's rules apply. `/api/v1/me/preferences` gains
+  `auto_read_seconds` (`aggregator/api/settings_pages/`, docs/API.md).
 - **Pinned sources.** A reader can pin an outlet (their profile's Pinned
   sources, or the Pin to menu button on its page), starting with The Texas
   Tribune. It gets a row under a Sources group in the sidebar, with its logo,

@@ -52,14 +52,19 @@ on their next request.
 
 - **Isolation:** the API process has only `/api/v1/*` routes, which a test
   checks. Content endpoints are read-only. The writes are a device's own
-  pairing, sign-out and last-used time, and the user's own feed preferences,
-  NewsBox and schedule. No request runs a model: summaries are queued as jobs
-  for the scheduler container.
+  pairing, sign-out and last-used time, the user's own settings, NewsBox and
+  schedule, and, from a device with the `admin` scope, the server's
+  settings. No request runs a model except an admin's LLM test button:
+  summaries are queued as jobs for the scheduler container.
 - **Scopes:** a device or key has `read`, and `summarize` for work that runs
   in the background: sending stories to NewsBox, saving bookmarks, and
   editing or running its schedule. New pairings get both, and a new key gets
   `summarize` only when you tick it;
   devices paired earlier were given `summarize` by migration `b7e2d4f9a1c3`.
+  `admin` lets a phone change the server's settings from the app (see
+  [Settings](#settings)). A pairing code gets it only when you tick
+  **Admin settings** for an admin, keys never get it, and it stops working the
+  moment the user is no longer an admin.
 - **Tokens:** a token is `msk_` followed by 32 random bytes. Only its SHA-256
   is stored. Paired devices' tokens expire after a year, and pairing again
   issues a new one; a key expires when you chose.
@@ -195,6 +200,33 @@ the page makes is checked. Files live in the `bookmark_data` volume, which
 the API mounts read-only. Each user has a storage limit (Settings › API ›
 Bookmark storage: a default, per-user overrides, blank for unlimited).
 A version that would go over the limit stops with status `over_quota`.
+
+### Settings
+
+`/settings` serves the app's settings as pages it draws with native controls,
+so a setting added on the server shows up in the app without an app release
+(`aggregator/api/settings_pages/`). Every device sees **Your account**:
+profile, email and password, web feed defaults, web appearance and boosted
+sources. A device with the `admin` scope also sees what the web's Settings
+has: Users, API (pairing codes, API keys, devices, limits, storage), Sign-in,
+Sections, Sources (feeds, scan order, boosted outlets, NewsAPI and GNews
+searches), Source API keys, Blocklist, Scrape health, LLM providers, Prompts,
+Tasks and Run schedule.
+
+| Endpoint | Returns |
+|---|---|
+| `GET /settings` | The pages, by group, and whether this device can open the admin ones |
+| `GET /settings/{key}` | One page: sections of facts, fields, rows and buttons. A row's page is `{key}/{id}` (`users/12`) |
+| `PATCH /settings/{key}` `{section, values}` | Saves fields, and answers with the page as it now stands. `422` names a refused field |
+| `POST /settings/{key}/actions/{name}` `{values}` | Runs a button (add, delete, pair, test, run now…). May return `secret` (a pairing code or new key, shown once), `open` (a page to go to) or `close` (the page is gone) |
+
+Keys and secrets are write-only: a page says whether one is saved and its last
+four characters. The same rules as the web pages apply, such as keeping one
+active admin. Some things stay on the web: turning the API off, turning OIDC
+sign-in on or password sign-in off (the web checks your own sign-in first),
+restarting containers, and the one-off jobs that run in the web process.
+`/me/preferences` also carries `auto_read_seconds`, so the app marks pages
+read after the same time as the web.
 
 ## Not yet
 
