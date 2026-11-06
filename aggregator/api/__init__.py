@@ -3,7 +3,7 @@
 Served only by its own app (aggregator/api_app.py), which registers this
 blueprint and nothing else, so the internet-facing process has no login or
 web pages to reach. The server's settings are reachable only from a device
-paired with the "admin" scope (settings_pages/). Clients authenticate with
+paired with the "admin" scope (admin/). Clients authenticate with
 bearer tokens: a phone gets one through a one-time pairing code, and anything
 else through an API key, both from Settings › API in the web app.
 """
@@ -33,4 +33,4 @@ def _api_error(e):
     return error_response(e.status, e.code, e.message, e.headers)
 
 
-from . import routes, me_routes, read_routes, skip_routes, article_routes, bookmark_routes, breaking_routes, headline_routes, settings_pages, openapi  # noqa: E402,F401
+from . import routes, me_routes, read_routes, skip_routes, article_routes, bookmark_routes, breaking_routes, headline_routes, admin, openapi  # noqa: E402,F401

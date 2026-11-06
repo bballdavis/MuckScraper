@@ -203,30 +203,55 @@ A version that would go over the limit stops with status `over_quota`.
 
 ### Settings
 
-`/settings` serves the app's settings as pages it draws with native controls,
-so a setting added on the server shows up in the app without an app release
-(`aggregator/api/settings_pages/`). Every device sees **Your account**:
-profile, email and password, web feed defaults, web appearance and boosted
-sources. A device with the `admin` scope also sees what the web's Settings
-has: Users, API (pairing codes, API keys, devices, limits, storage), Sign-in,
-Sections, Sources (feeds, scan order, boosted outlets, NewsAPI and GNews
-searches), Source API keys, Blocklist, Scrape health, LLM providers, Prompts,
-Tasks and Run schedule.
+The app draws its own screen for each of the web's settings pages, from
+plain JSON resources built on the same modules and rules as the web
+(`aggregator/api/admin/`). A `GET` returns a page's data. A write answers
+`{"message", "data"}`, where `data` is the page as it now stands, and a
+refused value is a `422` `{"error": {"code": "invalid", "message", "field"}}`.
 
-| Endpoint | Returns |
+Every device has **your account**:
+
+| Endpoint | What it is |
 |---|---|
-| `GET /settings` | The pages, by group, and whether this device can open the admin ones |
-| `GET /settings/{key}` | One page: sections of facts, fields, rows and buttons. A row's page is `{key}/{id}` (`users/12`) |
-| `PATCH /settings/{key}` `{section, values}` | Saves fields, and answers with the page as it now stands. `422` names a refused field |
-| `POST /settings/{key}/actions/{name}` `{values}` | Runs a button (add, delete, pair, test, run now…). May return `secret` (a pairing code or new key, shown once), `open` (a page to go to) or `close` (the page is gone) |
+| `GET /me/account` | Username, email, role, web preferences and their choices, boosted and pinned sources, and `admin_settings` (`on`, `available` for an admin on a phone without admin access, or null) |
+| `PUT /me/account/email`, `PUT /me/account/password` | Need `current_password` |
+| `PATCH /me/account/preferences` | Any of `start_page`, `range`, `scrape_status`, `hide_single`, `analysis_layout`, `auto_read_seconds` |
 
-Keys and secrets are write-only: a page says whether one is saved and its last
-four characters. The same rules as the web pages apply, such as keeping one
-active admin. Some things stay on the web: turning the API off, turning OIDC
-sign-in on or password sign-in off (the web checks your own sign-in first),
-restarting containers, and the one-off jobs that run in the web process.
-`/me/preferences` also carries `auto_read_seconds`, so the app marks pages
-read after the same time as the web.
+A device with the `admin` scope, for a user who is still an admin, also has
+everything in the web's Settings under `/admin`:
+
+| Page | Endpoints |
+|---|---|
+| Home | `GET /admin/summary` (one line for each page) |
+| Overview | `GET /admin/overview`, `POST /admin/containers/{name}/restart` `{force}`, `POST /admin/containers/restart-all` |
+| Users | `GET`/`POST /admin/users`, `GET`/`PATCH`/`DELETE /admin/users/{id}`, `PUT /admin/users/{id}/password` |
+| API | `GET /admin/api`, `PATCH /admin/api/settings` (on or off, full text, keys, public URL, limits), `PATCH /admin/api/storage`, `POST /admin/api/pairing-codes`, `POST /admin/api/keys`, `POST /admin/api/devices/{id}/revoke`, `PUT /admin/api/devices/{id}/admin`, `POST /admin/api/devices/revoke-all` |
+| Sign-in | `GET`/`PATCH /admin/sign-in`, `POST /admin/sign-in/links`, `DELETE /admin/sign-in/links/{key}` |
+| Sections | `GET`/`POST /admin/sections`, `PATCH /admin/sections/{id}`, `PUT /admin/sections/order` |
+| Sources | `GET /admin/sources`, `POST /admin/feeds`, `PATCH`/`DELETE /admin/feeds/{id}`, `PUT /admin/sources/scan-order`, `PUT /admin/sources/priority` |
+| Searches | `GET`/`POST /admin/searches`, `PATCH`/`DELETE /admin/searches/{id}`, `PUT /admin/searches/order` |
+| Source API keys | `GET /admin/source-keys`, `PATCH /admin/source-keys/{key}` `{values, schedule}` |
+| Blocklist | `GET`/`POST /admin/blocklist`, `PATCH`/`DELETE /admin/blocklist/{table}/{id}` |
+| Scrape health | `GET /admin/scrape-health` |
+| LLM providers | `GET /admin/llm`, `PUT /admin/llm/routing`, `PUT /admin/llm/roles`, `PATCH /admin/llm/providers/{key}` `{values}`, `PUT /admin/llm/auto-deep-analysis`, `POST /admin/llm/test` `{tier}`, `GET /admin/llm/health` |
+| Prompts | `GET /admin/prompts`, `GET`/`PUT /admin/prompts/{key}`, `POST /admin/prompts/{key}/reset` |
+| Tasks | `GET /admin/tasks`, `POST /admin/tasks/{id}/run`, `PUT /admin/tasks/{id}/paused`, `POST /admin/jobs/{id}/cancel`, `POST /admin/actions/{key}` (the one-off jobs) |
+| Run schedule | `GET`/`POST /admin/schedule`, `PATCH`/`DELETE /admin/schedule/{id}` |
+| Fetch | `GET`/`POST /admin/fetch` (also open to scrapers) |
+
+An admin's phone gets the `admin` scope by ticking **Admin settings** on its
+pairing code, or later with **Allow admin settings** in the web's Settings ›
+API device list. Keys and secrets are write-only: a page says whether one is
+saved and its last four characters. Long jobs (the one-off jobs, a manual
+fetch, the AllSides sync and merging outlets) are queued for the scheduler's
+job worker, since an API request stops at 30 seconds.
+
+The `api` container needs the app's environment for these pages
+(`<<: *app-env` in docker-compose.yml), above all the same
+`CONFIG_ENCRYPTION_KEY` as the web, or a key saved from the phone could not
+be read by the scheduler. Until it has it, the API refuses to save keys and
+the Overview says why. Restarting containers also needs
+`DOCKER_RESTART_PROXY_URL`.
 
 ## Not yet
 

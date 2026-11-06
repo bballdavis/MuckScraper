@@ -7,15 +7,19 @@ All notable changes to MuckScraper are documented here.
 ## [Unreleased]
 
 ### Added
-- **Settings in the app.** `/api/v1/settings` serves settings pages that
-  MuckScroller draws natively: every reader's profile, email, password, web
-  feed defaults, web appearance and boosted sources, and for a phone paired
-  with **Admin settings** (a new `admin` scope, ticked for an admin's pairing
-  code on Settings › API) everything in the web's Settings: users, the API,
-  sign-in, sections, sources and searches, source API keys, the blocklist,
-  scrape health, LLM providers, prompts, tasks and the run schedule. Keys stay
-  write-only, and the web's rules apply. `/api/v1/me/preferences` gains
-  `auto_read_seconds` (`aggregator/api/settings_pages/`, docs/API.md).
+- **Settings in the app.** Everything in the web's Settings, for the
+  MuckScroller app to draw as its own screens: every reader's account (email,
+  password, web preferences, boosted and pinned sources) under
+  `/api/v1/me/account`, and for a phone with **Admin settings** (an `admin`
+  scope, ticked on an admin's pairing code or switched on later from
+  Settings › API's device list) the Overview and container restarts, users,
+  the API, sign-in, sections, sources and searches, source API keys and their
+  poll schedules, the blocklist, scrape health, LLM providers with spending
+  caps and test calls, prompts, tasks and one-off jobs, the run schedule and
+  manual fetches under `/api/v1/admin`. Keys stay write-only and the web's
+  rules apply. The `api` container now gets the app's environment, so a key
+  saved from the phone uses the web's encryption key (`aggregator/api/admin/`,
+  docs/API.md).
 - **Pinned sources.** A reader can pin an outlet (their profile's Pinned
   sources, or the Pin to menu button on its page), starting with The Texas
   Tribune. It gets a row under a Sources group in the sidebar, with its logo,

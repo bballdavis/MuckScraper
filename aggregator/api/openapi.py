@@ -1,6 +1,8 @@
 """The OpenAPI 3.1 description of /api/v1, served at /api/v1/openapi.json
 for generating the iOS client (swift-openapi-generator). Kept by hand next to
 routes.py and serializers.py; tests/test_api.py checks every route is in it."""
+import re
+
 from flask import jsonify
 
 from . import api, API_VERSION
@@ -230,41 +232,10 @@ SCHEMAS["DeckCard"] = {"allOf": [_ref("StorySummary"), _obj(
                     "description": "headlines: in the latest edition; more: another story from the past week"})]}
 SCHEMAS["StorySkip"] = _obj(["story_id", "skipped_at"], story_id=_I, skipped_at=_DT)
 
-# Settings pages (settings_pages/schema.py): the app draws them with native controls.
-_TONE = {"type": "string", "enum": ["ok", "warn", "bad"]}
-_VALUE = {"description": "bool (toggle), string (choice, text kinds), integer or null (number), "
-                         "array of strings (multichoice); a secret's is never sent"}
-SCHEMAS["SettingsField"] = {"type": "object", "required": ["key", "label", "type"], "properties": {
-    "key": _S, "label": _S,
-    "type": {"type": "string", "enum": ["toggle", "choice", "multichoice", "text", "url", "email", "number",
-                                        "decimal", "secret", "password", "multiline"]},
-    "value": _VALUE, "placeholder": _S, "help": _S, "unit": _S, "required": _B, "min": _I, "max": _I,
-    "choices": {"type": "array", "items": _obj(["value", "label"], value=_S, label=_S, detail=_S)},
-    "secret": _obj(["saved"], saved=_B, hint=_S, note=_S)}}
-SCHEMAS["SettingsAction"] = _obj(["key", "label"], key=_S, label=_S,
-                                 role={"type": "string", "enum": ["destructive"]}, confirm=_S,
-                                 fields={"type": "array", "items": _ref("SettingsField")})
-SCHEMAS["SettingsItem"] = _obj(["id", "title"], id=_S, title=_S, subtitle=_S, detail=_S,
-                               badge=_obj(["text"], text=_S, tone=_TONE),
-                               page={**_S, "description": "The page this row opens"},
-                               active={**_B, "description": "Draw a switch; it saves {active} to `page`"},
-                               remove={**_S, "description": "Action a swipe runs with {id}"}, remove_label=_S)
-SCHEMAS["SettingsSection"] = _obj(["key"], key=_S, title=_S, footer=_S,
-                                  facts={"type": "array", "items": _obj(["label", "value"], label=_S, value=_S,
-                                                                       tone=_TONE)},
-                                  fields={"type": "array", "items": _ref("SettingsField")},
-                                  save={"type": "string", "enum": ["auto", "form"]},
-                                  items={"type": "array", "items": _ref("SettingsItem")}, empty=_S,
-                                  reorder={**_B, "description": "Rows can be dragged; runs the reorder action with {ids}"},
-                                  actions={"type": "array", "items": _ref("SettingsAction")})
-SCHEMAS["SettingsPage"] = _obj(["key", "title", "sections"], key=_S, title=_S,
-                               notice=_obj(["text"], text=_S, tone=_TONE),
-                               sections={"type": "array", "items": _ref("SettingsSection")})
-SCHEMAS["SettingsResult"] = _obj([], page=_ref("SettingsPage"), message=_S,
-                                 close={**_B, "description": "Go back: the page is gone"},
-                                 open={**_S, "description": "A page to open next, such as a row just added"},
-                                 secret=_obj(["title", "value"], title=_S, value=_S, note=_S,
-                                             link={**_S, "description": "A pairing link to show as a QR code"}))
+SCHEMAS["Invalid"] = _obj(["error"], error=_obj(["code", "message"], code={"type": "string", "enum": ["invalid"]},
+                                                 message=_S, field={**_S, "description": "The value refused"}))
+SCHEMAS["SettingsWrite"] = _obj(["data"], message=_S, data={
+    "type": ["object", "null"], "description": "The resource as it now stands, as its GET returns it"})
 
 
 def _json(schema, description="OK"):
@@ -482,33 +453,30 @@ PATHS = {
     "/me/schedules/run": {"post": {
         "operationId": "runSchedule", "description": "Needs the summarize scope. Runs the schedule once, now.",
         "responses": {"202": _json(_obj(["run_id", "added"], run_id=_S, added=_I), "Run queued"), **_ERRORS}}},
-    "/settings": _get("settings", _json(_obj(
-        ["groups", "admin", "admin_available"],
-        groups={"type": "array", "items": _obj(["key", "title", "pages"], key=_S, title=_S, pages={
-            "type": "array", "items": _obj(["key", "title", "icon"], key=_S, title=_S, icon=_S, detail=_S)})},
-        admin={**_B, "description": "This device can open the admin pages"},
-        admin_available={**_B, "description": "An admin on a device paired without admin access"}))),
-    "/settings/{key}": {
-        **_get("settingsPage", _json(_ref("SettingsPage")),
-               [{"name": "key", "in": "path", "required": True, "schema": _S,
-                 "description": "A page key, or a key and a row id (users/12)"}], _NOT_FOUND),
-        "patch": {"operationId": "saveSettingsPage",
-                  "description": "Admin pages need the admin scope. 422 names the field that was refused.",
-                  "parameters": [{"name": "key", "in": "path", "required": True, "schema": _S}],
-                  "requestBody": {"required": True, "content": {"application/json": {"schema": _obj(
-                      ["values"], section=_S, values={"type": "object"})}}},
-                  "responses": {"200": _json(_ref("SettingsResult")), **_ERRORS, **_NOT_FOUND,
-                                "422": _json(_ref("Error"), "A value was refused")}},
-    },
-    "/settings/{key}/actions/{name}": {"post": {
-        "operationId": "runSettingsAction",
-        "parameters": [{"name": "key", "in": "path", "required": True, "schema": _S},
-                       {"name": "name", "in": "path", "required": True, "schema": _S}],
-        "requestBody": {"required": True, "content": {"application/json": {"schema": _obj(
-            [], values={"type": "object"})}}},
-        "responses": {"200": _json(_ref("SettingsResult")), **_ERRORS, **_NOT_FOUND,
-                      "422": _json(_ref("Error"), "A value was refused")}}},
 }
+
+
+def _settings_paths():
+    """The account and admin routes (api/admin/), from their own list, so
+    every one is in the spec. Each answers JSON; a write answers
+    SettingsWrite and a refused value Invalid (422)."""
+    from .admin import ROUTES
+    paths = {}
+    for path, method, op_id, description in ROUTES:
+        params = [{"name": name, "in": "path", "required": True, "schema": _S}
+                  for name in re.findall(r"{(\w+)}", path)]
+        ok = _json({"type": "object"}) if method == "get" else _json(_ref("SettingsWrite"))
+        responses = {"200": ok, **_ERRORS, **_NOT_FOUND, "422": _json(_ref("Invalid"), "A value was refused")}
+        if path.startswith("/admin"):
+            responses["403"] = _json(_ref("Error"), "Needs a device paired with admin access")
+        op = {"operationId": op_id, "parameters": params, "description": description, "responses": responses}
+        if method != "get":
+            op["requestBody"] = {"required": False, "content": {"application/json": {"schema": {"type": "object"}}}}
+        paths.setdefault(path, {})[method] = op
+    return paths
+
+
+PATHS.update(_settings_paths())
 
 SPEC = {
     "openapi": "3.1.0",

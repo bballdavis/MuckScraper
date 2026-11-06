@@ -24,6 +24,11 @@ with app.app_context():
     try:
         from aggregator.blueprints.admin import reconcile_orphaned_task_statuses
         reconcile_orphaned_task_statuses()
+        # So the API container can check it holds the same encryption key
+        # before it saves an API key (aggregator/secret_box.py).
+        from aggregator import secret_box
+        secret_box.write_canary()
+        db.session.commit()
     except (sqlalchemy.exc.OperationalError, sqlalchemy.exc.ProgrammingError):
         # Normal on a first install: Postgres is still starting, or the tables
         # don't exist until bootstrap_admin.py creates them. Nothing to clean up.

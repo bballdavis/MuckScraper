@@ -158,14 +158,25 @@
                         {%- elif not d.user.is_active %}<span class="chip chip-danger">User disabled</span>
                         {%- else %}<span class="chip chip-safe">Active</span>{% endif %}
                     </td>
-                    <td>
+                    <td><div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+                        {%- if d.is_live and d.kind != 'key' and d.user.role == 'admin' %}
+                        <form method="POST" action="{{ url_for('admin.set_api_device_admin', device_id=d.id) }}" title="Lets this phone change the server's settings from the app's Settings.">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            {%- if 'admin' in d.scope_list %}
+                            <button type="submit" class="btn btn-quiet">Turn off admin</button>
+                            {%- else %}
+                            <input type="hidden" name="admin" value="on">
+                            <button type="submit" class="btn btn-quiet">Allow admin settings</button>
+                            {%- endif %}
+                        </form>
+                        {%- endif %}
                         {%- if d.is_live %}
                         <form method="POST" action="{{ url_for('admin.revoke_api_device', device_id=d.id) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-quiet">Sign out</button>
                         </form>
                         {%- endif %}
-                    </td>
+                    </div></td>
                 </tr>
             {%- endfor %}
             </tbody>

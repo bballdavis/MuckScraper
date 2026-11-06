@@ -241,6 +241,10 @@ BULK_TASK_FUNCTIONS = {
     "reclassify_articles": "news_fetcher.fetch_and_store_articles:reclassify_all_articles",
     "audit_scrapes": "news_fetcher.fetch_and_store_articles:audit_existing_scrapes",
     "scrape_all_missing": "aggregator.blueprints.admin.articles:_scrape_all_missing_task",
+    # The web runs these two in its request; the app queues them, since the
+    # API container's requests stop at 30 seconds.
+    "sync_allsides": "news_fetcher.fetch_and_store_articles:sync_allsides_ratings",
+    "merge_outlets": "news_fetcher.fetch_and_store_articles:merge_duplicate_outlets",
 }
 
 
@@ -277,6 +281,55 @@ def _fail_bulk_task(payload, message):
 
 
 jobs.register("bulk_task", _run_bulk_task, _fail_bulk_task)
+
+
+def _run_manual_fetch(payload):
+    """Job handler for a manual fetch started from the app (Settings ›
+    Fetch). The web's Fetch page runs the same call in its own request."""
+    from . import MANUAL_FETCH_STATUS_KEY
+    from news_fetcher.fetch_and_store_articles import fetch_and_store_articles
+    label = payload.get("label") or "Custom"
+    started_at = (_load_json_setting(MANUAL_FETCH_STATUS_KEY) or {}).get("started_at") or datetime.utcnow().isoformat()
+    try:
+        fetch_and_store_articles(
+            topic_name=label,
+            mode=payload.get("mode") or "top",
+            query=payload.get("query"),
+            country=payload.get("country"),
+            category=payload.get("category"),
+            sources=payload.get("sources"),
+            gnews_query=payload.get("gnews_query"),
+            gnews_category=payload.get("gnews_category"),
+        )
+    finally:
+        _save_json_setting(MANUAL_FETCH_STATUS_KEY, {
+            "status": "idle", "started_at": started_at, "label": label,
+            "finished_at": datetime.utcnow().isoformat(),
+        })
+
+
+def _fail_manual_fetch(payload, message):
+    from . import MANUAL_FETCH_STATUS_KEY
+    status = _load_json_setting(MANUAL_FETCH_STATUS_KEY) or {}
+    _save_json_setting(MANUAL_FETCH_STATUS_KEY, {
+        "status": "idle", "started_at": status.get("started_at"), "label": payload.get("label") or "Custom",
+        "finished_at": datetime.utcnow().isoformat(), "error": message,
+    })
+
+
+def start_manual_fetch(params):
+    """Queue a manual fetch for the job worker. False when one is already
+    running (from the web or the app)."""
+    from . import MANUAL_FETCH_STATUS_KEY
+    claimed = _try_claim_task_status(MANUAL_FETCH_STATUS_KEY, {
+        "status": "running", "started_at": datetime.utcnow().isoformat(), "label": params.get("label") or "Custom",
+    })
+    if claimed:
+        jobs.enqueue("manual_fetch", params, priority=BULK_TASK_PRIORITY)
+    return claimed
+
+
+jobs.register("manual_fetch", _run_manual_fetch, _fail_manual_fetch)
 jobs.register("ai_task", _run_ai_task, _fail_ai_task)
 
 # Clicked on one story or article and watched, so ahead of bulk actions.

@@ -30,6 +30,8 @@ BULK_TASK_ACTIONS = {
     "force_resummarize",
     "reclassify_articles",
     "audit_scrapes",
+    "sync_allsides",
+    "merge_outlets",
 }
 
 # Submodule imports must come after the constants above (they depend on

@@ -54,3 +54,38 @@ def decrypt(token):
     except (InvalidToken, ValueError) as e:
         logger.warning("[secret_box] Could not decrypt a saved secret (%s); was the key changed?", type(e).__name__)
         return None
+
+
+# A value the web app encrypts at start (aggregator/app.py), so another
+# process can tell whether it holds the same key before it saves a secret.
+# The API runs in its own container: without CONFIG_ENCRYPTION_KEY there, a
+# key saved from the app would be one the scheduler can't read.
+CANARY_KEY = "secret_box_canary_v1"
+_CANARY_TEXT = "muckscraper-canary"
+
+
+def write_canary():
+    """Store the canary under this process's key, unless it already reads.
+    The caller commits."""
+    from aggregator import db
+    from aggregator.models import AppSetting
+    row = db.session.get(AppSetting, CANARY_KEY)
+    if row is not None and decrypt(row.value) == _CANARY_TEXT:
+        return
+    if row is None:
+        row = AppSetting(key=CANARY_KEY)
+        db.session.add(row)
+    row.value = encrypt(_CANARY_TEXT)
+
+
+def same_key_as_web():
+    """Whether secrets this process saves can be read by the web app and the
+    scheduler. Without a canary yet, any saved secret that still reads (or
+    none saved at all) is taken as yes."""
+    from aggregator import db
+    from aggregator.models import AppSetting, ConfigSetting
+    row = db.session.get(AppSetting, CANARY_KEY)
+    if row is not None:
+        return decrypt(row.value) == _CANARY_TEXT
+    saved = ConfigSetting.query.filter(ConfigSetting.secret_value.isnot(None)).limit(5).all()
+    return not saved or any(decrypt(r.secret_value) is not None for r in saved)
