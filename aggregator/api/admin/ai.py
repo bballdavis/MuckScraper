@@ -11,6 +11,7 @@ from flask import g, jsonify
 from aggregator import config_store, db, secret_box
 from aggregator.models import PromptTemplate
 
+from .. import serializers as ser
 from ..errors import ApiError
 from . import config_fields, reply, route
 from . import values as v
@@ -233,7 +234,7 @@ def _title(key):
 
 def _prompt_row(p):
     return {"key": p.key, "title": _title(p.key), "description": p.description, "edited": p.updated_at is not None,
-            "updated_at": p.updated_at.isoformat() + "Z" if p.updated_at else None}
+            "updated_at": ser.iso(p.updated_at)}
 
 
 def _prompt_detail(p, warning=None):

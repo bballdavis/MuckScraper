@@ -380,7 +380,9 @@ def _api_page():
             "public_url": config["public_url"],
             "limits": {name: config[name] for name in LIMIT_LABELS},
         },
-        "limit_fields": [{"key": k, "label": label} for k, label in LIMIT_LABELS.items()],
+        # A list, beside the limits object, so a client that converts key
+        # case can still match each limit to its value.
+        "limit_fields": [{"key": k, "label": label, "value": config[k]} for k, label in LIMIT_LABELS.items()],
         "live_count": sum(1 for d in devices if d.is_live),
         "pending_codes": pending,
         "last_request": ser.iso(max((d.last_used_at for d in devices if d.last_used_at), default=None)),
@@ -449,7 +451,7 @@ def _formatted_code(code):
 
 @route("/admin/api/pairing-codes", methods=("POST",))
 def create_pairing():
-    """{user_id, admin}: a one-time pairing code, its display form and the QR link."""
+    """{user_id, admin, site, server}: a one-time pairing code, its display form and the QR link."""
     from aggregator.blueprints.admin.api_access import pairing_link
     values = v.body()
     user = _active_user(values)
@@ -459,13 +461,20 @@ def create_pairing():
             raise Invalid(f"{user.username} isn't an admin, so their phone can't have admin settings.", "admin")
         scopes.append(ADMIN_SCOPE)
     code, row = create_pairing_code(user, scopes, g.user.username)
-    server = api_settings.load(fresh=True)["public_url"].rstrip("/")
-    site = (values.get("site") or "").strip() if isinstance(values.get("site"), str) else ""
+    def address(key):
+        value = values.get(key)
+        value = value.strip().rstrip("/") if isinstance(value, str) else ""
+        return value if value.startswith(("https://", "http://")) else ""
+
+    # The phone making the code knows both addresses, so a server without a
+    # public address set still gets a link another phone can pair from.
+    server = api_settings.load(fresh=True)["public_url"].rstrip("/") or address("server")
+    site = address("site")
     db.session.commit()
     return jsonify({
         "code": code,
         "display": _formatted_code(code),
-        "link": pairing_link(code, server, site if site.startswith(("https://", "http://")) else None),
+        "link": pairing_link(code, server, site or None),
         "username": user.username,
         "admin": ADMIN_SCOPE in scopes,
         "expires_at": ser.iso(row.expires_at),
