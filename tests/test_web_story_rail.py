@@ -1,4 +1,4 @@
-"""The story page's round rail buttons (Philip, 2026-10-23): under the read
+"""The story page's round rail buttons: under the read
 toggle, editors get Generate executive summary and Generate multi-source
 analysis while each is still to be generated; each goes once it exists.
 
@@ -95,7 +95,7 @@ class StoryRailTests(unittest.TestCase):
         self.assertIn("read-toggle", rail)
 
     # While a summary or analysis is written, ai_tasks.js puts a skeleton in
-    # that section's [data-ai-slot] (Philip, 2026-10-27). Editors get the
+    # that section's [data-ai-slot]. Editors get the
     # script and a slot per section; readers can't generate, so no script.
     def _page(self, path, user="editor"):
         client = self.web.test_client()

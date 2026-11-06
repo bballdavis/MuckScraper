@@ -99,7 +99,7 @@
                 {%- endif %}
             </section>
 
-            {#- Appearance (Philip, 2026-10-23): the story page's analysis
+            {#- Appearance: the story page's analysis
                 layout, Cards by default. Saves on change. -#}
             <form class="panel" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -121,7 +121,7 @@
                 <noscript><div class="panel-foot"><button type="submit" class="btn">Save</button></div></noscript>
             </form>
 
-            {#- Reading (Philip, 2026-10-25): auto mark-as-read on story and
+            {#- Reading: auto mark-as-read on story and
                 article pages after this long with the tab visible (reading_prefs.py,
                 static/js/reads.js). Saves on change. -#}
             <form class="panel" method="POST">
@@ -144,7 +144,7 @@
                 <noscript><div class="panel-foot"><button type="submit" class="btn">Save</button></div></noscript>
             </form>
 
-            {#- Boosted sources (Philip, 2026-10-30): stories from these outlets show in
+            {#- Boosted sources: stories from these outlets show in
                 Trending even when no other outlet has picked them up, and come first in
                 Latest and the Swipe deck (aggregator/source_priority.py). Each row is its
                 own form, since a remove button needs its own name. -#}
@@ -180,7 +180,7 @@
                 {%- endfor %}
             </section>
 
-            {#- Pinned sources (Philip, 2026-11-01): each gets a row in the menu's Sources group
+            {#- Pinned sources: each gets a row in the menu's Sources group
                 and a page of its own stories (aggregator/pinned_sources.py). -#}
             <section class="panel boost-sources">
                 <div class="panel-head">

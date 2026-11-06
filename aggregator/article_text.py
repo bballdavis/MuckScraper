@@ -5,7 +5,7 @@ publisher's feed teaser or a short bit is stored, and "none" when it is
 headline only: a paywall, a blocked site (reuters.com) or a feed with no
 description. A story with no article long enough to summarize can't get a
 summary, so the app says it is headline only instead of offering Summarize
-(Philip, 2026-10-27).
+.
 """
 import re
 

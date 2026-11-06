@@ -1,6 +1,6 @@
 /* Rate lean dialog (static/js/lean_modal.js): one Left-to-Right scale with
    the AI's pick filled in and its reason underneath; picking another lean
-   says so and opens a note. A bottom sheet on phones. Philip picked this
+   says so and opens a note. A bottom sheet on phones. This was picked
    layout (option B) on 2026-10-25. */
 .lean-modal {
     width: min(460px, calc(100vw - 32px));

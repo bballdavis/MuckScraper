@@ -1,6 +1,6 @@
 """Per-user reading choices, set under Reading on the profile page.
 
-For now just auto mark-as-read (Philip, 2026-10-25): once a story or article
+For now just auto mark-as-read: once a story or article
 page has been in front of the reader for this many seconds (counting only
 while the tab is visible), static/js/reads.js marks it read and shows a toast
 with Undo. 0 turns it off. Stored like appearance_prefs, as one JSON

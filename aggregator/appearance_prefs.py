@@ -1,6 +1,6 @@
 """Per-user appearance choices, set under Appearance on the profile page.
 
-For now just the story page's analysis layout (Philip, 2026-10-23): Cards
+For now just the story page's analysis layout: Cards
 (the default) or Sections. Stored like feed_prefs, as one JSON AppSetting per
 user (`appearance_v1:<user id>`), so it needs no migration. Signed-out
 visitors get the defaults.

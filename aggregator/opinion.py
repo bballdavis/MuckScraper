@@ -114,8 +114,8 @@ def published_edition_opinion_cards(edition):
 class OpinionCard:
     """An OpinionPiece shaped like a one-article Story, so the Op/Ed page's
     Latest list draws it with the same compact story_card as a single-article
-    story on All Stories (Philip, 2026-10-27: "structurally we don't want to
-    be doing that much different here"). The card leaves out the Breaking
+    story on All Stories, so the two lists stay one structure. The card
+    leaves out the Breaking
     tag and the AI actions for it (`is_opinion`)."""
 
     is_opinion = True

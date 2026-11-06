@@ -1,5 +1,5 @@
 # news_fetcher/image_focus.py
-"""Where a photo's subject is, so crops keep it in frame (Philip, 2026-10-27).
+"""Where a photo's subject is, so crops keep it in frame.
 
 Cards, the article page and the iOS app crop every photo to their own shape,
 and a center crop of a tall photo of a person cuts off their head. Each

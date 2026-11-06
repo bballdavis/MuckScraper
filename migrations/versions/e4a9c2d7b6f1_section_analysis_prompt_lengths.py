@@ -1,7 +1,7 @@
 """Section analysis prompts ask for long sections first and one or two
 sentences in the short ones, so the story page and the iOS app can stack the
 long ones and put the short ones side by side; business moves its analysts
-section after the broader picture (Philip, 2026-10-29).
+section after the broader picture.
 
 Only prompts that were never edited are replaced: an edited prompt keeps its
 text and can still reset to the new default.

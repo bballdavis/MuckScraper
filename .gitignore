@@ -62,3 +62,8 @@ SoakReports/
 reviewer/
 quality_check.py
 QualityReports/
+
+# Local JS dependencies and generated docs output; never commit these
+node_modules/
+website/build/
+website/.docusaurus/

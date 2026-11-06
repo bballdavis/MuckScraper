@@ -6,7 +6,7 @@ forty articles ends up in nearly every topic: one piece mentions the markets
 and it is in Buss/Fin, one classifier miss and it is in Other. Filtering a
 section by `Story.topics` alone therefore filled Sports, Sci/Tech and Other
 with the same big stories Headlines leads with, newest first, and the
-section looked like Headlines (Philip, 2026-10-27).
+section looked like Headlines.
 
 A story belongs in a section when at least a third of its articles carry the
 topic themselves. A story whose articles carry no topics at all (older rows,

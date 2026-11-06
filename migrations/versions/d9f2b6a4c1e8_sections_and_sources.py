@@ -5,7 +5,7 @@ Revision ID: d9f2b6a4c1e8
 Revises: a7c3e9f1b5d2
 Create Date: 2026-10-27
 
-Philip (2026-10-27): the Topics settings didn't match the sidebar, a section
+the Topics settings didn't match the sidebar, a section
 like Sports was only "fed" by one NewsAPI search, and the source settings were
 hard to follow. Sections (the `topics` table) are now the one list everything
 hangs off (aggregator/sources.py):

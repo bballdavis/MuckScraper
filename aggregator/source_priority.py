@@ -5,7 +5,7 @@ The Texas Tribune is the first. Most of its stories are Texas-specific, so
 they rarely reach the three outlets Trending asks for, and the Swipe deck
 (which orders by source count) sank them.
 
-Two layers (Philip, 2026-10-30):
+Two layers:
 - The admin's list (Settings › Sources): one AppSetting, a JSON list of outlet
   names. Until it is saved, DEFAULT_NAMES. Every reader gets these.
 - Each reader's own changes (the profile page, or the API): one AppSetting

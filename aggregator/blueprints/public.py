@@ -46,7 +46,7 @@ def index():
 def headlines_feed():
     """
     Headlines: Trending, Latest or Controversial (?view=, headline_views.py),
-    read live (Philip, 2026-10-24). Before that it showed the newest edition
+    read live. Before that it showed the newest edition
     in its stored rank, which without a ranker was selection order.
 
     ?edition=<id> shows a published edition (Regis, 2026-10-18), its stories

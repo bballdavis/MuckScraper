@@ -265,9 +265,9 @@ def deep_report_type(story):
 
     detect_analysis_type(), except that a general story ('default') with at
     least one bias-rated source gets the politics prompt's left / center /
-    right breakdown too (Philip, 2026-10-25: a West Bank story came out as
+    right breakdown too; with the general prompt such a story came out as
     Why it matters / Key details / Different perspectives instead of the
-    L/C/R the story page is built around). Science, sports and business keep
+    L/C/R the story page is built around. Science, sports and business keep
     their own formats; a story with no rated sources keeps the general one,
     since all three buckets would be empty.
     """
