@@ -5,8 +5,9 @@ Revises: c5d2e8a1f7b4
 Create Date: 2026-10-25
 
 The story page offers Regenerate for the summary or the multi-source
-analysis only when sources have arrived since it was written. The summary already has summary_generated_at; this is the
-analysis's. Existing rows stay NULL and fall back to summary_generated_at.
+analysis only when sources have arrived since it was written. The summary
+already has summary_generated_at; this is the analysis's. Existing rows
+stay NULL and fall back to summary_generated_at.
 """
 from alembic import op
 import sqlalchemy as sa

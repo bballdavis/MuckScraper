@@ -786,7 +786,8 @@ def test_matching_claim_links_an_existing_account_once(app, flow):
 
 def test_matching_claim_by_custom_claim_and_username(app, flow):
     with app.app_context():
-        db.session.add(User(username="reader", email="reader@example.com", role="scraper", is_active=True))
+        db.session.add(User(username="reader", email="reader@example.com",
+                            role="scraper", is_active=True))
         db.session.commit()
     configure(app, match_claim="nickname")
     _, start, finish = flow

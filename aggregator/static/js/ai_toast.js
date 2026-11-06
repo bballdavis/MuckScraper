@@ -1,5 +1,6 @@
 /* Progress for the AI tasks (summaries, multi-source analysis) as a toast at
- * the bottom of the screen, like the read Undo toast. Pages call aiToast(message, isError);
+ * the bottom of the screen, like the read Undo toast, rather than a box at
+ * the top of the page. Pages call aiToast(message, isError);
  * it stays while the task runs (the page reloads when it is done) and an
  * error fades after a few seconds. Styles: theme.css .ai-toast. */
 (function () {

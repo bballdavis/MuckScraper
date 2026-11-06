@@ -1,6 +1,6 @@
 /* The story page's multi-source analysis (templates/story_analysis.html):
    Cards (default) and Sections, picked under Appearance on the profile page
-. Bias colours come from theme.css. */
+   (Philip, 2026-10-23). Bias colours come from theme.css. */
 
 .sa {
     --sa-l-tint: rgba(26, 107, 181, 0.07);

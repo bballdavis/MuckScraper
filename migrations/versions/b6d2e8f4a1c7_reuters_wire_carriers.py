@@ -5,9 +5,10 @@ Revises: f3c8a1d6e2b9
 Create Date: 2026-10-27
 
 reuters.com answered 401 to 144 article fetches in 48 hours, its robots.txt
-disallows the article paths, and its terms forbid scraping. A permanent scrape_blocklist row makes Reuters headline-only,
-like the hard paywalls, so nothing fetches reuters.com any more. Its
-headlines still come from the Google News site:reuters.com feed.
+disallows the article paths, and its terms forbid scraping. A permanent
+scrape_blocklist row makes Reuters headline-only, like the hard paywalls,
+so nothing fetches reuters.com any more. Its headlines still come from the
+Google News site:reuters.com feed.
 
 The text comes from sites licensed to republish the Reuters wire instead
 (news_fetcher/wire_carriers.py): three Google News feeds, and two article

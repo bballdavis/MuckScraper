@@ -137,8 +137,9 @@
 /* Grade and lean as one split pill (story_card_macros.html grade_pill;
    the grade on the left in an outlined half, the lean
    chip as the whole right half, its colour running to the pill's outer
-   edge. One tip for the whole pill, like the iOS app's popover, above it and right-aligned by default; story cards open it
-   left-aligned, since the pill starts their bottom row. A tap focuses the
+   edge. One tip for the whole pill, like the iOS app's popover, above it
+   and right-aligned by default; story cards open it left-aligned, since
+   the pill starts their bottom row. A tap focuses the
    pill, so :focus opens it too on touch screens. It sits above a compact
    card's stretched headline link. */
 .grade-pill {
@@ -482,7 +483,8 @@ a.pg-step:hover, a.pg-num:hover, .pg-more:hover { background: var(--btn-muted-bg
 }
 
 /* Touch screens: iOS Safari zooms the page in when a field under 16px takes
-   focus and leaves it zoomed, so the page no longer fits the screen. Fields go to 16px there instead of turning pinch-zoom off.
+   focus and leaves it zoomed, so the page no longer fits the screen.
+   Fields go to 16px there instead of turning pinch-zoom off.
    !important so it wins over each page's own smaller field sizes. */
 @media (hover: none) and (pointer: coarse) {
     input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),

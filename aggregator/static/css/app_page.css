@@ -3,7 +3,7 @@
  * section inside it (templates/settings_base.html). Linked after theme.css
  * and feed_header.css.
  *
- * Compact, per the settings mock: 3px corners on
+ * Compact, per the settings mock (Philip, 2026-10-22): 3px corners on
  * buttons, inputs, chips and bars; panels with a hairline border and a
  * small radius; selected items get a full fill, never a side border.
  */

@@ -46,8 +46,8 @@
     color: var(--text-faint); font-size: 40px;
 }
 
-/* The outlet's name on fallback tiles is set like a newspaper nameplate
-. Playfair Display, OFL, served from static/fonts. */
+/* The outlet's name on fallback tiles is set like a newspaper nameplate:
+   Playfair Display, OFL, served from static/fonts. */
 @font-face {
     font-family: "Playfair Display";
     src: url("../fonts/playfair-display-latin-800-normal.woff2") format("woff2");

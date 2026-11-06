@@ -27,7 +27,7 @@ public = Blueprint("public", __name__)
 
 @public.route("/")
 def index():
-    # Land on Headlines (the more natural starting page).
+    # Land on Headlines (Regis, 2026-10-04: the more natural starting page).
     if current_user.is_authenticated:
         # The start page the reader chose on their profile (feed_prefs.py).
         start = feed_prefs.load(current_user)["start_page"]

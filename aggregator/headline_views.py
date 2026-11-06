@@ -1,5 +1,6 @@
-"""Headlines' three views: Trending, Latest and Controversial. Read live from the database rather than from the twice-daily
-edition, which still drives automatic summaries and stays under Past editions.
+"""Headlines' three views: Trending, Latest and Controversial. Read live
+from the database rather than from the twice-daily edition, which still
+drives automatic summaries and stays under Past editions.
 
 - Trending: 3+ outlets with an article in the last 24 hours, ranked by
   story_rank's headline score (outlets, both-sides bonus, recent outlets,
@@ -16,7 +17,8 @@ edition, which still drives automatic summaries and stays under Past editions.
 Outlets are counted without copies (aggregator/article_copies.py), and lean
 is the article's score, else its outlet's, like story_rank.
 
-Each section (topic) has the same three views of its own stories: build(topic_id=) keeps the stories tagged with that topic.
+Each section (topic) has the same three views of its own stories:
+build(topic_id=) keeps the stories tagged with that topic.
 """
 from collections import namedtuple
 from datetime import datetime, timedelta
