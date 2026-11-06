@@ -1,10 +1,11 @@
 """The API: JSON under /api/v1, for the MuckScroller app and any other client.
 
 Served only by its own app (aggregator/api_app.py), which registers this
-blueprint and nothing else, so the internet-facing process has no admin,
-login or web pages to reach. Clients authenticate with bearer tokens: a phone
-gets one through a one-time pairing code, and anything else through an API
-key, both from Settings › API in the web app.
+blueprint and nothing else, so the internet-facing process has no login or
+web pages to reach. The server's settings are reachable only from a device
+paired with the "admin" scope (settings_pages/). Clients authenticate with
+bearer tokens: a phone gets one through a one-time pairing code, and anything
+else through an API key, both from Settings › API in the web app.
 """
 from flask import Blueprint, request
 
@@ -32,4 +33,4 @@ def _api_error(e):
     return error_response(e.status, e.code, e.message, e.headers)
 
 
-from . import routes, me_routes, read_routes, skip_routes, article_routes, bookmark_routes, breaking_routes, headline_routes, openapi  # noqa: E402,F401
+from . import routes, me_routes, read_routes, skip_routes, article_routes, bookmark_routes, breaking_routes, headline_routes, settings_pages, openapi  # noqa: E402,F401

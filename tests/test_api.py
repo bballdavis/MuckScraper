@@ -454,7 +454,8 @@ class ApiEndToEndTests(unittest.TestCase):
         token = self._pair()
         headers = {"Authorization": f"Bearer {token}"}
         r = self.client.put("/api/v1/me/preferences", json={"range": "24h", "hide_single": True}, headers=headers)
-        self.assertEqual(r.get_json(), {"start_page": "headlines", "range": "24h", "hide_single": True})
+        self.assertEqual(r.get_json(), {"start_page": "headlines", "range": "24h", "hide_single": True,
+                                        "auto_read_seconds": 45})
         r = self.client.put("/api/v1/me/preferences", json={"scrape_status": "failed"}, headers=headers)
         self.assertEqual(r.status_code, 400)
         self.assertEqual(self._get("/api/v1/me/preferences", token).get_json()["range"], "24h")

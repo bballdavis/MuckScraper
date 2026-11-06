@@ -47,7 +47,7 @@
     <div class="pairing">
         <div class="qr" aria-hidden="true">{{ pairing.qr }}</div>
         <div class="pairing-text">
-            <span class="row-sub">Code for {{ pairing.username }}</span>
+            <span class="row-sub">Code for {{ pairing.username }}{% if pairing.admin %}, with admin settings{% endif %}</span>
             <span class="pair-code">{{ pairing.display }}</span>
             <span class="row-sub">Expires {{ pairing.expires_at | local_datetime }}. It is shown only now.</span>
             {%- if not pairing.server %}
@@ -65,6 +65,10 @@
                 <option value="{{ u.id }}"{% if u.id == current_user.id %} selected{% endif %}>{{ u.username }} ({{ u.role_label }})</option>
                 {%- endfor %}
             </select>
+        </label>
+        <label class="pair-user" title="Lets the phone change the server's settings (users, sources, LLM providers and the rest) from the app's Settings. Only for an admin's phone.">
+            <input type="checkbox" name="admin">
+            <span class="row-label">Admin settings</span>
         </label>
         <button type="submit" class="btn">Create pairing code</button>
     </form>
@@ -142,7 +146,7 @@
             {%- for d in devices %}
                 <tr{% if not d.is_live %} class="muted"{% endif %}>
                     <td>{{ d.name }}</td>
-                    <td>{{ 'API key' if d.kind == 'key' else 'Paired device' }}</td>
+                    <td>{{ 'API key' if d.kind == 'key' else 'Paired device' }}{% if 'admin' in d.scope_list %} <span class="chip">Admin</span>{% endif %}</td>
                     <td>{{ d.user.username }}</td>
                     <td>{{ d.created_at | local_datetime }}</td>
                     <td>{{ d.last_used_at | local_datetime if d.last_used_at else '—' }}</td>
