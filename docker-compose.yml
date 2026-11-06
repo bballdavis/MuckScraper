@@ -6,7 +6,7 @@ x-app-image: &app-image
   build: .
   image: muckscraper-app
 
-# Environment shared by app and scheduler. Add a new provider key here once.
+# Environment shared by app, scheduler, api and capture. Add a new provider key here once.
 x-app-env: &app-env
     FLASK_APP: aggregator.app
     SECRET_KEY: ${SECRET_KEY}
@@ -140,9 +140,12 @@ services:
     ports:
       - "${API_BIND:-127.0.0.1}:${API_PORT:-5050}:5050"
     environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
-      SECRET_KEY: ${SECRET_KEY}
+      # The app's own environment, so the app's admin settings see the same
+      # providers, keys and CONFIG_ENCRYPTION_KEY as the web: a key saved from
+      # the phone has to be one the scheduler can read.
+      <<: *app-env
       DISPLAY_TIMEZONE: ${DISPLAY_TIMEZONE:-UTC}
+      DOCKER_RESTART_PROXY_URL: http://docker-restart-proxy:5001
       # Reverse proxies or tunnels in front of the API; 0 when none.
       API_PROXY_HOPS: ${API_PROXY_HOPS:-1}
       API_CLIENT_IP_HEADER: ${API_CLIENT_IP_HEADER:-}

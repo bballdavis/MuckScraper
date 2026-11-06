@@ -184,7 +184,7 @@ def create_api_pairing_code():
         return redirect(url_for("admin.api_page"))
     scopes = list(API_SCOPES)
     if request.form.get("admin") == "on":
-        # Admin settings in the app (aggregator/api/settings_pages/): only
+        # Admin settings in the app (aggregator/api/admin/): only
         # for an admin, and only when asked for, so a lost reader's phone
         # can never reach them.
         if user.role != ROLE_ADMIN:
@@ -233,6 +233,26 @@ def revoke_api_device(device_id):
         device.revoked_at = datetime.utcnow()
         db.session.commit()
         flash(f"Signed out {device.name} ({device.user.username}).", "success")
+    return redirect(url_for("admin.api_page") + "#devices")
+
+
+@admin.route("/settings/api/devices/<int:device_id>/admin", methods=["POST"])
+@role_required(ROLE_ADMIN)
+def set_api_device_admin(device_id):
+    """Give an admin's paired phone the app's admin settings, or take them
+    away, without pairing it again."""
+    device = ApiDevice.query.get_or_404(device_id)
+    on = request.form.get("admin") == "on"
+    if device.kind == "key":
+        flash("API keys can't have admin settings.", "error")
+    elif on and (device.user is None or device.user.role != ROLE_ADMIN):
+        flash(f"{device.user.username} isn't an admin, so their phone can't have admin settings.", "error")
+    else:
+        scopes = [s for s in device.scope_list if s != ADMIN_SCOPE] + ([ADMIN_SCOPE] if on else [])
+        device.scopes = " ".join(scopes)
+        db.session.commit()
+        flash(f"{device.name} {'can now' if on else 'can no longer'} change the server's settings from the app.",
+              "success")
     return redirect(url_for("admin.api_page") + "#devices")
 
 
